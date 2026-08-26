@@ -1,0 +1,47 @@
+services:
+  media-server:
+    build: .
+    container_name: live-media-server
+    ports:
+      - "8080:8080" # HTTP & WebSocket
+      - "50000-50050:50000-50050/udp" # WebRTC Media Ports
+    environment:
+      - PORT=8080
+      - SERVER_ROLE=origin
+      - SERVER_ID=origin-server-1
+      - PUBLIC_IP=192.168.0.116
+      - SERVER_SECRET=super_secret_cascade_key_123
+      - SERVER_PUBLIC_ADDR=ws://192.168.0.116:8080/ws
+      - REDIS_ADDR=redis:6379
+      - TURN_URL=turn:192.168.0.116:3478
+      - TURN_USERNAME=myuser
+      - TURN_PASSWORD=mypassword
+    depends_on:
+      - redis
+      - turn-server
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: live-media-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  turn-server:
+    image: coturn/coturn
+    container_name: coturn-server
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+    command:
+      - turnserver
+      - -a
+      - -o
+      - -v
+      - -n
+      - --no-dtls
+      - --no-tls
+      - -u=myuser:mypassword
+      - -r=myrealm.com
+    restart: unless-stopped
