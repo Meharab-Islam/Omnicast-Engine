@@ -11,11 +11,12 @@
   "9": "webrtc.go",
   "10": "models.go",
   "11": "RoomManager",
-  "12": "main",
+  "12": "api/auth.go",
   "13": "🚀 Go Live Media Server (SFU & Interactive Streaming)",
   "14": "CascadeManager",
   "15": "HandleCoHostConnection",
   "16": "LiveRoomClient",
-  "17": "LiveRoomClient",
-  "18": "live-media-server"
+  "17": "main",
+  "18": "live-media-server",
+  "19": "LiveRoomClient"
 }

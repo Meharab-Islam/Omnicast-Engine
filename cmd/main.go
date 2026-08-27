@@ -14,11 +14,15 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"live-media-server/internal/api"
 	"live-media-server/internal/broker"
+	"live-media-server/internal/config"
 	"live-media-server/internal/signaling"
 	"live-media-server/internal/webrtc"
 )
 
 func main() {
+	// Zero-Config Boot: Auto-generate secure credentials, resolve public IP, and persist to .env
+	cfg := config.LoadOrGenerateConfig()
+
 	// Initialize Pion WebRTC API with VP8, H264, Opus codecs and interceptors
 	webrtcAPI, err := webrtc.InitWebRTC()
 	if err != nil {
@@ -34,32 +38,24 @@ func main() {
 	roomManager.SetWebhookDispatcher(webhookDispatcher)
 
 	// Initialize Redis Pub/Sub Broker if REDIS_ADDR is configured
-	redisAddr := getEnv("REDIS_ADDR", "")
-	redisPass := getEnv("REDIS_PASSWORD", "")
-	if redisAddr != "" {
-		redisBroker, err := broker.NewRedisBroker(redisAddr, redisPass, 0)
+	if cfg.RedisAddr != "" {
+		redisBroker, err := broker.NewRedisBroker(cfg.RedisAddr, cfg.RedisPass, 0)
 		if err != nil {
-			log.Printf("[Redis Warning] Failed to connect to Redis at %s: %v. Running in standalone in-memory mode.\n", redisAddr, err)
+			log.Printf("[Redis Warning] Failed to connect to Redis at %s: %v. Running in standalone in-memory mode.\n", cfg.RedisAddr, err)
 		} else {
 			roomManager.SetBroker(redisBroker)
-			log.Printf("[Redis] Distributed Pub/Sub broker activated on %s.\n", redisAddr)
+			log.Printf("[Redis] Distributed Pub/Sub broker activated on %s.\n", cfg.RedisAddr)
 		}
 	} else {
 		log.Println("[Redis] REDIS_ADDR not configured. Running in standalone in-memory mode.")
 	}
 
-	// Read server role and identification environment variables
-	port := getEnv("PORT", "8080")
-	publicIP := getEnv("PUBLIC_IP", "192.168.0.116")
-	serverRole := getEnv("SERVER_ROLE", "origin")
-	serverID := getEnv("SERVER_ID", "server-node-1")
-	serverPublicAddr := getEnv("SERVER_PUBLIC_ADDR", fmt.Sprintf("ws://%s:%s/ws", publicIP, port))
-
-	roomManager.SetServerConfig(serverRole, serverPublicAddr)
-	log.Printf("[Server Init] Role: %s | ID: %s | Public Address: %s\n", serverRole, serverID, serverPublicAddr)
+	serverPublicAddr := getEnv("SERVER_PUBLIC_ADDR", fmt.Sprintf("ws://%s:%s/ws", cfg.PublicIP, cfg.Port))
+	roomManager.SetServerConfig(cfg.ServerRole, serverPublicAddr)
+	log.Printf("[Server Init] Role: %s | ID: %s | Public Address: %s\n", cfg.ServerRole, cfg.ServerID, serverPublicAddr)
 
 	// Initialize CascadeManager for SFU Cascading (Inter-Server WebRTC)
-	cascadeManager := webrtc.NewCascadeManager(webrtcAPI, roomManager.GetBroker(), serverID)
+	cascadeManager := webrtc.NewCascadeManager(webrtcAPI, roomManager.GetBroker(), cfg.ServerID)
 	roomManager.SetCascadeManager(cascadeManager)
 
 	pkManager := signaling.NewPKManager(roomManager)
@@ -204,6 +200,51 @@ func main() {
 		})
 	})
 
+	// POST /api/admin/rooms/:id/end - Admin Kill Switch to forcefully terminate and destroy a room
+	adminEndHandler := func(c *fiber.Ctx) error {
+		apiKey := c.Get("X-API-Key")
+		if apiKey == "" {
+			apiKey = c.Query("api_key")
+		}
+		expectedKey := os.Getenv("API_KEY")
+		if expectedKey == "" {
+			expectedKey = "dev_api_key_123"
+		}
+
+		if apiKey != expectedKey {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"status": "error",
+				"error":  "Unauthorized: valid X-API-Key header or api_key query param required",
+			})
+		}
+
+		roomID := c.Params("id")
+		if roomID == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"status": "error",
+				"error":  "Room ID parameter is required",
+			})
+		}
+
+		if _, exists := roomManager.GetRoom(roomID); !exists {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"status": "error",
+				"error":  "Room not found or already ended",
+			})
+		}
+
+		roomManager.ForceEndRoom(roomID, "admin", "closed_by_admin")
+
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"status":    "success",
+			"message":   "Room forcefully ended and destroyed successfully",
+			"room_id":   roomID,
+			"timestamp": time.Now().UTC().Unix(),
+		})
+	}
+	app.Post("/api/admin/rooms/:id/end", adminEndHandler)
+	app.Post("/api/admin/rooms/:id/close", adminEndHandler)
+
 	// GET /room/:id - Return details for a specific active room
 	app.Get("/room/:id", func(c *fiber.Ctx) error {
 		roomID := c.Params("id")
@@ -305,11 +346,14 @@ func main() {
 
 	// Start server in a separate goroutine
 	go func() {
-		log.Printf("Live Media Server starting on port :%s...\n", port)
-		if err := app.Listen(":" + port); err != nil {
+		if err := app.Listen(":" + cfg.Port); err != nil {
 			log.Printf("Server stopped listening: %v\n", err)
 		}
 	}()
+
+	// Small pause to let listener start, then print styled zero-config banner
+	time.Sleep(100 * time.Millisecond)
+	config.PrintStartupBanner(cfg)
 
 	// Block until an interrupt or termination signal is received
 	sig := <-sigChan

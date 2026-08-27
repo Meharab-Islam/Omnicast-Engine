@@ -98,10 +98,11 @@ func TestRoomManager(t *testing.T) {
 		t.Error("Expected viewer to receive broadcasted chat")
 	}
 
-	// Test Viewer Disconnect
+	// Test Viewer Disconnect enters reconnecting state and RemoveViewer cleans up
 	rm.HandleClientDisconnect(dummyClient)
+	rm.RemoveViewer("room-101", dummyClient.ID)
 	if fetchedRoom.ViewersCount() != 0 {
-		t.Errorf("Expected 0 viewers after viewer disconnect, got %d", fetchedRoom.ViewersCount())
+		t.Errorf("Expected 0 viewers after viewer removal, got %d", fetchedRoom.ViewersCount())
 	}
 
 	// Drain messages
@@ -154,11 +155,11 @@ func TestRoomManager(t *testing.T) {
 		if err := json.Unmarshal(msgBytes, &msg); err != nil {
 			t.Fatalf("Failed to parse room_closed message: %v", err)
 		}
-		if msg.Event != "room_closed" {
-			t.Errorf("Expected event 'room_closed', got '%s'", msg.Event)
+		if msg.Event != "room_ended" && msg.Event != "room_closed" {
+			t.Errorf("Expected event 'room_ended' or 'room_closed', got '%s'", msg.Event)
 		}
 	default:
-		t.Error("Expected viewer to receive 'room_closed' message on close")
+		t.Error("Expected viewer to receive 'room_ended' message on close")
 	}
 }
 

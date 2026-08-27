@@ -69,4 +69,19 @@ func TestRedisBroker_NilOperations(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error on DeleteRoomState of nil broker")
 	}
+
+	err = b.PushChatMessage(nil, "room-101", nil)
+	if err != nil {
+		t.Fatal("expected nil error on PushChatMessage of nil broker")
+	}
+
+	err = b.RefreshRoomTTL(nil, "room-101")
+	if err != nil {
+		t.Fatal("expected nil error on RefreshRoomTTL of nil broker")
+	}
+
+	err = b.BatchRefreshRoomTTLs(nil, []string{"room-101"})
+	if err != nil {
+		t.Fatal("expected nil error on BatchRefreshRoomTTLs of nil broker")
+	}
 }

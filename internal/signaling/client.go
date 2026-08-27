@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"live-media-server/internal/api"
+	"live-media-server/internal/config"
 	"live-media-server/internal/models"
 	internalWebRTC "live-media-server/internal/webrtc"
 
@@ -44,18 +45,18 @@ var DefaultRTCConfiguration = webrtc.Configuration{
 
 // Client represents a connected WebSocket client
 type Client struct {
-	ID             string                  `json:"id"`
-	UserName       string                  `json:"user_name,omitempty"`
-	AvatarURL      string                  `json:"avatar_url,omitempty"`
-	Role           string                  `json:"role,omitempty"`
-	RoomID         string                  `json:"room_id,omitempty"`
-	Claims         *UserClaims             `json:"-"`
-	Hub            *Hub                    `json:"-"`
-	RoomManager    *RoomManager            `json:"-"`
-	WebRTCAPI      *webrtc.API             `json:"-"`
-	PeerConnection *webrtc.PeerConnection  `json:"-"`
-	Conn           *websocket.Conn         `json:"-"`
-	Send           chan []byte             `json:"-"`
+	ID             string                 `json:"id"`
+	UserName       string                 `json:"user_name,omitempty"`
+	AvatarURL      string                 `json:"avatar_url,omitempty"`
+	Role           string                 `json:"role,omitempty"`
+	RoomID         string                 `json:"room_id,omitempty"`
+	Claims         *UserClaims            `json:"-"`
+	Hub            *Hub                   `json:"-"`
+	RoomManager    *RoomManager           `json:"-"`
+	WebRTCAPI      *webrtc.API            `json:"-"`
+	PeerConnection *webrtc.PeerConnection `json:"-"`
+	Conn           *websocket.Conn        `json:"-"`
+	Send           chan []byte            `json:"-"`
 	mu             sync.Mutex
 }
 
@@ -178,6 +179,12 @@ func (c *Client) handleSignalingMessage(msg *models.SignalingMessage) {
 
 	case "kick_seat", "seat_kick":
 		c.handleKickSeat(msg)
+
+	case "kick_participant", "kick_user":
+		c.handleKickParticipant(msg)
+
+	case "end_room", "close_room", "stop_room":
+		c.handleEndRoom(msg)
 
 	case "pk_request", "request_pk":
 		c.handlePKRequest(msg)
@@ -437,6 +444,51 @@ func (c *Client) handleViewerJoinPlay(msg *models.SignalingMessage) {
 		_ = cascadeMgr.EnsureCascaded(room)
 	}
 
+	// Check if user is banned from this room
+	if room.IsUserBanned(c.ID) {
+		log.Printf("Viewer join rejected: user %s is banned from room %s\n", c.ID, roomID)
+		bannedPayload, _ := json.Marshal(map[string]any{
+			"event":   "error",
+			"code":    "user_banned",
+			"message": "You have been banned from this room by the host",
+			"room_id": roomID,
+		})
+		if enc, err := (&models.SignalingMessage{
+			Event:   "error",
+			RoomID:  roomID,
+			Payload: bannedPayload,
+		}).Encode(); err == nil {
+			select {
+			case c.Send <- enc:
+			default:
+			}
+		}
+		return
+	}
+
+	// Check max viewers limit from config (0 = UNLIMITED)
+	appCfg := config.GetAppConfig()
+	if appCfg.YAML.RoomManagement.MaxViewersPerRoom > 0 && room.ViewersCount() >= appCfg.YAML.RoomManagement.MaxViewersPerRoom {
+		log.Printf("Viewer join rejected: room %s is full (%d/%d viewers)\n", roomID, room.ViewersCount(), appCfg.YAML.RoomManagement.MaxViewersPerRoom)
+		errPayload, _ := json.Marshal(map[string]any{
+			"event":   "error",
+			"code":    "room_full",
+			"message": "Room has reached maximum viewer capacity",
+			"room_id": roomID,
+		})
+		if enc, err := (&models.SignalingMessage{
+			Event:   "error",
+			RoomID:  roomID,
+			Payload: errPayload,
+		}).Encode(); err == nil {
+			select {
+			case c.Send <- enc:
+			default:
+			}
+		}
+		return
+	}
+
 	// Setup PeerConnection with host's tracks attached and dynamic TURN REST credentials
 	pc, err := internalWebRTC.HandleViewerConnection(c.WebRTCAPI, c.RoomManager, roomID, internalWebRTC.GetDynamicRTCConfiguration(c.ID))
 	if err != nil {
@@ -692,6 +744,11 @@ func (c *Client) handleChatMessage(msg *models.SignalingMessage) {
 		return
 	}
 
+	// Store bounded chat in Redis (strictly kept at max 50 items with LTRIM and 24h TTL)
+	if broker := c.RoomManager.GetBroker(); broker != nil && broker.IsActive() {
+		_ = broker.PushChatMessage(nil, roomID, msg)
+	}
+
 	log.Printf("Broadcasted chat message from user %s in Room %s\n", c.ID, roomID)
 }
 
@@ -785,10 +842,10 @@ func (c *Client) handleGiftMessage(msg *models.SignalingMessage) {
 			RoomID: roomID,
 			UserID: senderID,
 			Data: map[string]any{
-				"gift_id":      giftPayload.GiftID,
-				"coins":        points,
-				"host_id":      room.HostID,
-				"new_score":    newScore,
+				"gift_id":   giftPayload.GiftID,
+				"coins":     points,
+				"host_id":   room.HostID,
+				"new_score": newScore,
 			},
 		})
 	}
@@ -968,19 +1025,33 @@ func (c *Client) handleSeatAccept(msg *models.SignalingMessage) {
 		return
 	}
 
-	// Find first available seat index (1..7) up to 8 max seats
+	// Find available seat based on CoHosting config (0 = UNLIMITED)
+	appCfg := config.GetAppConfig()
+	maxSeats := appCfg.YAML.CoHosting.MaxActiveSeats
 	activeSeats := room.GetActiveSeats()
 	assignedSeat := ""
-	for i := 1; i <= 7; i++ {
-		seatKey := fmt.Sprintf("%d", i)
-		if _, taken := activeSeats[seatKey]; !taken {
-			assignedSeat = seatKey
-			break
+
+	if maxSeats > 0 {
+		for i := 1; i <= maxSeats; i++ {
+			seatKey := fmt.Sprintf("%d", i)
+			if _, taken := activeSeats[seatKey]; !taken {
+				assignedSeat = seatKey
+				break
+			}
+		}
+	} else {
+		// UNLIMITED co-host seats (0): search for next available positive integer key
+		for i := 1; ; i++ {
+			seatKey := fmt.Sprintf("%d", i)
+			if _, taken := activeSeats[seatKey]; !taken {
+				assignedSeat = seatKey
+				break
+			}
 		}
 	}
 
 	if assignedSeat == "" {
-		log.Printf("Seat accept rejected: all 8 seats are occupied in room %s\n", roomID)
+		log.Printf("Seat accept rejected: all %d seats are occupied in room %s\n", maxSeats, roomID)
 		return
 	}
 
@@ -1579,4 +1650,169 @@ func (c *Client) handlePKStop(msg *models.SignalingMessage) {
 	}
 
 	_ = pkm.StopPK(roomID)
+}
+
+// handleKickParticipant handles manual kicking/banning of a participant by the Host
+func (c *Client) handleKickParticipant(msg *models.SignalingMessage) {
+	roomID := msg.RoomID
+	if roomID == "" {
+		return
+	}
+
+	room, exists := c.RoomManager.GetRoom(roomID)
+	if !exists || room == nil {
+		return
+	}
+
+	// Verify that only the room host (or admin) can kick participants
+	if c.ID != room.HostID && c.Role != "admin" {
+		log.Printf("Kick participant rejected: client %s is not host or admin of room %s\n", c.ID, roomID)
+		return
+	}
+
+	var payload struct {
+		TargetUserID string `json:"target_user_id"`
+		TargetUser   string `json:"target_user"`
+		Reason       string `json:"reason"`
+	}
+	_ = json.Unmarshal(msg.Payload, &payload)
+	targetID := payload.TargetUserID
+	if targetID == "" {
+		targetID = payload.TargetUser
+	}
+	if targetID == "" {
+		targetID = msg.TargetUser
+	}
+
+	if targetID == "" {
+		log.Printf("Kick participant rejected: missing target_user_id\n")
+		return
+	}
+
+	// Cannot kick the host
+	if targetID == room.HostID {
+		return
+	}
+
+	appCfg := config.GetAppConfig()
+	if appCfg.YAML.Moderation.AutoBanOnKick {
+		room.AddBannedUser(targetID)
+		log.Printf("[Moderation] User %s banned from room %s\n", targetID, roomID)
+	}
+
+	// Cancel any pending reconnect timers
+	room.CancelParticipantReconnectTimer(targetID)
+
+	// If target is connected locally, close connection and notify
+	if viewerObj, found := room.GetViewer(targetID); found && viewerObj != nil {
+		if vc, ok := viewerObj.(*Client); ok && vc != nil {
+			kickedPayload, _ := json.Marshal(map[string]any{
+				"event":   "participant_removed",
+				"reason":  "kicked_by_host",
+				"room_id": roomID,
+				"user_id": targetID,
+			})
+			if enc, err := (&models.SignalingMessage{
+				Event:   "participant_removed",
+				RoomID:  roomID,
+				UserID:  targetID,
+				Payload: kickedPayload,
+			}).Encode(); err == nil {
+				select {
+				case vc.Send <- enc:
+				default:
+				}
+			}
+			vc.mu.Lock()
+			if vc.PeerConnection != nil {
+				_ = vc.PeerConnection.Close()
+				vc.PeerConnection = nil
+			}
+			if vc.Conn != nil {
+				_ = vc.Conn.Close()
+			}
+			vc.mu.Unlock()
+		}
+	}
+
+	// Remove from room and SFU tracks
+	c.RoomManager.RemoveViewer(roomID, targetID)
+
+	// Broadcast participant_removed to everyone in the room
+	removedPayload, _ := json.Marshal(map[string]any{
+		"event":   "participant_removed",
+		"room_id": roomID,
+		"user_id": targetID,
+		"reason":  "kicked_by_host",
+	})
+	_ = c.RoomManager.BroadcastToRoom(roomID, &models.SignalingMessage{
+		Event:   "participant_removed",
+		RoomID:  roomID,
+		UserID:  targetID,
+		Payload: removedPayload,
+	})
+}
+
+// handleEndRoom handles manual room termination (Kill Switch) triggered by Host, Moderator, or Admin
+func (c *Client) handleEndRoom(msg *models.SignalingMessage) {
+	roomID := msg.RoomID
+	if roomID == "" && len(msg.Payload) > 0 {
+		var payloadData struct {
+			RoomID string `json:"room_id"`
+		}
+		_ = json.Unmarshal(msg.Payload, &payloadData)
+		roomID = payloadData.RoomID
+	}
+	if roomID == "" {
+		roomID = c.RoomID
+	}
+
+	if roomID == "" {
+		log.Printf("End room rejected: missing room_id\n")
+		return
+	}
+
+	room, exists := c.RoomManager.GetRoom(roomID)
+	if !exists || room == nil {
+		log.Printf("End room rejected: room %s does not exist\n", roomID)
+		return
+	}
+
+	// Authorization check: User must be Room Host, Moderator, or Admin
+	isHost := c.ID == room.HostID
+	isAdminOrMod := c.Role == "admin" || c.Role == "moderator"
+	if c.Claims != nil {
+		if c.Claims.Role == "admin" || c.Claims.Role == "moderator" {
+			isAdminOrMod = true
+		}
+	}
+
+	if !isHost && !isAdminOrMod {
+		log.Printf("End room rejected: client %s is not authorized to end room %s (Role: %s)\n", c.ID, roomID, c.Role)
+		errPayload, _ := json.Marshal(map[string]any{
+			"event":   "error",
+			"code":    "unauthorized",
+			"message": "Only the Host or a Moderator/Admin can end this room",
+			"room_id": roomID,
+		})
+		if enc, err := (&models.SignalingMessage{
+			Event:   "error",
+			RoomID:  roomID,
+			Payload: errPayload,
+		}).Encode(); err == nil {
+			select {
+			case c.Send <- enc:
+			default:
+			}
+		}
+		return
+	}
+
+	reason := "closed_by_host"
+	if isAdminOrMod && !isHost {
+		reason = "closed_by_moderator"
+	}
+
+	log.Printf("[Kill Switch] Authorized end_room request for room '%s' by user '%s' (%s)\n", roomID, c.ID, reason)
+	c.RoomManager.ForceEndRoom(roomID, c.ID, reason)
 }

@@ -414,6 +414,31 @@ func (rb *RedisBroker) DeleteRoomState(ctx context.Context, roomID string) error
 	return rb.client.Del(ctx, stateKey, scoreKey).Err()
 }
 
+// UnlinkAllRoomKeys instantly and non-blockingly wipes all Redis keys associated with a room using UNLINK
+func (rb *RedisBroker) UnlinkAllRoomKeys(ctx context.Context, roomID string) error {
+	if rb == nil || !rb.IsActive() {
+		return nil
+	}
+
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(rb.ctx, 2*time.Second)
+		defer cancel()
+	}
+
+	keys := []string{
+		fmt.Sprintf("room:%s:state", roomID),
+		fmt.Sprintf("room:%s:score", roomID),
+		fmt.Sprintf("room:%s:chats", roomID),
+		fmt.Sprintf("room:%s:participants", roomID),
+		fmt.Sprintf("room:%s:banned", roomID),
+		fmt.Sprintf("room:%s:origin", roomID),
+		fmt.Sprintf("pk:session:%s", roomID),
+	}
+
+	return rb.client.Unlink(ctx, keys...).Err()
+}
+
 // SavePKSession saves the active PK session linked to both rooms in Redis
 func (rb *RedisBroker) SavePKSession(ctx context.Context, session *models.PKSession) error {
 	if rb == nil || !rb.IsActive() || session == nil {
@@ -503,6 +528,87 @@ func (rb *RedisBroker) PublishPKEvent(sessionID string, msg *models.SignalingMes
 	defer cancel()
 
 	return rb.client.Publish(ctx, channel, data).Err()
+}
+
+// PushChatMessage stores a recent chat message in a bounded Redis list (max 50 items) with LTRIM
+func (rb *RedisBroker) PushChatMessage(ctx context.Context, roomID string, msg *models.SignalingMessage) error {
+	if rb == nil || !rb.IsActive() || msg == nil {
+		return nil
+	}
+
+	key := fmt.Sprintf("room:%s:chats", roomID)
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(rb.ctx, 2*time.Second)
+		defer cancel()
+	}
+
+	pipe := rb.client.Pipeline()
+	pipe.LPush(ctx, key, data)
+	pipe.LTrim(ctx, key, 0, 49) // Bounded Memory: Strictly keep only the last 50 messages (0..49)
+	pipe.Expire(ctx, key, 24*time.Hour)
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+// RefreshRoomTTL refreshes the 24-hour TTL on all Redis keys associated with an active room
+func (rb *RedisBroker) RefreshRoomTTL(ctx context.Context, roomID string) error {
+	if rb == nil || !rb.IsActive() {
+		return nil
+	}
+
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(rb.ctx, 2*time.Second)
+		defer cancel()
+	}
+
+	stateKey := fmt.Sprintf("room:%s:state", roomID)
+	scoreKey := fmt.Sprintf("room:%s:score", roomID)
+	chatsKey := fmt.Sprintf("room:%s:chats", roomID)
+	originKey := fmt.Sprintf("room:%s:origin", roomID)
+
+	pipe := rb.client.Pipeline()
+	pipe.Expire(ctx, stateKey, 24*time.Hour)
+	pipe.Expire(ctx, scoreKey, 24*time.Hour)
+	pipe.Expire(ctx, chatsKey, 24*time.Hour)
+	pipe.Expire(ctx, originKey, 24*time.Hour)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// BatchRefreshRoomTTLs refreshes the 24-hour TTL across a slice of active room IDs concurrently
+func (rb *RedisBroker) BatchRefreshRoomTTLs(ctx context.Context, roomIDs []string) error {
+	if rb == nil || !rb.IsActive() || len(roomIDs) == 0 {
+		return nil
+	}
+
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(rb.ctx, 3*time.Second)
+		defer cancel()
+	}
+
+	pipe := rb.client.Pipeline()
+	for _, roomID := range roomIDs {
+		stateKey := fmt.Sprintf("room:%s:state", roomID)
+		scoreKey := fmt.Sprintf("room:%s:score", roomID)
+		chatsKey := fmt.Sprintf("room:%s:chats", roomID)
+		originKey := fmt.Sprintf("room:%s:origin", roomID)
+
+		pipe.Expire(ctx, stateKey, 24*time.Hour)
+		pipe.Expire(ctx, scoreKey, 24*time.Hour)
+		pipe.Expire(ctx, chatsKey, 24*time.Hour)
+		pipe.Expire(ctx, originKey, 24*time.Hour)
+	}
+
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 // Close closes all active subscriptions and the Redis client connection

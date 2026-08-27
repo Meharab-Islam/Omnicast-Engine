@@ -35,6 +35,9 @@ type Room struct {
 	AudioTrack   *webrtc.TrackLocalStaticRTP            `json:"-"`
 	CoHostTracks   map[string]*CoHostMedia                `json:"-"`
 	TrackSwitchers map[string]any                         `json:"-"`
+	bannedUsers    map[string]bool                        `json:"-"`
+	participantReconnectTimers map[string]*time.Timer     `json:"-"`
+	emptyRoomTimer *time.Timer                            `json:"-"`
 	reconnectTimer *time.Timer                          `json:"-"`
 	isReconnecting bool                                 `json:"-"`
 	lastPLITime    time.Time                            `json:"-"`
@@ -57,6 +60,8 @@ func NewRoom(roomID, hostID string) *Room {
 		VideoSSRCs:     make(map[string]uint32),
 		CoHostTracks:   make(map[string]*CoHostMedia),
 		TrackSwitchers: make(map[string]any),
+		bannedUsers:    make(map[string]bool),
+		participantReconnectTimers: make(map[string]*time.Timer),
 	}
 }
 
@@ -78,6 +83,8 @@ func NewRoomWithName(roomID, roomName, hostID string) *Room {
 		VideoTracks:    make(map[string]*webrtc.TrackLocalStaticRTP),
 		CoHostTracks:   make(map[string]*CoHostMedia),
 		TrackSwitchers: make(map[string]any),
+		bannedUsers:    make(map[string]bool),
+		participantReconnectTimers: make(map[string]*time.Timer),
 	}
 }
 
@@ -679,4 +686,88 @@ func (r *Room) IsReconnecting() bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.isReconnecting
+}
+
+// AddBannedUser adds a user ID to the room's permanent blacklist
+func (r *Room) AddBannedUser(userID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.bannedUsers == nil {
+		r.bannedUsers = make(map[string]bool)
+	}
+	r.bannedUsers[userID] = true
+}
+
+// IsUserBanned checks if a user is currently banned from entering the room
+func (r *Room) IsUserBanned(userID string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.bannedUsers == nil {
+		return false
+	}
+	return r.bannedUsers[userID]
+}
+
+// StartParticipantReconnectTimer starts a grace period timer for a disconnected viewer or co-host
+func (r *Room) StartParticipantReconnectTimer(userID string, d time.Duration, onTimeout func()) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.participantReconnectTimers == nil {
+		r.participantReconnectTimers = make(map[string]*time.Timer)
+	}
+	if existing, ok := r.participantReconnectTimers[userID]; ok && existing != nil {
+		existing.Stop()
+	}
+	r.participantReconnectTimers[userID] = time.AfterFunc(d, func() {
+		r.mu.Lock()
+		delete(r.participantReconnectTimers, userID)
+		r.mu.Unlock()
+		if onTimeout != nil {
+			onTimeout()
+		}
+	})
+}
+
+// CancelParticipantReconnectTimer stops a participant's reconnect timer when they restore connection
+func (r *Room) CancelParticipantReconnectTimer(userID string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.participantReconnectTimers == nil {
+		return false
+	}
+	if timer, ok := r.participantReconnectTimers[userID]; ok && timer != nil {
+		stopped := timer.Stop()
+		delete(r.participantReconnectTimers, userID)
+		return stopped
+	}
+	return false
+}
+
+// StartEmptyRoomTimer starts a delayed auto-destruction timer when a room becomes empty
+func (r *Room) StartEmptyRoomTimer(d time.Duration, onTimeout func()) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.emptyRoomTimer != nil {
+		r.emptyRoomTimer.Stop()
+	}
+	r.emptyRoomTimer = time.AfterFunc(d, func() {
+		r.mu.Lock()
+		r.emptyRoomTimer = nil
+		r.mu.Unlock()
+		if onTimeout != nil {
+			onTimeout()
+		}
+	})
+}
+
+// CancelEmptyRoomTimer cancels the empty room destruction timer when someone joins
+func (r *Room) CancelEmptyRoomTimer() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.emptyRoomTimer != nil {
+		stopped := r.emptyRoomTimer.Stop()
+		r.emptyRoomTimer = nil
+		return stopped
+	}
+	return false
 }

@@ -11,6 +11,7 @@ import (
 	pionWebRTC "github.com/pion/webrtc/v3"
 	"live-media-server/internal/api"
 	"live-media-server/internal/broker"
+	"live-media-server/internal/config"
 	"live-media-server/internal/models"
 	internalWebRTC "live-media-server/internal/webrtc"
 )
@@ -30,7 +31,7 @@ type RoomManager struct {
 	mu                sync.RWMutex
 }
 
-// NewRoomManager initializes and returns a new RoomManager instance with WorkerPool and background flusher
+// NewRoomManager initializes and returns a new RoomManager instance with WorkerPool, batch flusher, and TTL refresher
 func NewRoomManager() *RoomManager {
 	rm := &RoomManager{
 		activeRooms:   make(map[string]*models.Room),
@@ -38,6 +39,7 @@ func NewRoomManager() *RoomManager {
 		pendingScores: make(map[string]int64),
 	}
 	rm.startBatchFlusher()
+	rm.startTTLRefresherWorker()
 	return rm
 }
 
@@ -51,6 +53,40 @@ func (rm *RoomManager) startBatchFlusher() {
 			rm.flushPendingScores()
 		}
 	}()
+}
+
+// startTTLRefresherWorker periodically refreshes the 24-hour TTL in Redis for all active rooms (every 30m)
+func (rm *RoomManager) startTTLRefresherWorker() {
+	go func() {
+		ticker := time.NewTicker(30 * time.Minute)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			rm.refreshActiveRoomsTTL()
+		}
+	}()
+}
+
+// refreshActiveRoomsTTL collects all active room IDs and extends their 24h expiration in Redis
+func (rm *RoomManager) refreshActiveRoomsTTL() {
+	rm.mu.RLock()
+	if rm.broker == nil || !rm.broker.IsActive() || len(rm.activeRooms) == 0 {
+		rm.mu.RUnlock()
+		return
+	}
+
+	roomIDs := make([]string, 0, len(rm.activeRooms))
+	for id := range rm.activeRooms {
+		roomIDs = append(roomIDs, id)
+	}
+	activeBroker := rm.broker
+	rm.mu.RUnlock()
+
+	if err := activeBroker.BatchRefreshRoomTTLs(nil, roomIDs); err != nil {
+		log.Printf("[Redis Warning] Failed to refresh TTL for active rooms: %v\n", err)
+	} else {
+		log.Printf("[Redis TTL Refresher] Refreshed 24h TTL for %d active rooms.\n", len(roomIDs))
+	}
 }
 
 // flushPendingScores flushes in-memory score deltas to Redis using pipeline INCRBY
@@ -212,6 +248,28 @@ func (rm *RoomManager) JoinViewer(roomID string, viewerClient *Client) error {
 		return errors.New("room not found")
 	}
 
+	// Cancel any pending empty room auto-destruction timer
+	room.CancelEmptyRoomTimer()
+
+	// If participant was in reconnecting grace period, restore state and broadcast 'participant_reconnected'
+	if room.CancelParticipantReconnectTimer(viewerClient.ID) {
+		log.Printf("Participant %s reconnected to Room '%s' within grace period!\n", viewerClient.ID, roomID)
+		reconnPayload, _ := json.Marshal(map[string]any{
+			"event":   "participant_reconnected",
+			"room_id": roomID,
+			"user_id": viewerClient.ID,
+			"data": map[string]any{
+				"user_id": viewerClient.ID,
+			},
+		})
+		_ = rm.BroadcastToRoom(roomID, &models.SignalingMessage{
+			Event:   "participant_reconnected",
+			RoomID:  roomID,
+			UserID:  viewerClient.ID,
+			Payload: reconnPayload,
+		})
+	}
+
 	room.AddViewer(viewerClient.ID, viewerClient)
 
 	// Subscribe to Redis room channel if broker is active on this node
@@ -253,6 +311,21 @@ func (rm *RoomManager) JoinViewer(roomID string, viewerClient *Client) error {
 
 	// Sync updated viewer count and seats to Redis RoomState
 	rm.SyncRoomState(roomID)
+
+	// Empty Room Auto-Destroy Check (The '0' Rule)
+	if viewerCount == 0 && room.GetHostClient() == nil {
+		appCfg := config.GetAppConfig()
+		emptyTimeout := appCfg.YAML.RoomManagement.EmptyRoomTimeoutSec
+		if emptyTimeout > 0 {
+			log.Printf("Room %s is empty. Starting %d-second destruction timer...\n", roomID, emptyTimeout)
+			room.StartEmptyRoomTimer(time.Duration(emptyTimeout)*time.Second, func() {
+				log.Printf("Empty room %s timeout reached. Executing instant cleanup...\n", roomID)
+				rm.destroyRoomInstant(roomID)
+			})
+		} else {
+			log.Printf("Room %s is empty. (empty_room_timeout_sec=0 -> Keeping room alive permanently).\n", roomID)
+		}
+	}
 
 	return nil
 }
@@ -527,10 +600,20 @@ func (rm *RoomManager) HandleClientDisconnect(client *Client) {
 	defer rm.mu.Unlock()
 
 
+	appCfg := config.GetAppConfig()
+	hostGraceSec := appCfg.YAML.RoomManagement.HostGracePeriodSec
+	if hostGraceSec <= 0 {
+		hostGraceSec = 25
+	}
+	viewerGraceSec := appCfg.YAML.Moderation.ViewerGracePeriodSec
+	if viewerGraceSec <= 0 {
+		viewerGraceSec = 120
+	}
+
 	for roomID, room := range rm.activeRooms {
 		// If the disconnecting client is the Host of this room
 		if room.HostID == client.ID {
-			log.Printf("Host client %s disconnected from Room '%s'. Starting 25s Grace Period for reconnection...\n", client.ID, roomID)
+			log.Printf("Host client %s disconnected from Room '%s'. Starting %ds Grace Period for reconnection...\n", client.ID, roomID, hostGraceSec)
 
 			// Clear active host client reference
 			room.SetHostClient(nil)
@@ -544,59 +627,45 @@ func (rm *RoomManager) HandleClientDisconnect(client *Client) {
 			}
 			_ = broadcastToRoomInternal(room, reconnectingMsg)
 
-			// Start Grace Period timer (25 seconds) before closing room
+			// Start Host Grace Period timer before closing room
 			targetRoomID := roomID
 			targetHostID := client.ID
-			room.StartReconnectTimer(25*time.Second, func() {
+			room.StartReconnectTimer(time.Duration(hostGraceSec)*time.Second, func() {
 				rm.CloseRoomAndNotify(targetRoomID, targetHostID)
 			})
 		} else {
 			// If the disconnecting client is a Viewer or Co-host in this room
 			if _, exists := room.GetViewer(client.ID); exists {
-				log.Printf("Viewer %s disconnected from room '%s'. Removing from room viewers...\n", client.ID, roomID)
-				room.RemoveViewer(client.ID)
-				room.RemoveCoHostTrack(client.ID)
+				log.Printf("Participant %s connection dropped from room '%s'. Entering %ds reconnecting state...\n", client.ID, roomID, viewerGraceSec)
 
-				// Trigger user_left webhook event
-				if rm.webhookDispatcher != nil {
-					rm.webhookDispatcher.Dispatch(api.WebhookEvent{
-						Event:  api.EventUserLeft,
-						RoomID: roomID,
-						UserID: client.ID,
-						Data: map[string]any{
-							"viewer_count": room.ViewersCount(),
-						},
-					})
-				}
-
-				// Broadcast updated viewer state (total_viewers & viewers_list) to everyone in the room & cluster
-				viewerCount := room.ViewersCount()
-				viewersList := room.GetViewersList()
-				payload, _ := json.Marshal(map[string]any{
-					"event":         "viewer_update",
-					"room_id":       roomID,
-					"total_viewers": viewerCount,
-					"count":         viewerCount,
-					"viewers_list":  viewersList,
+				// Broadcast 'participant_reconnecting' event to the room
+				reconnPayload, _ := json.Marshal(map[string]any{
+					"event":   "participant_reconnecting",
+					"room_id": roomID,
+					"user_id": client.ID,
+					"role":    client.Role,
+					"data": map[string]any{
+						"user_id": client.ID,
+						"role":    client.Role,
+					},
 				})
-				updateMsg := &models.SignalingMessage{
-					Event:        "viewer_update",
-					RoomID:       roomID,
-					TotalViewers: viewerCount,
-					ViewersList:  viewersList,
-					Payload:      payload,
-				}
-				_ = broadcastToRoomInternal(room, updateMsg)
-				if rm.broker != nil && rm.broker.IsActive() {
-					_ = rm.broker.PublishRoomEvent(roomID, updateMsg)
-				}
+				_ = broadcastToRoomInternal(room, &models.SignalingMessage{
+					Event:   "participant_reconnecting",
+					RoomID:  roomID,
+					UserID:  client.ID,
+					Payload: reconnPayload,
+				})
 
-				// Synchronize updated RoomState to Redis
-				syncRoomStateInternal(room, rm.broker)
+				// Start participant reconnect timer instead of instant kick
+				targetRoomID := roomID
+				targetUserID := client.ID
+				room.StartParticipantReconnectTimer(targetUserID, time.Duration(viewerGraceSec)*time.Second, func() {
+					log.Printf("Participant %s reconnect grace period expired in room %s. Performing cleanup...\n", targetUserID, targetRoomID)
+					rm.RemoveViewer(targetRoomID, targetUserID)
+				})
 			}
 		}
 	}
-
 
 	// Close client's PeerConnection to release WebRTC resources and prevent memory leak
 	client.mu.Lock()
@@ -608,8 +677,27 @@ func (rm *RoomManager) HandleClientDisconnect(client *Client) {
 	client.mu.Unlock()
 }
 
-// CloseRoomAndNotify closes an active room, notifies viewers with 'room_closed', triggers webhook, and cleans up resources
+// destroyRoomInstant completely wipes a room, its Redis keys (UNLINK), PeerConnections, WebSockets, and memory
+func (rm *RoomManager) destroyRoomInstant(roomID string) {
+	rm.CloseRoomAndNotifyWithReason(roomID, "", "closed_and_destroyed")
+}
+
+// ForceEndRoom forcefully terminates and destroys a room, executing full memory, WebRTC, WebSocket, and Redis cleanup
+func (rm *RoomManager) ForceEndRoom(roomID, actorID, reason string) {
+	if reason == "" {
+		reason = "closed_by_host"
+	}
+	rm.CloseRoomAndNotifyWithReason(roomID, actorID, reason)
+}
+
+// CloseRoomAndNotify closes an active room and notifies all participants with default reason
 func (rm *RoomManager) CloseRoomAndNotify(roomID, hostID string) {
+	rm.CloseRoomAndNotifyWithReason(roomID, hostID, "closed_by_host")
+}
+
+// CloseRoomAndNotifyWithReason closes an active room, notifies participants with 'room_ended',
+// forcefully closes all WebRTC PeerConnections & WebSockets, flushes Redis with UNLINK, and frees memory.
+func (rm *RoomManager) CloseRoomAndNotifyWithReason(roomID, hostID, reason string) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
@@ -618,12 +706,21 @@ func (rm *RoomManager) CloseRoomAndNotify(roomID, hostID string) {
 		return
 	}
 
-	log.Printf("Closing Room '%s' (Host: %s) and notifying viewers...\n", roomID, hostID)
+	if hostID == "" {
+		hostID = room.HostID
+	}
 
-	// Clean up Redis registration and subscription
+	log.Printf("[Instant Cleanup] Force-closing Room '%s' (Triggered by: %s, Reason: %s)...\n", roomID, hostID, reason)
+
+	// Cancel any active timers on the room
+	room.CancelReconnectTimer()
+	room.CancelEmptyRoomTimer()
+
+	// Instant Redis Wipe: Unlink state, score, chats, participants, banned, and PK sessions
 	if rm.broker != nil && rm.broker.IsActive() {
 		rm.broker.UnsubscribeRoom(roomID)
 		_ = rm.broker.RemoveRoomOrigin(roomID)
+		_ = rm.broker.UnlinkAllRoomKeys(nil, roomID)
 	}
 
 	// Trigger room_ended webhook event
@@ -635,34 +732,75 @@ func (rm *RoomManager) CloseRoomAndNotify(roomID, hostID string) {
 			Data: map[string]any{
 				"host_id":    hostID,
 				"host_score": room.GetHostScore(),
+				"reason":     reason,
 			},
 		})
 	}
 
-	// Prepare 'room_closed' message for all viewers
-	closedMsg := models.SignalingMessage{
-		Event:  "room_closed",
-		RoomID: roomID,
-		UserID: hostID,
+	// Prepare 'room_ended' and 'room_closed' event payloads
+	endedPayload, _ := json.Marshal(map[string]any{
+		"event":   "room_ended",
+		"room_id": roomID,
+		"reason":  reason,
+		"data": map[string]any{
+			"reason":  reason,
+			"room_id": roomID,
+		},
+	})
+	endedMsg := &models.SignalingMessage{
+		Event:   "room_ended",
+		RoomID:  roomID,
+		UserID:  hostID,
+		Payload: endedPayload,
 	}
-	closedBytes, _ := closedMsg.Encode()
+	endedBytes, _ := endedMsg.Encode()
 
-	// Broadcast 'room_closed' to all viewers and clear viewers map
+	// 1. Forcefully terminate and disconnect all Viewers & Co-Hosts
 	for viewerID, v := range room.Viewers {
 		if viewerClient, ok := v.(*Client); ok && viewerClient != nil {
 			select {
-			case viewerClient.Send <- closedBytes:
+			case viewerClient.Send <- endedBytes:
 			default:
-				log.Printf("Viewer %s send buffer full while sending room_closed\n", viewerID)
 			}
+
+			// Forcefully close WebRTC and WebSocket
+			viewerClient.mu.Lock()
+			if viewerClient.PeerConnection != nil {
+				_ = viewerClient.PeerConnection.Close()
+				viewerClient.PeerConnection = nil
+			}
+			if viewerClient.Conn != nil {
+				_ = viewerClient.Conn.Close()
+			}
+			viewerClient.mu.Unlock()
 		}
 		room.RemoveViewer(viewerID)
 	}
 
-	// Clear media tracks
+	// 2. Forcefully terminate Host connection if active
+	if room.HostClient != nil {
+		if hostClient, ok := room.HostClient.(*Client); ok && hostClient != nil {
+			select {
+			case hostClient.Send <- endedBytes:
+			default:
+			}
+
+			hostClient.mu.Lock()
+			if hostClient.PeerConnection != nil {
+				_ = hostClient.PeerConnection.Close()
+				hostClient.PeerConnection = nil
+			}
+			if hostClient.Conn != nil {
+				_ = hostClient.Conn.Close()
+			}
+			hostClient.mu.Unlock()
+		}
+	}
+
+	// Clear media tracks & switchers
 	room.SetTracks(nil, nil)
 	delete(rm.activeRooms, roomID)
-	log.Printf("Room '%s' successfully closed and removed.\n", roomID)
+	log.Printf("[Kill Switch] Room '%s' completely wiped from memory and network.\n", roomID)
 }
 
 // RoomInfo represents public room information for the active room list
