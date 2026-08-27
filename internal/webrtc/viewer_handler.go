@@ -2,6 +2,7 @@ package webrtc
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -44,14 +45,23 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 		return nil, errors.New("room is required")
 	}
 
+	// Select optimal video track for viewer (Medium 'h', then Low 'q', then Full 'f', then room.VideoTrack)
+	videoTrack := room.GetDefaultViewerVideoTrack()
+	audioTrack := room.AudioTrack
+	coHosts := room.GetAllCoHostTracks()
+
+	// If host media has not published yet, return error gracefully
+	if videoTrack == nil && audioTrack == nil && len(coHosts) == 0 {
+		return nil, fmt.Errorf("host media not ready")
+	}
+
 	// Create a new PeerConnection for the viewer
 	peerConnection, err := api.NewPeerConnection(config)
 	if err != nil {
 		return nil, err
 	}
 
-	// Select optimal video track for viewer (Medium 'h', then Low 'q', then Full 'f', then room.VideoTrack)
-	videoTrack := room.GetDefaultViewerVideoTrack()
+	viewerID := fmt.Sprintf("viewer_%d", time.Now().UnixNano())
 
 	var switcher *TrackSwitcher
 	if videoTrack != nil {
@@ -67,45 +77,59 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 			return nil, trackErr
 		}
 
-		// Initialize TrackSwitcher with initial layer 'h' (Medium)
-		initialLayer := LayerMedium
-		if room.GetVideoTrackByRID(LayerMedium) == nil {
-			if room.GetVideoTrackByRID(LayerLow) != nil {
+		// Initialize TrackSwitcher with initial layer 'f' (High / Full Resolution HD)
+		initialLayer := LayerHigh
+		if room.GetVideoTrackByRID(LayerHigh) == nil {
+			if room.GetVideoTrackByRID(LayerMedium) != nil {
+				initialLayer = LayerMedium
+			} else if room.GetVideoTrackByRID(LayerLow) != nil {
 				initialLayer = LayerLow
-			} else {
-				initialLayer = LayerHigh
 			}
 		}
 
 		switcher = NewTrackSwitcher(viewerVideoTrack, initialLayer)
-		viewerID := peerConnection.RemoteDescription().SDP
-		if viewerID == "" {
-			viewerID = viewerVideoTrack.ID()
+		viewerID = viewerVideoTrack.ID()
+		if peerConnection != nil {
+			if remoteDesc := peerConnection.RemoteDescription(); remoteDesc != nil && remoteDesc.SDP != "" {
+				viewerID = remoteDesc.SDP
+			}
 		}
-		room.RegisterTrackSwitcher(viewerID, switcher)
+		if room != nil {
+			room.RegisterTrackSwitcher(viewerID, switcher)
+		}
 
 		videoSender, addErr := peerConnection.AddTrack(viewerVideoTrack)
 		if addErr != nil {
 			log.Printf("Failed to add video track to viewer PeerConnection (Room %s): %v\n", room.RoomID, addErr)
-			room.UnregisterTrackSwitcher(viewerID)
+			if room != nil {
+				room.UnregisterTrackSwitcher(viewerID)
+			}
 			_ = peerConnection.Close()
 			return nil, addErr
 		}
 
-		// 1. Send initial debounced PLI on track attachment
-		room.SendPLIThrottled(1500 * time.Millisecond)
+		// 1. Send immediate Keyframe PLI request on track attachment
+		if room != nil {
+			room.SendPLIImmediate()
+		}
 
 		// Read incoming RTCP feedback from viewer (PLI/FIR/NACK/REMB) in background goroutine with ABR auto-switching
 		abr := NewABRController()
 		go func() {
-			rtcpBufPtr := GetRTPBuffer()
-			defer PutRTPBuffer(rtcpBufPtr)
-			rtcpBuf := *rtcpBufPtr
+			rtcpBuf := make([]byte, 1500)
 
 			for {
+				if videoSender == nil {
+					return
+				}
 				n, _, rtcpErr := videoSender.Read(rtcpBuf)
 				if rtcpErr != nil {
-					room.UnregisterTrackSwitcher(viewerID)
+					if room != nil {
+						room.UnregisterTrackSwitcher(viewerID)
+					}
+					if switcher != nil {
+						switcher.Close()
+					}
 					return
 				}
 				pkts, unmarshalErr := rtcp.Unmarshal(rtcpBuf[:n])
@@ -119,18 +143,28 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 								log.Printf("[ABR Auto-Switch] Room %s: Viewer switching layer %s -> %s (Bitrate: %d bps)\n",
 									room.RoomID, switcher.GetCurrentLayer(), optimalLayer, estimatedBps)
 								switcher.SwitchLayer(optimalLayer)
-								room.SendPLIThrottled(1000 * time.Millisecond)
+								if room != nil {
+									room.SendPLIImmediate()
+								}
 							}
 						case *rtcp.TransportLayerNack:
 							if switcher != nil && switcher.GetCurrentLayer() == LayerHigh {
 								log.Printf("[ABR Packet Loss] Room %s: NACK detected, downgrading to Medium '%s'\n", room.RoomID, LayerMedium)
 								switcher.SwitchLayer(LayerMedium)
-								room.SendPLIThrottled(1000 * time.Millisecond)
+								if room != nil {
+									room.SendPLIImmediate()
+								}
 							}
 						case *rtcp.PictureLossIndication, *rtcp.FullIntraRequest:
-							room.SendPLIThrottled(1500 * time.Millisecond)
+							// Direct RTCP PLI/FIR routing from viewer -> host/publishers for instant keyframe regeneration
+							if room != nil {
+								room.SendPLIImmediate()
+							}
 						}
 					}
+				} else if room != nil {
+					// Fallback on any raw RTCP feedback
+					room.SendPLIImmediate()
 				}
 			}
 		}()
@@ -181,19 +215,75 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 		}
 	}
 
-	// 3. Trigger PLI on ICE connection state change and PeerConnection state change
+	// 3. Trigger immediate multi-burst PLI on ICE connected state to guarantee instantaneous keyframe delivery & eliminate datamoshing
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		log.Printf("Viewer ICE Connection State (Room %s): %s\n", room.RoomID, connectionState.String())
-		if connectionState == webrtc.ICEConnectionStateConnected || connectionState == webrtc.ICEConnectionStateChecking {
-			room.SendPLIThrottled(1500 * time.Millisecond)
+		if connectionState == webrtc.ICEConnectionStateConnected {
+			if room != nil {
+				// Immediate initial PLI packet
+				room.SendPLIImmediate()
+				// Send high-frequency rapid bursts (100ms, 150ms, 250ms, 400ms, 600ms) to ensure
+				// the publisher's camera encoder emits an IDR I-Frame at the exact instant the viewer's decoder initializes
+				go func() {
+					intervals := []time.Duration{
+						100 * time.Millisecond,
+						150 * time.Millisecond,
+						250 * time.Millisecond,
+						400 * time.Millisecond,
+						600 * time.Millisecond,
+					}
+					for _, d := range intervals {
+						time.Sleep(d)
+						if room != nil {
+							room.SendPLIImmediate()
+						}
+					}
+				}()
+			}
+		} else if connectionState == webrtc.ICEConnectionStateFailed || connectionState == webrtc.ICEConnectionStateClosed {
+			if switcher != nil {
+				switcher.Close()
+			}
 		}
 	})
 
-	peerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
-		log.Printf("Viewer PeerConnection State (Room %s): %s\n", room.RoomID, state.String())
-		if state == webrtc.PeerConnectionStateConnected {
-			room.SendPLIThrottled(1500 * time.Millisecond)
+	// 4. Attach OnTrack listener in case this viewer upgrades to a publisher / co-host
+	peerConnection.OnTrack(func(remoteTrack *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+		log.Printf("Viewer/CoHost %s incoming track [Kind: %s, ID: %s, SSRC: %d, MimeType: %s]\n",
+			viewerID, remoteTrack.Kind().String(), remoteTrack.ID(), remoteTrack.SSRC(), remoteTrack.Codec().MimeType)
+
+		localTrack, trackErr := webrtc.NewTrackLocalStaticRTP(
+			remoteTrack.Codec().RTPCodecCapability,
+			remoteTrack.ID(),
+			remoteTrack.StreamID(),
+		)
+		if trackErr != nil {
+			log.Printf("Failed to create TrackLocalStaticRTP for viewer/cohost %s: %v\n", viewerID, trackErr)
+			return
 		}
+
+		if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
+			room.SetCoHostTrack(viewerID, localTrack)
+		} else if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio {
+			room.SetCoHostAudioTrack(viewerID, localTrack)
+		}
+
+		// Forward incoming RTP continuously
+		go func() {
+			bufPtr := GetRTPBuffer()
+			defer PutRTPBuffer(bufPtr)
+			buf := *bufPtr
+
+			for {
+				n, _, readErr := remoteTrack.Read(buf)
+				if readErr != nil {
+					return
+				}
+				if _, writeErr := localTrack.Write(buf[:n]); writeErr != nil {
+					return
+				}
+			}
+		}()
 	})
 
 	return peerConnection, nil

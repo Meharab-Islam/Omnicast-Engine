@@ -62,15 +62,19 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				close(client.Send)
 				log.Printf("Client unregistered: %s (Total clients: %d)\n", client.ID, len(h.clients))
 			}
 			rm := h.roomManager
 			h.mu.Unlock()
 
-			// Handle Host/Viewer cleanup and room closure
+			// Handle Host/Viewer cleanup and room closure first
 			if rm != nil {
 				rm.HandleClientDisconnect(client)
+			}
+
+			// Safely close client send channel after cleanup
+			if client != nil {
+				client.CloseSend()
 			}
 		}
 	}

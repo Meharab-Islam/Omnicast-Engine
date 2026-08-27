@@ -30,16 +30,16 @@
     "semantic_hash": "753ef9d80b4dc0c5b0894e33d7bbb01c"
   },
   "internal/signaling/client.go": {
-    "mtime": 1787846107.8330517,
-    "seen": 1787846306.066388,
-    "ast_hash": "60e9739d830fb258c81e8bf20a2b5231",
+    "mtime": 1787853274.0392444,
+    "seen": 1787853291.2750258,
+    "ast_hash": "8f01aded062a53105380f60e8c3f5028",
     "semantic_hash": ""
   },
   "internal/signaling/hub.go": {
-    "mtime": 1787774588.0644455,
-    "seen": 1787774606.293163,
-    "ast_hash": "1c0fef3406c15681ce828a285ae48bfd",
-    "semantic_hash": "1c0fef3406c15681ce828a285ae48bfd"
+    "mtime": 1787851855.4123063,
+    "seen": 1787851883.361418,
+    "ast_hash": "600f49ed4ab5c753b1f22bf8625e554c",
+    "semantic_hash": ""
   },
   "internal/models/message.go": {
     "mtime": 1787807461.9724646,
@@ -48,15 +48,15 @@
     "semantic_hash": ""
   },
   "internal/models/room.go": {
-    "mtime": 1787844838.366104,
-    "seen": 1787844905.4718752,
-    "ast_hash": "a3b6af16a5f72a062f1ce5aefe805439",
+    "mtime": 1787853050.0405328,
+    "seen": 1787853088.80398,
+    "ast_hash": "d25c65492f56fc1bdda28d290b1a4c4a",
     "semantic_hash": ""
   },
   "internal/signaling/room_manager.go": {
-    "mtime": 1787846115.5996068,
-    "seen": 1787846306.066391,
-    "ast_hash": "577aa5254f569f30bd0830d5aa5f2f19",
+    "mtime": 1787851870.1236715,
+    "seen": 1787851883.361421,
+    "ast_hash": "3677f2a5ca4db1313bb0fdd3bb8a2dd7",
     "semantic_hash": ""
   },
   "internal/webrtc/engine.go": {
@@ -66,9 +66,9 @@
     "semantic_hash": ""
   },
   "internal/webrtc/host_handler.go": {
-    "mtime": 1787846086.0516088,
-    "seen": 1787846306.066396,
-    "ast_hash": "315ebc42c90ce04b855ecd9ba5c3df67",
+    "mtime": 1787853059.8269808,
+    "seen": 1787853088.803991,
+    "ast_hash": "dea1a47eed55f976a5999587cf3a8eec",
     "semantic_hash": ""
   },
   "internal/models/message_test.go": {
@@ -90,9 +90,9 @@
     "semantic_hash": "54c82bc5187d4f0a1e0408f2edc4bef6"
   },
   "internal/webrtc/viewer_handler.go": {
-    "mtime": 1787846098.1235104,
-    "seen": 1787846306.0664,
-    "ast_hash": "838ed1aedf5f644efba60746e7ca50ee",
+    "mtime": 1787853073.336558,
+    "seen": 1787853088.8039942,
+    "ast_hash": "634ae537abf9e5b1d8a6a819bead346c",
     "semantic_hash": ""
   },
   "internal/signaling/pk_manager.go": {
@@ -108,9 +108,9 @@
     "semantic_hash": "75c98bad0a4970a82278b45535fb0190"
   },
   "internal/models/room_test.go": {
-    "mtime": 1787806626.5846622,
-    "seen": 1787806797.937928,
-    "ast_hash": "390a2fdaec464e39eaa948595902c2c5",
+    "mtime": 1787852729.1979022,
+    "seen": 1787852742.571177,
+    "ast_hash": "bb5a96052021ed8b0fdccc8f0dd39e62",
     "semantic_hash": ""
   },
   "internal/signaling/auth.go": {
@@ -228,9 +228,9 @@
     "semantic_hash": ""
   },
   "internal/webrtc/turn_auth.go": {
-    "mtime": 1787808220.7659774,
-    "seen": 1787808355.330948,
-    "ast_hash": "325edfbc9f790f70d884360d75b19c7c",
+    "mtime": 1787851147.582571,
+    "seen": 1787851161.3867111,
+    "ast_hash": "4f340c06cc75e21e96921aaa04ee76f2",
     "semantic_hash": ""
   },
   "internal/webrtc/turn_auth_test.go": {
@@ -252,9 +252,9 @@
     "semantic_hash": ""
   },
   "internal/webrtc/track_switcher.go": {
-    "mtime": 1787808455.1738782,
-    "seen": 1787808595.406247,
-    "ast_hash": "7ef6a996ff11bb27a1f0e421dcb8e04a",
+    "mtime": 1787851742.0037572,
+    "seen": 1787851798.789899,
+    "ast_hash": "dfabef9168ffc8fb46ccc6faad2014f2",
     "semantic_hash": ""
   },
   "internal/webrtc/track_switcher_test.go": {
@@ -330,9 +330,9 @@
     "semantic_hash": ""
   },
   "entrypoint.sh": {
-    "mtime": 1787848669.8709462,
-    "seen": 1787848713.72116,
-    "ast_hash": "3cbb0b63c8c494a8998ec911a42f6d53",
+    "mtime": 1787851135.3651373,
+    "seen": 1787851161.3866901,
+    "ast_hash": "d3e6964f55a8d77da5d486732aa0118c",
     "semantic_hash": ""
   }
 }

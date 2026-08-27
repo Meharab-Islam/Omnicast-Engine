@@ -75,10 +75,10 @@ func TestRoomSimulcastTracks(t *testing.T) {
 		t.Fatalf("expected trackF for RID 'f'")
 	}
 
-	// Basic adaptive default should return Medium 'h'
+	// Basic adaptive default should return Full HD 'f'
 	defaultTrack := room.GetDefaultViewerVideoTrack()
-	if defaultTrack != trackH {
-		t.Fatalf("expected default viewer video track to be Medium ('h')")
+	if defaultTrack != trackF {
+		t.Fatalf("expected default viewer video track to be Full HD ('f')")
 	}
 
 	allVideoTracks := room.GetAllVideoTracks()

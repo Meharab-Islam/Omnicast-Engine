@@ -8,11 +8,13 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
-// CoHostMedia holds the video and audio media tracks for an active co-host
+// CoHostMedia holds the video and audio media tracks and WebRTC PeerConnection for an active co-host
 type CoHostMedia struct {
-	CoHostID   string                      `json:"cohost_id"`
-	VideoTrack *webrtc.TrackLocalStaticRTP `json:"-"`
-	AudioTrack *webrtc.TrackLocalStaticRTP `json:"-"`
+	CoHostID       string                      `json:"cohost_id"`
+	VideoTrack     *webrtc.TrackLocalStaticRTP `json:"-"`
+	AudioTrack     *webrtc.TrackLocalStaticRTP `json:"-"`
+	PeerConnection *webrtc.PeerConnection      `json:"-"`
+	VideoSSRC      uint32                      `json:"-"`
 }
 
 // Room represents a live media broadcast session
@@ -283,7 +285,48 @@ func (r *Room) GetHostPeerConnection() *webrtc.PeerConnection {
 	return r.HostPC
 }
 
-// SendPLIThrottled sends a Picture Loss Indication (Keyframe request) to the Host,
+// SendPLIImmediate sends an immediate un-throttled Picture Loss Indication (Keyframe request) to the Host and all active Co-Hosts
+func (r *Room) SendPLIImmediate() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.lastPLITime = time.Now()
+	sent := false
+
+	// 1. Send PLI to Main Host
+	hostPC := r.HostPC
+	if hostPC != nil && hostPC.ConnectionState() != webrtc.PeerConnectionStateClosed {
+		packets := make([]rtcp.Packet, 0, len(r.VideoSSRCs)+1)
+		if r.HostVideoSSRC != 0 {
+			packets = append(packets, &rtcp.PictureLossIndication{MediaSSRC: r.HostVideoSSRC})
+		}
+		for _, ssrc := range r.VideoSSRCs {
+			if ssrc != 0 && ssrc != r.HostVideoSSRC {
+				packets = append(packets, &rtcp.PictureLossIndication{MediaSSRC: ssrc})
+			}
+		}
+		if len(packets) == 0 {
+			packets = append(packets, &rtcp.PictureLossIndication{MediaSSRC: 0})
+		}
+		_ = hostPC.WriteRTCP(packets)
+		sent = true
+	}
+
+	// 2. Send PLI to all active Co-Hosts
+	for _, coHost := range r.CoHostTracks {
+		if coHost != nil && coHost.PeerConnection != nil && coHost.PeerConnection.ConnectionState() != webrtc.PeerConnectionStateClosed {
+			ssrc := coHost.VideoSSRC
+			_ = coHost.PeerConnection.WriteRTCP([]rtcp.Packet{
+				&rtcp.PictureLossIndication{MediaSSRC: ssrc},
+			})
+			sent = true
+		}
+	}
+
+	return sent
+}
+
+// SendPLIThrottled sends a Picture Loss Indication (Keyframe request) to the Host and Co-Hosts,
 // debouncing/throttling requests to maximum 1 PLI per minInterval (e.g. 1.5 seconds) per video track.
 func (r *Room) SendPLIThrottled(minInterval time.Duration) bool {
 	r.mu.Lock()
@@ -296,16 +339,37 @@ func (r *Room) SendPLIThrottled(minInterval time.Duration) bool {
 	}
 
 	r.lastPLITime = now
-	hostPC := r.HostPC
-	ssrc := r.HostVideoSSRC
+	sent := false
 
-	if hostPC != nil && ssrc != 0 && hostPC.ConnectionState() != webrtc.PeerConnectionStateClosed {
-		_ = hostPC.WriteRTCP([]rtcp.Packet{
-			&rtcp.PictureLossIndication{MediaSSRC: ssrc},
-		})
-		return true
+	hostPC := r.HostPC
+	if hostPC != nil && hostPC.ConnectionState() != webrtc.PeerConnectionStateClosed {
+		packets := make([]rtcp.Packet, 0, len(r.VideoSSRCs)+1)
+		if r.HostVideoSSRC != 0 {
+			packets = append(packets, &rtcp.PictureLossIndication{MediaSSRC: r.HostVideoSSRC})
+		}
+		for _, ssrc := range r.VideoSSRCs {
+			if ssrc != 0 && ssrc != r.HostVideoSSRC {
+				packets = append(packets, &rtcp.PictureLossIndication{MediaSSRC: ssrc})
+			}
+		}
+		if len(packets) == 0 {
+			packets = append(packets, &rtcp.PictureLossIndication{MediaSSRC: 0})
+		}
+		_ = hostPC.WriteRTCP(packets)
+		sent = true
 	}
-	return false
+
+	for _, coHost := range r.CoHostTracks {
+		if coHost != nil && coHost.PeerConnection != nil && coHost.PeerConnection.ConnectionState() != webrtc.PeerConnectionStateClosed {
+			ssrc := coHost.VideoSSRC
+			_ = coHost.PeerConnection.WriteRTCP([]rtcp.Packet{
+				&rtcp.PictureLossIndication{MediaSSRC: ssrc},
+			})
+			sent = true
+		}
+	}
+
+	return sent
 }
 
 // SetHostVideoSSRC stores the host's incoming video track SSRC
@@ -473,18 +537,18 @@ func (r *Room) GetAudioTrack() *webrtc.TrackLocalStaticRTP {
 	return r.AudioTrack
 }
 
-// GetDefaultViewerVideoTrack returns the recommended video track for new viewers (Medium 'h', then Low 'q', then Full 'f', then default VideoTrack)
+// GetDefaultViewerVideoTrack returns the recommended video track for new viewers (HD 'f' first, then Medium 'h', then Low 'q', then default VideoTrack)
 func (r *Room) GetDefaultViewerVideoTrack() *webrtc.TrackLocalStaticRTP {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if r.VideoTracks != nil {
+		if t, ok := r.VideoTracks["f"]; ok && t != nil {
+			return t
+		}
 		if t, ok := r.VideoTracks["h"]; ok && t != nil {
 			return t
 		}
 		if t, ok := r.VideoTracks["q"]; ok && t != nil {
-			return t
-		}
-		if t, ok := r.VideoTracks["f"]; ok && t != nil {
 			return t
 		}
 	}
@@ -550,6 +614,36 @@ func (r *Room) SetCoHostAudioTrack(coHostID string, track *webrtc.TrackLocalStat
 		r.CoHostTracks[coHostID] = media
 	}
 	media.AudioTrack = track
+}
+
+// SetCoHostPeerConnection assigns the PeerConnection for a co-host
+func (r *Room) SetCoHostPeerConnection(coHostID string, pc *webrtc.PeerConnection) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.CoHostTracks == nil {
+		r.CoHostTracks = make(map[string]*CoHostMedia)
+	}
+	media, exists := r.CoHostTracks[coHostID]
+	if !exists || media == nil {
+		media = &CoHostMedia{CoHostID: coHostID}
+		r.CoHostTracks[coHostID] = media
+	}
+	media.PeerConnection = pc
+}
+
+// SetCoHostVideoSSRC assigns the incoming video SSRC for a co-host
+func (r *Room) SetCoHostVideoSSRC(coHostID string, ssrc uint32) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.CoHostTracks == nil {
+		r.CoHostTracks = make(map[string]*CoHostMedia)
+	}
+	media, exists := r.CoHostTracks[coHostID]
+	if !exists || media == nil {
+		media = &CoHostMedia{CoHostID: coHostID}
+		r.CoHostTracks[coHostID] = media
+	}
+	media.VideoSSRC = ssrc
 }
 
 // GetCoHostTrack retrieves a specific co-host's video track

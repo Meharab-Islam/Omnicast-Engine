@@ -439,11 +439,7 @@ func broadcastToRoomInternal(room *models.Room, msg *models.SignalingMessage) er
 	// Forward message to Host if connected
 	if room.HostClient != nil {
 		if hostClient, ok := room.HostClient.(*Client); ok && hostClient != nil {
-			select {
-			case hostClient.Send <- encoded:
-			default:
-				log.Printf("Host client %s send buffer full\n", room.HostID)
-			}
+			hostClient.SafeSend(encoded)
 		}
 	}
 
@@ -458,9 +454,8 @@ func broadcastToRoomInternal(room *models.Room, msg *models.SignalingMessage) er
 
 	// Forward message to all Viewers
 	for _, client := range targets {
-		select {
-		case client.Send <- encoded:
-		default:
+		if client != nil {
+			client.SafeSend(encoded)
 		}
 	}
 
@@ -527,10 +522,9 @@ func (rm *RoomManager) AddTrackAndRenegotiate(roomID string, track *pionWebRTC.T
 			Payload: offerJSON,
 		}
 		if encoded, err := offerMsg.Encode(); err == nil {
-			select {
-			case client.Send <- encoded:
+			if client.SafeSend(encoded) {
 				log.Printf("Sent renegotiation SDP offer to client %s for CoHost %s track in Room %s\n", targetID, coHostID, roomID)
-			default:
+			} else {
 				log.Printf("Client %s send buffer full during renegotiation\n", targetID)
 			}
 		}
@@ -758,10 +752,7 @@ func (rm *RoomManager) CloseRoomAndNotifyWithReason(roomID, hostID, reason strin
 	// 1. Forcefully terminate and disconnect all Viewers & Co-Hosts
 	for viewerID, v := range room.Viewers {
 		if viewerClient, ok := v.(*Client); ok && viewerClient != nil {
-			select {
-			case viewerClient.Send <- endedBytes:
-			default:
-			}
+			viewerClient.SafeSend(endedBytes)
 
 			// Forcefully close WebRTC and WebSocket
 			viewerClient.mu.Lock()
@@ -780,10 +771,7 @@ func (rm *RoomManager) CloseRoomAndNotifyWithReason(roomID, hostID, reason strin
 	// 2. Forcefully terminate Host connection if active
 	if room.HostClient != nil {
 		if hostClient, ok := room.HostClient.(*Client); ok && hostClient != nil {
-			select {
-			case hostClient.Send <- endedBytes:
-			default:
-			}
+			hostClient.SafeSend(endedBytes)
 
 			hostClient.mu.Lock()
 			if hostClient.PeerConnection != nil {

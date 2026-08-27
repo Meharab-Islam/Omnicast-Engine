@@ -19,23 +19,27 @@ if [ -z "$PUBLIC_IP" ]; then
     export PUBLIC_IP="$DETECTED_IP"
 fi
 
-# 3. Start Coturn STUN/TURN in the background
-TURN_SECRET="${TURN_SECRET:-$(openssl rand -hex 16 2>/dev/null || echo "turn_secret_default_32char_key")}"
-TURN_REALM="${TURN_REALM:-${DOMAIN_NAME:-live.omnicast.internal}}"
+# 3. Synchronize TURN_SECRET and start Coturn STUN/TURN Server
+export TURN_SECRET="${TURN_SECRET:-$(openssl rand -hex 32 2>/dev/null || echo "omnicast_turn_secret_32char_key_999")}"
+export TURN_REALM="${TURN_REALM:-${DOMAIN_NAME:-${PUBLIC_IP:-live.omnicast.internal}}}"
 
 echo "==> Starting embedded Coturn STUN/TURN Server (Public IP: $PUBLIC_IP, Realm: $TURN_REALM)..."
-turnserver \
-    --log-file=/dev/null \
+turnserver --daemon \
+    --log-file=stdout \
     --external-ip="$PUBLIC_IP" \
+    --listening-port=3478 \
+    --listening-ip=0.0.0.0 \
     --use-auth-secret \
     --static-auth-secret="$TURN_SECRET" \
     --realm="$TURN_REALM" \
     --total-quota=100 \
     --min-port=49152 \
     --max-port=49250 \
-    -v -n --no-tls --no-dtls &
+    --lt-cred-mech \
+    --fingerprint \
+    -v -n --no-tls --no-dtls
 
-echo "✔ Coturn Server is running on port 3478"
+echo "✔ Coturn STUN/TURN Server is active on port 3478 (Auth: REST Secret)"
 
 # 4. Configure & Start Caddy (Auto-SSL) if DOMAIN_NAME is provided
 if [ -n "$DOMAIN_NAME" ]; then

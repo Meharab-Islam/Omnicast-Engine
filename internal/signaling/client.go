@@ -2,6 +2,7 @@ package signaling
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -57,6 +58,8 @@ type Client struct {
 	PeerConnection *webrtc.PeerConnection `json:"-"`
 	Conn           *websocket.Conn        `json:"-"`
 	Send           chan []byte            `json:"-"`
+	closed         bool
+	writeMu        sync.Mutex
 	mu             sync.Mutex
 }
 
@@ -247,13 +250,91 @@ func (c *Client) handlePublishOffer(msg *models.SignalingMessage) {
 	// Determine if this is Main Host or a Co-Host
 	isCoHost := room.HostID != "" && room.HostID != c.ID
 
+	c.mu.Lock()
+	existingPC := c.PeerConnection
+	c.mu.Unlock()
+
+	if existingPC == nil {
+		if vObj, ok := room.GetViewer(c.ID); ok && vObj != nil {
+			if vc, ok := vObj.(*Client); ok && vc != nil {
+				vc.mu.Lock()
+				existingPC = vc.PeerConnection
+				vc.mu.Unlock()
+				c.mu.Lock()
+				c.PeerConnection = existingPC
+				c.mu.Unlock()
+			}
+		}
+	}
+
 	var pc *webrtc.PeerConnection
 	var err error
 
-	if isCoHost {
-		log.Printf("Publishing media as Co-Host %s in Room %s\n", c.ID, roomID)
+	// Seamless Co-Host Upgrade: If user already has an active PeerConnection (e.g. upgraded Viewer),
+	// DO NOT tear it down or close it! Reuse and renegotiate on the existing PeerConnection.
+	if existingPC != nil && existingPC.ConnectionState() != webrtc.PeerConnectionStateClosed {
+		log.Printf("[Seamless Renegotiation] Reusing active PeerConnection for client %s in Room %s\n", c.ID, roomID)
+		pc = existingPC
+		c.mu.Lock()
+		c.Role = "cohost"
+		c.mu.Unlock()
+
+		// Configure OnTrack listener to capture newly published co-host streams
+		pc.OnTrack(func(remoteTrack *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+			log.Printf("CoHost %s incoming published track [Kind: %s, ID: %s, SSRC: %d, Mime: %s]\n",
+				c.ID, remoteTrack.Kind().String(), remoteTrack.ID(), remoteTrack.SSRC(), remoteTrack.Codec().MimeType)
+
+			localTrack, trackErr := webrtc.NewTrackLocalStaticRTP(
+				remoteTrack.Codec().RTPCodecCapability,
+				remoteTrack.ID(),
+				remoteTrack.StreamID(),
+			)
+			if trackErr != nil {
+				log.Printf("Failed to create TrackLocalStaticRTP for cohost %s: %v\n", c.ID, trackErr)
+				return
+			}
+
+			if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
+				room.SetCoHostTrack(c.ID, localTrack)
+				room.SetCoHostVideoSSRC(c.ID, uint32(remoteTrack.SSRC()))
+			} else if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio {
+				room.SetCoHostAudioTrack(c.ID, localTrack)
+			}
+
+			// Broadcast new_cohost event and trigger server-side track renegotiation
+			newCoHostPayload, _ := json.Marshal(map[string]any{
+				"event":     "new_cohost",
+				"cohost_id": c.ID,
+				"room_id":   roomID,
+			})
+			_ = c.RoomManager.BroadcastToRoom(roomID, &models.SignalingMessage{
+				Event:   "new_cohost",
+				RoomID:  roomID,
+				UserID:  c.ID,
+				Payload: newCoHostPayload,
+			})
+
+			c.RoomManager.AddTrackAndRenegotiate(roomID, localTrack, c.ID)
+
+			// Forward RTP packets continuously
+			go func() {
+				bufPtr := internalWebRTC.GetRTPBuffer()
+				defer internalWebRTC.PutRTPBuffer(bufPtr)
+				buf := *bufPtr
+				for {
+					n, _, readErr := remoteTrack.Read(buf)
+					if readErr != nil {
+						return
+					}
+					if _, writeErr := localTrack.Write(buf[:n]); writeErr != nil {
+						return
+					}
+				}
+			}()
+		})
+	} else if isCoHost {
+		log.Printf("Publishing media as fresh Co-Host %s in Room %s\n", c.ID, roomID)
 		pc, err = internalWebRTC.HandleCoHostConnection(c.WebRTCAPI, room, c.ID, internalWebRTC.GetDynamicRTCConfiguration(c.ID), func(coHostID string, track *webrtc.TrackLocalStaticRTP) {
-			// 1. Broadcast new_cohost event to everyone in the room
 			newCoHostPayload, _ := json.Marshal(map[string]any{
 				"event":     "new_cohost",
 				"cohost_id": coHostID,
@@ -266,17 +347,19 @@ func (c *Client) handlePublishOffer(msg *models.SignalingMessage) {
 				Payload: newCoHostPayload,
 			}
 			_ = c.RoomManager.BroadcastToRoom(roomID, broadcastMsg)
-			log.Printf("Broadcasted 'new_cohost' for CoHost %s in Room %s\n", coHostID, roomID)
-
-			// 2. Add track and perform WebRTC renegotiation with all active viewers and host
 			c.RoomManager.AddTrackAndRenegotiate(roomID, track, coHostID)
 		})
+		if err == nil {
+			c.mu.Lock()
+			c.PeerConnection = pc
+			c.Role = "cohost"
+			c.mu.Unlock()
+		}
 	} else {
-		// Check if this room is in a Grace Period reconnection state
+		// Main Host
 		if room.IsReconnecting() {
 			if room.CancelReconnectTimer() {
 				log.Printf("Host %s successfully reconnected to Room '%s' within Grace Period!\n", c.ID, roomID)
-				// Broadcast 'host_reconnected' event to all viewers in the room
 				reconnectedMsg := &models.SignalingMessage{
 					Event:  "host_reconnected",
 					RoomID: roomID,
@@ -286,68 +369,67 @@ func (c *Client) handlePublishOffer(msg *models.SignalingMessage) {
 			}
 		}
 
-		// Register host client instance in room
 		room.SetHostClient(c)
 		pc, err = internalWebRTC.HandleHostConnection(c.WebRTCAPI, room, internalWebRTC.GetDynamicRTCConfiguration(c.ID))
+		if err == nil {
+			c.mu.Lock()
+			c.PeerConnection = pc
+			c.Role = "host"
+			c.mu.Unlock()
+		}
 	}
 
 	if err != nil {
-		log.Printf("Failed to create PeerConnection for client %s: %v\n", c.ID, err)
+		log.Printf("Failed to create/setup PeerConnection for client %s: %v\n", c.ID, err)
 		return
 	}
 
-	c.mu.Lock()
-	if c.PeerConnection != nil {
-		_ = c.PeerConnection.Close()
-	}
-	c.PeerConnection = pc
-	c.mu.Unlock()
-
-	// Connection Resiliency: Handle Disconnected and Failed states gracefully with Grace Period
-	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
-		log.Printf("Host %s ICE Connection State (Room: %s): %s\n", c.ID, roomID, state.String())
-		if state == webrtc.ICEConnectionStateDisconnected {
-			log.Printf("Host %s ICE state 'Disconnected' (transient network change). Waiting for reconnection or ICE restart...\n", c.ID)
-			return
-		}
-		if state == webrtc.ICEConnectionStateFailed || state == webrtc.ICEConnectionStateClosed {
-			log.Printf("Host %s ICE state '%s'. Initiating Grace Period for Room '%s'...\n", c.ID, state.String(), roomID)
-			c.mu.Lock()
-			if c.PeerConnection != nil {
-				_ = c.PeerConnection.Close()
-				c.PeerConnection = nil
+	// Register ICE and candidate callbacks ONLY if brand new PeerConnection
+	if existingPC == nil {
+		pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
+			log.Printf("Publisher %s ICE Connection State (Room: %s): %s\n", c.ID, roomID, state.String())
+			if state == webrtc.ICEConnectionStateDisconnected {
+				log.Printf("Publisher %s ICE state 'Disconnected' (transient network dip). Waiting for reconnection or ICE restart...\n", c.ID)
+				return
 			}
-			c.mu.Unlock()
-			c.RoomManager.HandleClientDisconnect(c)
-		}
-	})
+			if state == webrtc.ICEConnectionStateFailed {
+				log.Printf("Publisher %s ICE state '%s'. Initiating Grace Period for Room '%s'...\n", c.ID, state.String(), roomID)
+				c.mu.Lock()
+				if c.PeerConnection == pc {
+					c.PeerConnection = nil
+					c.mu.Unlock()
+					c.RoomManager.HandleClientDisconnect(c)
+				} else {
+					c.mu.Unlock()
+				}
+			}
+		})
 
-	// Send server-side ICE candidates to the host client via WebSocket
-	pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
-		if candidate == nil {
-			return
-		}
-		candJSON, err := json.Marshal(candidate.ToJSON())
-		if err != nil {
-			log.Printf("Failed to marshal ICE candidate: %v\n", err)
-			return
-		}
+		pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
+			if candidate == nil {
+				return
+			}
+			candJSON, err := json.Marshal(candidate.ToJSON())
+			if err != nil {
+				log.Printf("Failed to marshal ICE candidate: %v\n", err)
+				return
+			}
 
-		iceResponse := models.SignalingMessage{
-			Event:   models.EventICE,
-			RoomID:  roomID,
-			UserID:  c.ID,
-			Payload: candJSON,
-		}
-		if encoded, err := iceResponse.Encode(); err == nil {
-			c.Send <- encoded
-		}
-	})
+			iceResponse := models.SignalingMessage{
+				Event:   models.EventICE,
+				RoomID:  roomID,
+				UserID:  c.ID,
+				Payload: candJSON,
+			}
+			if encoded, err := iceResponse.Encode(); err == nil {
+				c.SafeSend(encoded)
+			}
+		})
+	}
 
 	// Parse SDP offer from payload
 	var offer webrtc.SessionDescription
 	if err := json.Unmarshal(msg.Payload, &offer); err != nil {
-		// Fallback for { "sdp": "...", "type": "offer" }
 		var sdpWrapper struct {
 			SDP  string `json:"sdp"`
 			Type string `json:"type"`
@@ -377,27 +459,27 @@ func (c *Client) handlePublishOffer(msg *models.SignalingMessage) {
 		if pc.ConnectionState() == webrtc.PeerConnectionStateClosed {
 			return
 		}
-		log.Printf("Failed to set remote description for host %s: %v\n", c.ID, err)
+		log.Printf("Failed to set remote description for client %s: %v\n", c.ID, err)
 		return
 	}
 
 	// Create Answer
 	answer, err := pc.CreateAnswer(nil)
 	if err != nil {
-		log.Printf("Failed to create SDP answer for host %s: %v\n", c.ID, err)
+		log.Printf("Failed to create SDP answer for client %s: %v\n", c.ID, err)
 		return
 	}
 
 	// Set Local Description (Answer)
 	if err := pc.SetLocalDescription(answer); err != nil {
-		log.Printf("Failed to set local description for host %s: %v\n", c.ID, err)
+		log.Printf("Failed to set local description for client %s: %v\n", c.ID, err)
 		return
 	}
 
-	// Send SDP Answer to Host via WebSocket
+	// Send SDP Answer via WebSocket
 	answerJSON, err := json.Marshal(answer)
 	if err != nil {
-		log.Printf("Failed to marshal SDP answer for host %s: %v\n", c.ID, err)
+		log.Printf("Failed to marshal SDP answer for client %s: %v\n", c.ID, err)
 		return
 	}
 
@@ -408,14 +490,15 @@ func (c *Client) handlePublishOffer(msg *models.SignalingMessage) {
 		Payload: answerJSON,
 	}
 
-	encodedResp, err := answerResponse.Encode()
-	if err != nil {
-		log.Printf("Failed to encode answer response: %v\n", err)
-		return
+	if encodedResp, err := answerResponse.Encode(); err == nil {
+		c.SafeSend(encodedResp)
+		log.Printf("Sent SDP answer to client %s for Room %s\n", c.ID, roomID)
 	}
 
-	c.Send <- encodedResp
-	log.Printf("Sent SDP answer to host client %s for Room %s\n", c.ID, roomID)
+	// Trigger immediate keyframe generation
+	if room != nil {
+		room.SendPLIImmediate()
+	}
 }
 
 // handleViewerJoinPlay handles a viewer requesting to subscribe/play media from an active room
@@ -458,10 +541,7 @@ func (c *Client) handleViewerJoinPlay(msg *models.SignalingMessage) {
 			RoomID:  roomID,
 			Payload: bannedPayload,
 		}).Encode(); err == nil {
-			select {
-			case c.Send <- enc:
-			default:
-			}
+			c.SafeSend(enc)
 		}
 		return
 	}
@@ -481,10 +561,7 @@ func (c *Client) handleViewerJoinPlay(msg *models.SignalingMessage) {
 			RoomID:  roomID,
 			Payload: errPayload,
 		}).Encode(); err == nil {
-			select {
-			case c.Send <- enc:
-			default:
-			}
+			c.SafeSend(enc)
 		}
 		return
 	}
@@ -509,31 +586,31 @@ func (c *Client) handleViewerJoinPlay(msg *models.SignalingMessage) {
 			Payload: stateJSON,
 		}
 		if encoded, err := syncMsg.Encode(); err == nil {
-			c.Send <- encoded
+			c.SafeSend(encoded)
 		}
 	}
 
 	c.mu.Lock()
-	if c.PeerConnection != nil {
-		_ = c.PeerConnection.Close()
-	}
 	c.PeerConnection = pc
 	c.mu.Unlock()
 
-	// Clean up viewer from room on Disconnected/Failed/Closed ICE states
+	// Clean up viewer from room on Failed ICE state (graceful: do not disconnect on transient Disconnected or closed)
 	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		log.Printf("Viewer %s ICE Connection State (Room: %s): %s\n", c.ID, roomID, state.String())
-		if state == webrtc.ICEConnectionStateDisconnected ||
-			state == webrtc.ICEConnectionStateFailed ||
-			state == webrtc.ICEConnectionStateClosed {
+		if state == webrtc.ICEConnectionStateDisconnected {
+			log.Printf("Viewer %s ICE state 'Disconnected' (transient network dip). Waiting for reconnection or ICE restart...\n", c.ID)
+			return
+		}
+		if state == webrtc.ICEConnectionStateFailed {
 			log.Printf("Viewer %s ICE state '%s'. Removing viewer from Room '%s' and cleaning up...\n", c.ID, state.String(), roomID)
 			c.mu.Lock()
-			if c.PeerConnection != nil {
-				_ = c.PeerConnection.Close()
+			if c.PeerConnection == pc {
 				c.PeerConnection = nil
+				c.mu.Unlock()
+				c.RoomManager.HandleClientDisconnect(c)
+			} else {
+				c.mu.Unlock()
 			}
-			c.mu.Unlock()
-			c.RoomManager.HandleClientDisconnect(c)
 		}
 	})
 
@@ -555,7 +632,7 @@ func (c *Client) handleViewerJoinPlay(msg *models.SignalingMessage) {
 			Payload: candJSON,
 		}
 		if encoded, err := iceResponse.Encode(); err == nil {
-			c.Send <- encoded
+			c.SafeSend(encoded)
 		}
 	})
 
@@ -622,14 +699,15 @@ func (c *Client) handleViewerJoinPlay(msg *models.SignalingMessage) {
 		Payload: answerJSON,
 	}
 
-	encodedResp, err := answerResponse.Encode()
-	if err != nil {
-		log.Printf("Failed to encode viewer answer response: %v\n", err)
-		return
+	if encodedResp, err := answerResponse.Encode(); err == nil {
+		c.SafeSend(encodedResp)
+		log.Printf("Sent SDP answer to viewer client %s for Room %s\n", c.ID, roomID)
 	}
 
-	c.Send <- encodedResp
-	log.Printf("Sent SDP answer to viewer client %s for Room %s\n", c.ID, roomID)
+	// Trigger immediate keyframe generation for crystal clear HD video on viewer join
+	if room != nil {
+		room.SendPLIImmediate()
+	}
 
 	// Broadcast updated viewer count to everyone in the room (Host and all Viewers)
 	roomObj, roomFound := c.RoomManager.GetRoom(roomID)
@@ -1490,30 +1568,106 @@ func (c *Client) handleSDPAnswer(msg *models.SignalingMessage) {
 	}
 }
 
+// SafeSend sends message bytes to client.Send channel without panicking if channel is closed or full
+func (c *Client) SafeSend(data []byte) (sent bool) {
+	if c == nil {
+		return false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.closed {
+		return false
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			sent = false
+		}
+	}()
+
+	select {
+	case c.Send <- data:
+		return true
+	default:
+		return false
+	}
+}
+
+// CloseSend safely closes the Send channel exactly once
+func (c *Client) CloseSend() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if !c.closed {
+		c.closed = true
+		if c.Send != nil {
+			close(c.Send)
+		}
+	}
+}
+
+// WriteMessage safely writes a message to the WebSocket connection protected by writeMu
+func (c *Client) WriteMessage(messageType int, data []byte) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	if c.Conn == nil {
+		return errors.New("websocket connection is nil")
+	}
+	_ = c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+	return c.Conn.WriteMessage(messageType, data)
+}
+
+// WriteJSON safely writes a JSON payload to the WebSocket connection protected by writeMu
+func (c *Client) WriteJSON(v any) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	if c.Conn == nil {
+		return errors.New("websocket connection is nil")
+	}
+	_ = c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+	return c.Conn.WriteJSON(v)
+}
+
 // WritePump pumps messages from the send channel to the websocket connection.
 // Sends periodic ping messages to keep connection alive and detect dropped clients.
 func (c *Client) WritePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		_ = c.Conn.Close()
+		c.writeMu.Lock()
+		if c.Conn != nil {
+			_ = c.Conn.Close()
+		}
+		c.writeMu.Unlock()
 	}()
 
 	for {
 		select {
 		case message, ok := <-c.Send:
+			c.writeMu.Lock()
+			if c.Conn == nil {
+				c.writeMu.Unlock()
+				return
+			}
 			_ = c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
 				_ = c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				c.writeMu.Unlock()
 				return
 			}
 
 			w, err := c.Conn.NextWriter(websocket.TextMessage)
 			if err != nil {
+				c.writeMu.Unlock()
 				return
 			}
 			if _, err := w.Write(message); err != nil {
+				c.writeMu.Unlock()
 				return
 			}
 
@@ -1521,22 +1675,33 @@ func (c *Client) WritePump() {
 			n := len(c.Send)
 			for i := 0; i < n; i++ {
 				if _, err := w.Write([]byte{'\n'}); err != nil {
+					c.writeMu.Unlock()
 					return
 				}
 				if _, err := w.Write(<-c.Send); err != nil {
+					c.writeMu.Unlock()
 					return
 				}
 			}
 
 			if err := w.Close(); err != nil {
+				c.writeMu.Unlock()
 				return
 			}
+			c.writeMu.Unlock()
 
 		case <-ticker.C:
-			_ = c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			c.writeMu.Lock()
+			if c.Conn == nil {
+				c.writeMu.Unlock()
 				return
 			}
+			_ = c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				c.writeMu.Unlock()
+				return
+			}
+			c.writeMu.Unlock()
 		}
 	}
 }

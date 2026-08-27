@@ -66,6 +66,7 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 					log.Printf("Default non-simulcast video track registered for Room: %s (SSRC: %d)\n", room.RoomID, remoteTrack.SSRC())
 				}
 				room.SetVideoTrackSSRC("default", uint32(remoteTrack.SSRC()))
+				room.SetHostVideoSSRC(uint32(remoteTrack.SSRC()))
 			} else {
 				// Simulcast quality layer ('q' = Low, 'h' = Medium, 'f' = High)
 				if existing := room.GetVideoTrackByRID(rid); existing != nil {
@@ -85,6 +86,9 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 					log.Printf("Simulcast video layer (RID: '%s') registered in Room.VideoTracks for Room: %s (SSRC: %d)\n", rid, room.RoomID, remoteTrack.SSRC())
 				}
 				room.SetVideoTrackSSRC(rid, uint32(remoteTrack.SSRC()))
+				if rid == "h" || room.GetHostVideoSSRC() == 0 {
+					room.SetHostVideoSSRC(uint32(remoteTrack.SSRC()))
+				}
 			}
 
 			// Send periodic PLI (Picture Loss Indication) keyframe requests to host
@@ -180,8 +184,8 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 	return peerConnection, nil
 }
 
-// HandleCoHostConnection creates a WebRTC PeerConnection for a co-host, saves their track to room.CoHostTracks,
-// forwards incoming RTP packets, and calls onTrackSaved callback so the signaling layer can broadcast new_cohost.
+// HandleCoHostConnection creates a WebRTC PeerConnection for a co-host, saves their tracks to room.CoHostTracks,
+// subscribes to existing host and co-host media, forwards incoming RTP packets, and calls onTrackSaved for room-wide renegotiation.
 func HandleCoHostConnection(api *webrtc.API, room *models.Room, coHostID string, config webrtc.Configuration, onTrackSaved func(coHostID string, track *webrtc.TrackLocalStaticRTP)) (*webrtc.PeerConnection, error) {
 	if api == nil {
 		return nil, errors.New("webrtc api instance is required")
@@ -195,6 +199,35 @@ func HandleCoHostConnection(api *webrtc.API, room *models.Room, coHostID string,
 		return nil, err
 	}
 
+	// Register Co-Host PeerConnection in room
+	room.SetCoHostPeerConnection(coHostID, peerConnection)
+
+	// 1. Attach Main Host video track to CoHost
+	if hostVideo := room.GetDefaultViewerVideoTrack(); hostVideo != nil {
+		if _, err := peerConnection.AddTrack(hostVideo); err != nil {
+			log.Printf("Failed to attach host video track to cohost %s: %v\n", coHostID, err)
+		}
+	}
+	// Attach Main Host audio track to CoHost
+	if hostAudio := room.GetAudioTrack(); hostAudio != nil {
+		if _, err := peerConnection.AddTrack(hostAudio); err != nil {
+			log.Printf("Failed to attach host audio track to cohost %s: %v\n", coHostID, err)
+		}
+	}
+
+	// 2. Attach any OTHER active Co-Hosts' video and audio tracks
+	for otherID, otherMedia := range room.GetAllCoHostTracks() {
+		if otherID != coHostID && otherMedia != nil {
+			if otherMedia.VideoTrack != nil {
+				_, _ = peerConnection.AddTrack(otherMedia.VideoTrack)
+			}
+			if otherMedia.AudioTrack != nil {
+				_, _ = peerConnection.AddTrack(otherMedia.AudioTrack)
+			}
+		}
+	}
+
+	// 3. Handle incoming media tracks published by the Co-Host
 	peerConnection.OnTrack(func(remoteTrack *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		log.Printf("CoHost %s incoming track [Kind: %s, ID: %s, SSRC: %d, MimeType: %s]\n",
 			coHostID, remoteTrack.Kind().String(), remoteTrack.ID(), remoteTrack.SSRC(), remoteTrack.Codec().MimeType)
@@ -205,13 +238,19 @@ func HandleCoHostConnection(api *webrtc.API, room *models.Room, coHostID string,
 			remoteTrack.StreamID(),
 		)
 		if trackErr != nil {
-			log.Printf("Failed to create TrackLocalStaticRTP for cohost track: %v\n", trackErr)
+			log.Printf("Failed to create TrackLocalStaticRTP for cohost %s track: %v\n", coHostID, trackErr)
 			return
 		}
 
-		// Save in CoHostTracks map
-		room.SetCoHostTrack(coHostID, localTrack)
-		log.Printf("CoHost track registered in Room %s for CoHost %s\n", room.RoomID, coHostID)
+		// Save in CoHostTracks map according to track Kind (never overwrite video with audio)
+		if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
+			room.SetCoHostTrack(coHostID, localTrack)
+			room.SetCoHostVideoSSRC(coHostID, uint32(remoteTrack.SSRC()))
+			log.Printf("CoHost %s video track registered in Room %s (SSRC: %d)\n", coHostID, room.RoomID, remoteTrack.SSRC())
+		} else if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio {
+			room.SetCoHostAudioTrack(coHostID, localTrack)
+			log.Printf("CoHost %s audio track registered in Room %s\n", coHostID, room.RoomID)
+		}
 
 		if onTrackSaved != nil {
 			onTrackSaved(coHostID, localTrack)
@@ -233,7 +272,7 @@ func HandleCoHostConnection(api *webrtc.API, room *models.Room, coHostID string,
 			}()
 		}
 
-		// Forward RTP packets to localTrack
+		// Forward RTP packets to localTrack continuously
 		go func() {
 			bufPtr := GetRTPBuffer()
 			defer PutRTPBuffer(bufPtr)

@@ -52,10 +52,17 @@ func GenerateTURNCredentials(userID, secret string, duration time.Duration) (str
 
 // GetDefaultICEServers constructs Pion webrtc.ICEServer slice configured with dynamic TURN REST credentials
 func GetDefaultICEServers(userID string) []webrtc.ICEServer {
-	publicIP := os.Getenv("PUBLIC_IP")
-	if publicIP == "" {
-		publicIP = "192.168.0.116"
+	host := os.Getenv("DOMAIN_NAME")
+	if host == "" {
+		host = os.Getenv("HOST_DOMAIN")
 	}
+	if host == "" {
+		host = os.Getenv("PUBLIC_IP")
+	}
+	if host == "" {
+		host = "127.0.0.1"
+	}
+
 	turnSecret := os.Getenv("TURN_SECRET")
 	if turnSecret == "" {
 		turnSecret = DefaultTURNSecret
@@ -67,13 +74,13 @@ func GetDefaultICEServers(userID string) []webrtc.ICEServer {
 		{
 			URLs: []string{
 				"stun:stun.l.google.com:19302",
-				fmt.Sprintf("stun:%s:3478", publicIP),
+				fmt.Sprintf("stun:%s:3478", host),
 			},
 		},
 		{
 			URLs: []string{
-				fmt.Sprintf("turn:%s:3478?transport=udp", publicIP),
-				fmt.Sprintf("turn:%s:3478?transport=tcp", publicIP),
+				fmt.Sprintf("turn:%s:3478?transport=udp", host),
+				fmt.Sprintf("turn:%s:3478?transport=tcp", host),
 			},
 			Username:       username,
 			Credential:     password,
@@ -84,10 +91,17 @@ func GetDefaultICEServers(userID string) []webrtc.ICEServer {
 
 // GetDefaultICEServersJSON returns JSON-serializable ICE servers array to pass directly to frontend SDKs
 func GetDefaultICEServersJSON(userID string) []ICEServerJSON {
-	publicIP := os.Getenv("PUBLIC_IP")
-	if publicIP == "" {
-		publicIP = "192.168.0.116"
+	host := os.Getenv("DOMAIN_NAME")
+	if host == "" {
+		host = os.Getenv("HOST_DOMAIN")
 	}
+	if host == "" {
+		host = os.Getenv("PUBLIC_IP")
+	}
+	if host == "" {
+		host = "127.0.0.1"
+	}
+
 	turnSecret := os.Getenv("TURN_SECRET")
 	if turnSecret == "" {
 		turnSecret = DefaultTURNSecret
@@ -99,13 +113,13 @@ func GetDefaultICEServersJSON(userID string) []ICEServerJSON {
 		{
 			URLs: []string{
 				"stun:stun.l.google.com:19302",
-				fmt.Sprintf("stun:%s:3478", publicIP),
+				fmt.Sprintf("stun:%s:3478", host),
 			},
 		},
 		{
 			URLs: []string{
-				fmt.Sprintf("turn:%s:3478?transport=udp", publicIP),
-				fmt.Sprintf("turn:%s:3478?transport=tcp", publicIP),
+				fmt.Sprintf("turn:%s:3478?transport=udp", host),
+				fmt.Sprintf("turn:%s:3478?transport=tcp", host),
 			},
 			Username:   username,
 			Credential: password,
