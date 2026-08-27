@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"
 )
 
@@ -27,12 +28,16 @@ type Room struct {
 	HostVideoSSRC uint32                 `json:"-"`
 	VideoSSRCs   map[string]uint32       `json:"-"`
 	Viewers      map[string]any          `json:"-"`
+	ActiveSeats  map[string]string       `json:"active_seats"`
+	MediaStates  map[string]MediaState   `json:"media_states"`
 	VideoTrack   *webrtc.TrackLocalStaticRTP            `json:"-"`
 	VideoTracks  map[string]*webrtc.TrackLocalStaticRTP `json:"-"`
 	AudioTrack   *webrtc.TrackLocalStaticRTP            `json:"-"`
-	CoHostTracks map[string]*CoHostMedia                `json:"-"`
+	CoHostTracks   map[string]*CoHostMedia                `json:"-"`
+	TrackSwitchers map[string]any                         `json:"-"`
 	reconnectTimer *time.Timer                          `json:"-"`
 	isReconnecting bool                                 `json:"-"`
+	lastPLITime    time.Time                            `json:"-"`
 	mu           sync.RWMutex
 }
 
@@ -46,9 +51,12 @@ func NewRoom(roomID, hostID string) *Room {
 		HostScore:    0,
 		CreatedAt:    time.Now().UTC(),
 		Viewers:      make(map[string]any),
-		VideoTracks:  make(map[string]*webrtc.TrackLocalStaticRTP),
-		VideoSSRCs:   make(map[string]uint32),
-		CoHostTracks: make(map[string]*CoHostMedia),
+		ActiveSeats:  map[string]string{"0": hostID},
+		MediaStates:    make(map[string]MediaState),
+		VideoTracks:    make(map[string]*webrtc.TrackLocalStaticRTP),
+		VideoSSRCs:     make(map[string]uint32),
+		CoHostTracks:   make(map[string]*CoHostMedia),
+		TrackSwitchers: make(map[string]any),
 	}
 }
 
@@ -65,8 +73,11 @@ func NewRoomWithName(roomID, roomName, hostID string) *Room {
 		HostScore:    0,
 		CreatedAt:    time.Now().UTC(),
 		Viewers:      make(map[string]any),
-		VideoTracks:  make(map[string]*webrtc.TrackLocalStaticRTP),
-		CoHostTracks: make(map[string]*CoHostMedia),
+		ActiveSeats:    map[string]string{"0": hostID},
+		MediaStates:    make(map[string]MediaState),
+		VideoTracks:    make(map[string]*webrtc.TrackLocalStaticRTP),
+		CoHostTracks:   make(map[string]*CoHostMedia),
+		TrackSwitchers: make(map[string]any),
 	}
 }
 
@@ -124,6 +135,13 @@ func (r *Room) GetMainSeatID() string {
 	return r.MainSeatID
 }
 
+// SetHostScore updates the host's score in a thread-safe manner
+func (r *Room) SetHostScore(score int64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.HostScore = int(score)
+}
+
 // AddHostScore increments the host's score and returns the new total (thread-safe)
 func (r *Room) AddHostScore(points int) int {
 	r.mu.Lock()
@@ -137,6 +155,97 @@ func (r *Room) GetHostScore() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.HostScore
+}
+
+// SetMediaState updates the media mute state for a user in the room (thread-safe)
+func (r *Room) SetMediaState(userID string, state MediaState) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.MediaStates == nil {
+		r.MediaStates = make(map[string]MediaState)
+	}
+	r.MediaStates[userID] = state
+}
+
+// GetMediaState retrieves the media mute state for a user in the room (thread-safe)
+func (r *Room) GetMediaState(userID string) (MediaState, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.MediaStates == nil {
+		return MediaState{}, false
+	}
+	state, exists := r.MediaStates[userID]
+	return state, exists
+}
+
+// SetActiveSeat assigns a seat ID to a user ID (thread-safe)
+func (r *Room) SetActiveSeat(seatID, userID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.ActiveSeats == nil {
+		r.ActiveSeats = make(map[string]string)
+	}
+	r.ActiveSeats[seatID] = userID
+}
+
+// RemoveActiveSeat removes a user from active seats (thread-safe)
+func (r *Room) RemoveActiveSeat(seatID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.ActiveSeats != nil {
+		delete(r.ActiveSeats, seatID)
+	}
+}
+
+// RemoveUserFromSeats removes any seat assigned to the specified user (thread-safe)
+func (r *Room) RemoveUserFromSeats(userID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.ActiveSeats != nil {
+		for sID, uID := range r.ActiveSeats {
+			if uID == userID {
+				delete(r.ActiveSeats, sID)
+			}
+		}
+	}
+}
+
+// GetActiveSeats returns a copy of active seat assignments (thread-safe)
+func (r *Room) GetActiveSeats() map[string]string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	seatsCopy := make(map[string]string, len(r.ActiveSeats))
+	for k, v := range r.ActiveSeats {
+		seatsCopy[k] = v
+	}
+	return seatsCopy
+}
+
+// GetRoomState constructs and returns a snapshot of the RoomState (thread-safe)
+func (r *Room) GetRoomState() *RoomState {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	seatsCopy := make(map[string]string, len(r.ActiveSeats))
+	for k, v := range r.ActiveSeats {
+		seatsCopy[k] = v
+	}
+
+	mediaCopy := make(map[string]MediaState, len(r.MediaStates))
+	for k, v := range r.MediaStates {
+		mediaCopy[k] = v
+	}
+
+	return &RoomState{
+		RoomID:       r.RoomID,
+		RoomName:     r.RoomName,
+		HostID:       r.HostID,
+		TotalViewers: len(r.Viewers),
+		HostScore:    int64(r.HostScore),
+		ActiveSeats:  seatsCopy,
+		MediaStates:  mediaCopy,
+		CreatedAt:    r.CreatedAt,
+	}
 }
 
 // SetHostClient stores the host client reference in a thread-safe manner
@@ -165,6 +274,31 @@ func (r *Room) GetHostPeerConnection() *webrtc.PeerConnection {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.HostPC
+}
+
+// SendPLIThrottled sends a Picture Loss Indication (Keyframe request) to the Host,
+// debouncing/throttling requests to maximum 1 PLI per minInterval (e.g. 1.5 seconds) per video track.
+func (r *Room) SendPLIThrottled(minInterval time.Duration) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	now := time.Now()
+	if now.Sub(r.lastPLITime) < minInterval {
+		// Throttled: drop duplicate PLI request
+		return false
+	}
+
+	r.lastPLITime = now
+	hostPC := r.HostPC
+	ssrc := r.HostVideoSSRC
+
+	if hostPC != nil && ssrc != 0 && hostPC.ConnectionState() != webrtc.PeerConnectionStateClosed {
+		_ = hostPC.WriteRTCP([]rtcp.Packet{
+			&rtcp.PictureLossIndication{MediaSSRC: ssrc},
+		})
+		return true
+	}
+	return false
 }
 
 // SetHostVideoSSRC stores the host's incoming video track SSRC
@@ -448,6 +582,39 @@ func (r *Room) GetActiveCoHostIDs() []string {
 		ids = append(ids, id)
 	}
 	return ids
+}
+
+// RegisterTrackSwitcher associates a viewer's TrackSwitcher with the room
+func (r *Room) RegisterTrackSwitcher(viewerID string, switcher any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.TrackSwitchers == nil {
+		r.TrackSwitchers = make(map[string]any)
+	}
+	r.TrackSwitchers[viewerID] = switcher
+}
+
+// UnregisterTrackSwitcher removes a viewer's TrackSwitcher from the room
+func (r *Room) UnregisterTrackSwitcher(viewerID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.TrackSwitchers != nil {
+		delete(r.TrackSwitchers, viewerID)
+	}
+}
+
+// GetAllTrackSwitchers returns a snapshot copy of all active track switchers
+func (r *Room) GetAllTrackSwitchers() map[string]any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.TrackSwitchers == nil {
+		return make(map[string]any)
+	}
+	copyMap := make(map[string]any, len(r.TrackSwitchers))
+	for k, v := range r.TrackSwitchers {
+		copyMap[k] = v
+	}
+	return copyMap
 }
 
 // GetAllCoHostTracks returns a shallow copy of all registered co-host media

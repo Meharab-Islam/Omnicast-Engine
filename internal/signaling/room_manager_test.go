@@ -281,3 +281,223 @@ func TestViewerUpdateEvent(t *testing.T) {
 		t.Error("Expected host to receive viewer_update on removal")
 	}
 }
+
+func TestRoomStateSyncAndGiftScore(t *testing.T) {
+	rm := NewRoomManager()
+	room, err := rm.CreateRoom("room-state-test", "host-st")
+	if err != nil {
+		t.Fatalf("Failed to create room: %v", err)
+	}
+
+	// Verify initial RoomState
+	state := rm.GetRoomState("room-state-test")
+	if state == nil {
+		t.Fatal("Expected non-nil RoomState from RoomManager")
+	}
+	if state.HostID != "host-st" || state.RoomID != "room-state-test" {
+		t.Fatalf("Unexpected state: %+v", state)
+	}
+
+	// Test Gift Scoring
+	newScore := rm.AddGiftScore("room-state-test", 25)
+	if newScore != 25 || room.GetHostScore() != 25 {
+		t.Fatalf("Expected new score 25, got %d", newScore)
+	}
+
+	// Test Media State
+	rm.SetMediaState("room-state-test", "host-st", models.MediaState{MutedAudio: true, MutedVideo: false})
+	updatedState := rm.GetRoomState("room-state-test")
+	if !updatedState.MediaStates["host-st"].MutedAudio {
+		t.Fatal("Expected host-st audio to be marked muted in RoomState")
+	}
+}
+
+func TestSeatManagementLifecycle(t *testing.T) {
+	rm := NewRoomManager()
+	room, err := rm.CreateRoom("room-seat-lifecycle", "host-leader")
+	if err != nil {
+		t.Fatalf("Failed to create room: %v", err)
+	}
+
+	hostClient := &Client{ID: "host-leader", Role: "host", RoomManager: rm, Send: make(chan []byte, 10)}
+	room.SetHostClient(hostClient)
+
+	viewerClient := &Client{ID: "viewer-guest", Role: "viewer", RoomManager: rm, Send: make(chan []byte, 10)}
+	_ = rm.JoinViewer("room-seat-lifecycle", viewerClient)
+
+	// Drain initial join messages (viewer_update)
+	for len(hostClient.Send) > 0 {
+		<-hostClient.Send
+	}
+	for len(viewerClient.Send) > 0 {
+		<-viewerClient.Send
+	}
+
+	// 1. Viewer sends seat_request
+	reqMsg := &models.SignalingMessage{
+		Event:  "seat_request",
+		RoomID: "room-seat-lifecycle",
+		UserID: "viewer-guest",
+	}
+	viewerClient.handleSeatRequest(reqMsg)
+
+	// Check host received seat_request
+	select {
+	case hostBytes := <-hostClient.Send:
+		var parsed models.SignalingMessage
+		_ = json.Unmarshal(hostBytes, &parsed)
+		if parsed.Event != "seat_request" || parsed.UserID != "viewer-guest" {
+			t.Fatalf("Expected seat_request for viewer-guest, got %+v", parsed)
+		}
+	default:
+		t.Fatal("Expected host to receive seat_request")
+	}
+
+	// 2. Host accepts seat
+	acceptMsg := &models.SignalingMessage{
+		Event:      "seat_accept",
+		RoomID:     "room-seat-lifecycle",
+		UserID:     "host-leader",
+		TargetUser: "viewer-guest",
+	}
+	hostClient.handleSeatAccept(acceptMsg)
+
+	// Check viewer received seat_accept
+	select {
+	case vBytes := <-viewerClient.Send:
+		var parsed models.SignalingMessage
+		_ = json.Unmarshal(vBytes, &parsed)
+		if parsed.Event != "seat_accept" {
+			t.Fatalf("Expected seat_accept event for viewer, got %s", parsed.Event)
+		}
+	default:
+		t.Fatal("Expected viewer to receive seat_accept")
+	}
+
+	if viewerClient.Role != "cohost" {
+		t.Fatalf("Expected viewer role to be upgraded to 'cohost', got '%s'", viewerClient.Role)
+	}
+
+	seats := room.GetActiveSeats()
+	if seats["1"] != "viewer-guest" {
+		t.Fatalf("Expected seat 1 to be assigned to viewer-guest, got %+v", seats)
+	}
+
+	// 3. Co-Host leaves seat
+	leaveMsg := &models.SignalingMessage{
+		Event:  "leave_seat",
+		RoomID: "room-seat-lifecycle",
+		UserID: "viewer-guest",
+	}
+	viewerClient.handleLeaveSeat(leaveMsg)
+
+	if viewerClient.Role != "viewer" {
+		t.Fatalf("Expected role to be reset to 'viewer', got '%s'", viewerClient.Role)
+	}
+
+	seatsAfterLeave := room.GetActiveSeats()
+	if _, exists := seatsAfterLeave["1"]; exists {
+		t.Fatal("Expected seat 1 to be cleared after leave_seat")
+	}
+}
+
+func TestPKBattleFullLifecycle(t *testing.T) {
+	rm := NewRoomManager()
+	pkm := NewPKManager(rm)
+	rm.SetPKManager(pkm)
+
+	// Create Room A & Host A
+	roomA, err := rm.CreateRoom("room-pk-A", "host-A")
+	if err != nil {
+		t.Fatalf("Failed to create room-pk-A: %v", err)
+	}
+	hostA := &Client{ID: "host-A", Role: "host", RoomManager: rm, Send: make(chan []byte, 10)}
+	roomA.SetHostClient(hostA)
+
+	// Create Room B & Host B
+	roomB, err := rm.CreateRoom("room-pk-B", "host-B")
+	if err != nil {
+		t.Fatalf("Failed to create room-pk-B: %v", err)
+	}
+	hostB := &Client{ID: "host-B", Role: "host", RoomManager: rm, Send: make(chan []byte, 10)}
+	roomB.SetHostClient(hostB)
+
+	// 1. Host A requests PK with Room B
+	pkReqMsg := &models.SignalingMessage{
+		Event:      "pk_request",
+		RoomID:     "room-pk-A",
+		UserID:     "host-A",
+		TargetUser: "room-pk-B",
+	}
+	hostA.handlePKRequest(pkReqMsg)
+
+	// Verify Host B received pk_request
+	select {
+	case hostBBytes := <-hostB.Send:
+		var parsed models.SignalingMessage
+		_ = json.Unmarshal(hostBBytes, &parsed)
+		if parsed.Event != "pk_request" {
+			t.Fatalf("Expected pk_request for Host B, got %s", parsed.Event)
+		}
+	default:
+		t.Fatal("Expected Host B to receive pk_request")
+	}
+
+	// 2. Host B accepts PK
+	pkAcceptMsg := &models.SignalingMessage{
+		Event:      "pk_accept",
+		RoomID:     "room-pk-B",
+		UserID:     "host-B",
+		TargetUser: "room-pk-A",
+	}
+	hostB.handlePKAccept(pkAcceptMsg)
+
+	// Check active PKSession
+	session, inPK := pkm.GetPKSession("room-pk-A")
+	if !inPK || session == nil {
+		t.Fatal("Expected active PKSession for room-pk-A")
+	}
+	if session.RoomID1 != "room-pk-A" || session.RoomID2 != "room-pk-B" {
+		t.Fatalf("Unexpected session data: %+v", session)
+	}
+
+	// Drain pk_started messages
+	for len(hostA.Send) > 0 {
+		<-hostA.Send
+	}
+	for len(hostB.Send) > 0 {
+		<-hostB.Send
+	}
+
+	// 3. Test Score Sync
+	rm.AddGiftScore("room-pk-A", 100)
+
+	// Host A and Host B should receive pk_score_update
+	select {
+	case aBytes := <-hostA.Send:
+		var parsed models.SignalingMessage
+		_ = json.Unmarshal(aBytes, &parsed)
+		if parsed.Event != "pk_score_update" {
+			t.Fatalf("Expected pk_score_update for Host A, got %s", parsed.Event)
+		}
+	default:
+		t.Fatal("Expected Host A to receive pk_score_update")
+	}
+
+	select {
+	case bBytes := <-hostB.Send:
+		var parsed models.SignalingMessage
+		_ = json.Unmarshal(bBytes, &parsed)
+		if parsed.Event != "pk_score_update" {
+			t.Fatalf("Expected pk_score_update for Host B, got %s", parsed.Event)
+		}
+	default:
+		t.Fatal("Expected Host B to receive pk_score_update")
+	}
+
+	// 4. End PK Battle
+	_ = pkm.StopPK("room-pk-A")
+	if _, stillActive := pkm.GetPKSession("room-pk-A"); stillActive {
+		t.Fatal("Expected PK session to be removed after StopPK")
+	}
+}

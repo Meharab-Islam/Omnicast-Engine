@@ -13,9 +13,11 @@ const DefaultJWTSecret = "live_media_server_jwt_secret_key_2026"
 
 // UserClaims defines the JWT payload structure for authenticated streaming
 type UserClaims struct {
-	UserID string `json:"user_id"`
-	Role   string `json:"role"` // "host", "viewer", "cohost"
-	RoomID string `json:"room_id"`
+	UserID    string `json:"user_id"`
+	UserName  string `json:"user_name,omitempty"`
+	AvatarURL string `json:"avatar_url,omitempty"`
+	Role      string `json:"role,omitempty"` // "host", "viewer", "cohost", "edge_server"
+	RoomID    string `json:"room_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -26,6 +28,29 @@ func GetJWTSecret() string {
 		return DefaultJWTSecret
 	}
 	return secret
+}
+
+// GenerateUserToken creates a signed JWT token containing user profile details (user_id, user_name, avatar_url)
+func GenerateUserToken(userID, userName, avatarURL, secret string, duration time.Duration) (string, error) {
+	if secret == "" {
+		secret = GetJWTSecret()
+	}
+
+	claims := UserClaims{
+		UserID:    userID,
+		UserName:  userName,
+		AvatarURL: avatarURL,
+		Role:      "user",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    "live-media-server",
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(secret))
 }
 
 // GenerateToken creates a signed JWT token with user_id, role, and room_id

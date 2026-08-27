@@ -171,8 +171,8 @@ func (cm *CascadeManager) connectAndRelay(session *CascadeSession, room *models.
 	}
 	session.WSConn = wsConn
 
-	// Create Inter-Server PeerConnection
-	pc, err := cm.webrtcAPI.NewPeerConnection(DefaultCascadeRTCConfiguration)
+	// Create Inter-Server PeerConnection with dynamic TURN/STUN configuration
+	pc, err := cm.webrtcAPI.NewPeerConnection(GetDynamicRTCConfiguration("cascade-edge-" + cm.serverID))
 	if err != nil {
 		return fmt.Errorf("failed to create inter-server PeerConnection: %w", err)
 	}
@@ -236,9 +236,12 @@ func (cm *CascadeManager) connectAndRelay(session *CascadeSession, room *models.
 			log.Printf("[SFU Cascade] Set audio track on Edge node for Room: %s\n", room.RoomID)
 		}
 
-		// Relay loop: Read RTP packets from Origin and write to Edge's local TrackLocalStaticRTP
+		// Relay loop: Read RTP packets from Origin and write to Edge's local TrackLocalStaticRTP (Zero-Allocation)
 		go func() {
-			buf := make([]byte, 1500)
+			bufPtr := GetRTPBuffer()
+			defer PutRTPBuffer(bufPtr)
+			buf := *bufPtr
+
 			for {
 				n, _, readErr := remoteTrack.Read(buf)
 				if readErr != nil {

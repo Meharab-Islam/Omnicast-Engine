@@ -3,22 +3,24 @@ services:
     build: .
     container_name: live-media-server
     ports:
-      - "8080:8080" # HTTP & WebSocket
+      - "${PORT:-8080}:8080" # HTTP & WebSocket
       - "50000-50050:50000-50050/udp" # WebRTC Media Ports
     environment:
       - PORT=8080
-      - SERVER_ROLE=origin
-      - SERVER_ID=origin-server-1
-      - PUBLIC_IP=192.168.0.116
-      - SERVER_SECRET=super_secret_cascade_key_123
-      - SERVER_PUBLIC_ADDR=ws://192.168.0.116:8080/ws
-      - REDIS_ADDR=redis:6379
-      - TURN_URL=turn:192.168.0.116:3478
-      - TURN_USERNAME=myuser
-      - TURN_PASSWORD=mypassword
+      - SERVER_ROLE=${SERVER_ROLE:-origin}
+      - SERVER_ID=${SERVER_ID:-origin-server-1}
+      - PUBLIC_IP=${PUBLIC_IP:-192.168.0.116}
+      - SERVER_SECRET=${SERVER_SECRET:-super_secret_cascade_key_123}
+      - API_KEY=${API_KEY:-dev_api_key_123}
+      - API_SECRET=${API_SECRET:-dev_api_secret_456}
+      - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_789}
+      - REDIS_ADDR=${REDIS_ADDR:-redis:6379}
+      - TURN_SECRET=${TURN_SECRET:-my_super_secure_turn_secret_999}
+      - TURN_REALM=${TURN_REALM:-live.myvps.com}
+      - TURN_URL=${TURN_URL:-turn:192.168.0.116:3478}
     depends_on:
       - redis
-      - turn-server
+      - coturn
     restart: unless-stopped
 
   redis:
@@ -28,20 +30,25 @@ services:
       - "6379:6379"
     restart: unless-stopped
 
-  turn-server:
+  coturn:
     image: coturn/coturn
     container_name: coturn-server
     ports:
       - "3478:3478"
       - "3478:3478/udp"
+      - "49152-49250:49152-49250/udp"
     command:
       - turnserver
-      - -a
-      - -o
+      - --log-file=stdout
+      - --external-ip=${PUBLIC_IP:-192.168.0.116}
+      - --use-auth-secret
+      - --static-auth-secret=${TURN_SECRET:-my_super_secure_turn_secret_999}
+      - --realm=${TURN_REALM:-live.myvps.com}
+      - --total-quota=100
+      - --min-port=49152
+      - --max-port=49250
       - -v
       - -n
-      - --no-dtls
       - --no-tls
-      - -u=myuser:mypassword
-      - -r=myrealm.com
+      - --no-dtls
     restart: unless-stopped

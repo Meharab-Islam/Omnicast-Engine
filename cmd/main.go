@@ -63,7 +63,7 @@ func main() {
 	roomManager.SetCascadeManager(cascadeManager)
 
 	pkManager := signaling.NewPKManager(roomManager)
-	_ = pkManager // Available for PK session management
+	roomManager.SetPKManager(pkManager)
 
 	hub := signaling.NewHub(roomManager)
 	go hub.Run()
@@ -115,6 +115,10 @@ func main() {
 			},
 		})
 	})
+
+	// Initialize REST Auth Handler for API Key / Secret validation and JWT generation
+	authHandler := api.NewAuthHandler()
+	app.Post("/api/auth/token", authHandler.HandleTokenGeneration)
 
 	// GET /auth/demo-token - Generates a signed JWT token for test clients
 	app.Get("/auth/demo-token", func(c *fiber.Ctx) error {

@@ -805,6 +805,12 @@
         </div>
 
         <div style="display: flex; gap: 10px; align-items: center;">
+          <button id="btnStartPK" class="btn" style="background: linear-gradient(135deg, #ec4899, #8b5cf6); color: white; display: none;" onclick="promptPKChallenge()">
+            ⚔️ PK Battle
+          </button>
+          <button id="btnStopPK" class="btn" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); display: none;" onclick="stopPKBattle()">
+            🛑 End PK
+          </button>
           <button id="btnRequestSeat" class="btn btn-seat" onclick="requestSeat()">
             🎤 Request Seat
           </button>
@@ -825,6 +831,29 @@
         <div style="display: flex; gap: 8px;">
           <button class="btn btn-accept" onclick="acceptSeatRequest()">✅ Accept</button>
           <button class="btn btn-reject" onclick="dismissSeatRequest()">❌ Reject</button>
+        </div>
+      </div>
+
+      <!-- Incoming PK Battle Request Notification -->
+      <div class="seat-alert" id="pkAlertBox" style="display: none; background: rgba(236, 72, 153, 0.15); border-color: rgba(236, 72, 153, 0.4);">
+        <div>
+          <strong>⚔️ PK Battle Challenge:</strong> Room <span id="pkRequesterRoomId" style="color: var(--accent-pink); font-weight: 700;"></span> challenged you to a PK Battle!
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-accept" style="background: var(--accent-pink);" onclick="acceptPKRequest()">⚔️ Accept PK</button>
+          <button class="btn btn-reject" onclick="dismissPKRequest()">❌ Decline</button>
+        </div>
+      </div>
+
+      <!-- Real-time PK Battle Progress Bar -->
+      <div id="pkContainer" style="display: none; margin-bottom: 12px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(236, 72, 153, 0.4); border-radius: 12px; padding: 10px 16px;">
+        <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 13px; margin-bottom: 6px;">
+          <span style="color: var(--accent-cyan);">🔵 <span id="pkHost1Label">Room A</span>: <strong id="pkScore1">0</strong> pts</span>
+          <span style="color: var(--accent-pink); font-size: 14px; letter-spacing: 1px;">⚔️ PK BATTLE LIVE ⚔️</span>
+          <span style="color: var(--accent-pink);"><span id="pkHost2Label">Room B</span>: <strong id="pkScore2">0</strong> pts 🔴</span>
+        </div>
+        <div style="width: 100%; height: 12px; background: rgba(236, 72, 153, 0.5); border-radius: 6px; overflow: hidden; display: flex;">
+          <div id="pkProgressBar" style="width: 50%; height: 100%; background: var(--accent-cyan); transition: width 0.3s ease;"></div>
         </div>
       </div>
 
@@ -920,6 +949,9 @@
     let localStream = null;
     let remoteStream = null;
     let isHost = false;
+    let isLeaving = false;
+    let hostReconnectTimeout = null;
+    let isReconnectingHost = false;
     let currentRoomID = '';
     let currentRoomName = '';
     let pendingRequesterId = null;
@@ -1009,6 +1041,13 @@
       document.getElementById('lobby-screen').style.display = 'none';
       document.getElementById('room-screen').style.display = 'flex';
       document.getElementById('currentRoomTitle').innerText = roomName || roomID;
+      if (isHost) {
+        document.getElementById('btnStartPK').style.display = 'inline-block';
+        document.getElementById('btnRequestSeat').style.display = 'none';
+      } else {
+        document.getElementById('btnStartPK').style.display = 'none';
+        document.getElementById('btnRequestSeat').style.display = 'inline-block';
+      }
     }
 
     function showLobbyView() {
@@ -1031,6 +1070,7 @@
 
         // 2. Switch UI view
         isHost = true;
+        isLeaving = false;
         showRoomView(roomID, roomName);
 
         const mainVideo = document.getElementById('mainVideo');
@@ -1050,22 +1090,31 @@
         const iceConfig = await fetchIceServersConfig();
         peerConnection = new RTCPeerConnection(iceConfig);
 
-        peerConnection.onicecandidate = (event) => {
-          if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              event: 'ice',
-              room_id: roomID,
-              user_id: myUserID,
-              payload: event.candidate.toJSON()
-            }));
-          }
-        };
+        setupHostPeerConnection(peerConnection, roomID, roomName);
 
-        // 5. অফার তৈরির আগেই Track অ্যাড করো (খুবই জরুরি):
-        localStream.getTracks().forEach(track => {
-          peerConnection.addTrack(track, localStream);
-          console.log('[Host] Attached track to PeerConnection:', track.kind, track.id);
-        });
+        // 5. Configure Simulcast Video Transceiver with 3 quality layers (High 'f', Med 'h', Low 'q')
+        const videoTrack = localStream.getVideoTracks()[0];
+        if (videoTrack) {
+          peerConnection.addTransceiver(videoTrack, {
+            direction: 'sendonly',
+            streams: [localStream],
+            sendEncodings: [
+              { rid: 'f', active: true, maxBitrate: 1200000 },
+              { rid: 'h', active: true, maxBitrate: 500000, scaleResolutionDownBy: 2 },
+              { rid: 'q', active: true, maxBitrate: 150000, scaleResolutionDownBy: 4 }
+            ]
+          });
+          console.log('[Host Simulcast] Added Video Transceiver with 3 encodings (f, h, q)');
+        }
+
+        const audioTrack = localStream.getAudioTracks()[0];
+        if (audioTrack) {
+          peerConnection.addTransceiver(audioTrack, {
+            direction: 'sendonly',
+            streams: [localStream]
+          });
+          console.log('[Host] Added Audio Transceiver');
+        }
 
         // 6. এরপর Offer তৈরি করো:
         const offer = await peerConnection.createOffer();
@@ -1158,6 +1207,15 @@
               document.getElementById('wsStatus').innerText = 'Disconnected';
               if (!opened) {
                 reject(new Error('WebSocket closed before opening'));
+              }
+
+              // Host Auto-Reconnect trigger
+              if (isHost && !isLeaving && currentRoomID) {
+                addLog('WebSocket disconnected. Host attempting auto-reconnect in 3s...', 'warn');
+                clearTimeout(hostReconnectTimeout);
+                hostReconnectTimeout = setTimeout(() => {
+                  reconnectHost();
+                }, 3000);
               }
             };
 
@@ -1265,27 +1323,39 @@
           updateViewersUI(totalViewers, viewersList);
           break;
 
+        case 'room_info_sync':
         case 'room_info':
           if (msg.payload) {
             const info = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;
             if (info.host_score !== undefined) {
-              document.getElementById('hostCoinBalance').innerText = info.host_score;
+              const coinEl = document.getElementById('hostCoinBalance');
+              if (coinEl) coinEl.innerText = info.host_score;
             }
-            if (info.viewer_count !== undefined) {
-              console.log("[Late Joiner Sync] Initial viewer count:", info.viewer_count);
+            if (info.total_viewers !== undefined || info.viewer_count !== undefined) {
+              const vCount = info.total_viewers !== undefined ? info.total_viewers : info.viewer_count;
+              console.log("[Late Joiner Sync] Initial viewer count:", vCount);
               const vBadgeSync = document.getElementById('viewer-count-badge') || document.getElementById('viewerCountBadge');
               if (vBadgeSync) {
-                vBadgeSync.innerText = `👥 ${info.viewer_count} Viewers`;
+                vBadgeSync.innerText = `👥 ${vCount} Viewers`;
               }
             }
             if (info.main_seat_id) {
               document.getElementById('mainSeatText').innerText = info.main_seat_id;
               swapToMainStage(info.main_seat_id);
             }
+            if (info.active_seats) {
+              Object.entries(info.active_seats).forEach(([seatIdx, uId]) => {
+                if (uId && uId !== info.host_id) {
+                  createCoHostCard(uId);
+                }
+              });
+            }
             if (info.active_cohosts) {
               info.active_cohosts.forEach(id => createCoHostCard(id));
             }
-            appendSystemMessage(`ℹ️ Room created at ${new Date(info.created_at).toLocaleTimeString()}`);
+            if (info.created_at) {
+              appendSystemMessage(`ℹ️ Room state synced. Live since ${new Date(info.created_at).toLocaleTimeString()}`);
+            }
           }
           break;
 
@@ -1326,12 +1396,15 @@
           }
           break;
 
+        case 'gift_processed':
         case 'gift_received':
           if (msg.payload) {
             const data = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;
             const newScore = data.new_score !== undefined ? data.new_score : (data.coins || 10);
-            document.getElementById('hostCoinBalance').innerText = newScore;
-            appendGiftMessage(data.sender_id || msg.user_id, data.coins || 10);
+            const coinEl = document.getElementById('hostCoinBalance');
+            if (coinEl) coinEl.innerText = newScore;
+            const sender = data.sender || data.sender_id || msg.user_id;
+            appendGiftMessage(sender, data.coins || 10);
           }
           break;
 
@@ -1346,6 +1419,82 @@
           if (target === myUserID) {
             appendSystemMessage('🎉 You are now a Co-Host! Publishing your stream...');
             await becomeCoHostPublisher();
+          }
+          break;
+
+        case 'seat_updated':
+          if (msg.payload) {
+            const seatData = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;
+            const action = seatData.action;
+            const targetUId = seatData.user_id;
+            console.log(`[Seat Updated] Action: ${action}, User: ${targetUId}`, seatData);
+
+            if (action === 'join' && targetUId) {
+              if (targetUId !== myUserID) {
+                createCoHostCard(targetUId);
+              }
+              appendSystemMessage(`🎤 Participant ${targetUId} joined Co-Host seat ${seatData.seat_id || ''}`);
+            } else if (action === 'leave' || action === 'kick') {
+              removeCoHostCard(targetUId);
+              if (targetUId === myUserID) {
+                appendSystemMessage(action === 'kick' ? '⚠️ You were removed from the Co-Host seat by the host.' : 'ℹ️ You stepped down from the Co-Host seat.');
+                const localCard = document.getElementById('card-local-preview');
+                if (localCard) localCard.style.display = 'none';
+              } else {
+                appendSystemMessage(`ℹ️ Participant ${targetUId} ${action === 'kick' ? 'was kicked from' : 'left'} Co-Host seat.`);
+              }
+            }
+          }
+          break;
+
+        case 'seat_left':
+        case 'seat_kicked':
+        case 'cohost_left':
+          const leftUserId = (msg.payload && (msg.payload.cohost_id || msg.payload.user_id)) || msg.user_id;
+          if (leftUserId) {
+            removeCoHostCard(leftUserId);
+            if (leftUserId === myUserID) {
+              const localCard = document.getElementById('card-local-preview');
+              if (localCard) localCard.style.display = 'none';
+              appendSystemMessage('ℹ️ You are now back to viewer mode.');
+            }
+          }
+          break;
+
+        case 'pk_request':
+          if (isHost && msg.payload) {
+            const pkData = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;
+            pendingPKRequesterRoom = pkData.from_room_id || pkData.room_a_id || msg.room_id;
+            document.getElementById('pkRequesterRoomId').innerText = pendingPKRequesterRoom;
+            document.getElementById('pkAlertBox').style.display = 'flex';
+            appendSystemMessage(`⚔️ Incoming PK Battle challenge from Room ${pendingPKRequesterRoom}!`);
+          }
+          break;
+
+        case 'pk_started':
+          const startData = msg.payload ? (typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload) : {};
+          appendSystemMessage(`🔥 PK BATTLE STARTED! ${startData.room_1 || 'Room A'} vs ${startData.room_2 || 'Room B'}`);
+          document.getElementById('pkContainer').style.display = 'block';
+          if (isHost) {
+            document.getElementById('btnStartPK').style.display = 'none';
+            document.getElementById('btnStopPK').style.display = 'inline-block';
+          }
+          updatePKScoreUI(startData.host_1_score || 0, startData.host_2_score || 0);
+          break;
+
+        case 'pk_score_update':
+          const scoreData = msg.payload ? (typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload) : {};
+          const s1 = scoreData.room_a_score ?? scoreData.score_1 ?? scoreData.host_1_score ?? 0;
+          const s2 = scoreData.room_b_score ?? scoreData.score_2 ?? scoreData.host_2_score ?? 0;
+          updatePKScoreUI(s1, s2);
+          break;
+
+        case 'pk_ended':
+          appendSystemMessage('🏁 PK Battle has ended. Great match!');
+          document.getElementById('pkContainer').style.display = 'none';
+          if (isHost) {
+            document.getElementById('btnStartPK').style.display = 'inline-block';
+            document.getElementById('btnStopPK').style.display = 'none';
           }
           break;
 
@@ -1694,13 +1843,18 @@
       card.id = `card-cohost-${coHostID}`;
       card.setAttribute('data-user-id', coHostID);
 
+      const kickBtnHtml = isHost ? `<button class="btn-pin" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; margin-left: 4px;" onclick="kickSeat('${escapeHtml(coHostID)}')">🚫 Kick</button>` : '';
+
       card.innerHTML = `
         <div class="video-header">
           <div class="video-header-left">
             <span class="tag tag-cohost">Co-Host</span>
             <span>${escapeHtml(coHostID)}</span>
           </div>
-          <button class="btn-pin" onclick="pinUserToMain('${escapeHtml(coHostID)}')">📌 Pin to Main</button>
+          <div style="display: flex; gap: 4px;">
+            <button class="btn-pin" onclick="pinUserToMain('${escapeHtml(coHostID)}')">📌 Pin</button>
+            ${kickBtnHtml}
+          </div>
         </div>
         <div class="video-wrapper">
           <video id="video-cohost-${escapeHtml(coHostID)}" autoplay playsinline></video>
@@ -1709,6 +1863,14 @@
 
       cohostGrid.appendChild(card);
       return card;
+    }
+
+    function removeCoHostCard(coHostID) {
+      const card = document.querySelector(`[data-user-id="${coHostID}"]`);
+      if (card && card.id !== 'card-main-stream') {
+        card.remove();
+        console.log('[Seat Management] Removed CoHost video card for:', coHostID);
+      }
     }
 
     // Chat, Seat & Gift Handlers
@@ -1758,9 +1920,84 @@
       dismissSeatRequest();
     }
 
-    function dismissSeatRequest() {
-      pendingRequesterId = null;
-      document.getElementById('seatAlertBox').style.display = 'none';
+    function leaveSeat() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({
+        event: 'leave_seat',
+        room_id: currentRoomID,
+        user_id: myUserID
+      }));
+      appendSystemMessage('Stepping down from Co-Host seat...');
+    }
+
+    function kickSeat(targetUserId) {
+      if (!ws || ws.readyState !== WebSocket.OPEN || !targetUserId) return;
+      ws.send(JSON.stringify({
+        event: 'kick_seat',
+        room_id: currentRoomID,
+        user_id: myUserID,
+        target_user: targetUserId,
+        payload: { target_user: targetUserId }
+      }));
+      appendSystemMessage(`Kicking Co-Host ${targetUserId}...`);
+    }
+
+    let pendingPKRequesterRoom = null;
+
+    function promptPKChallenge() {
+      const targetRoom = prompt('Enter opponent Room ID to challenge for PK Battle:');
+      if (!targetRoom || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+      ws.send(JSON.stringify({
+        event: 'pk_request',
+        room_id: currentRoomID,
+        user_id: myUserID,
+        target_user: targetRoom.trim(),
+        payload: { target_room: targetRoom.trim() }
+      }));
+      appendSystemMessage(`⚔️ PK Battle challenge sent to Room ${targetRoom}...`);
+    }
+
+    function acceptPKRequest() {
+      if (!pendingPKRequesterRoom || !ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({
+        event: 'pk_accept',
+        room_id: currentRoomID,
+        user_id: myUserID,
+        target_user: pendingPKRequesterRoom,
+        payload: { target_room: pendingPKRequesterRoom }
+      }));
+      dismissPKRequest();
+    }
+
+    function dismissPKRequest() {
+      pendingPKRequesterRoom = null;
+      document.getElementById('pkAlertBox').style.display = 'none';
+    }
+
+    function stopPKBattle() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({
+        event: 'pk_stop',
+        room_id: currentRoomID,
+        user_id: myUserID
+      }));
+      appendSystemMessage('Ending PK Battle session...');
+    }
+
+    function updatePKScoreUI(score1, score2) {
+      const s1El = document.getElementById('pkScore1');
+      const s2El = document.getElementById('pkScore2');
+      const barEl = document.getElementById('pkProgressBar');
+
+      if (s1El) s1El.innerText = score1;
+      if (s2El) s2El.innerText = score2;
+
+      if (barEl) {
+        const total = (score1 + score2) || 1;
+        const pct1 = Math.max(10, Math.min(90, Math.round((score1 / total) * 100)));
+        barEl.style.width = `${pct1}%`;
+      }
     }
 
     function updateViewersUI(count, viewersList = []) {
@@ -1822,6 +2059,8 @@
     }
 
     function stopStream() {
+      isLeaving = true;
+      clearTimeout(hostReconnectTimeout);
       if (localStream) {
         localStream.getTracks().forEach(t => t.stop());
         localStream = null;
@@ -1838,6 +2077,89 @@
       document.getElementById('localVideo').srcObject = null;
       document.getElementById('card-local-preview').style.display = 'none';
       dismissSeatRequest();
+    }
+
+    // Host PeerConnection event handlers
+    function setupHostPeerConnection(pc, roomID, roomName) {
+      pc.onicecandidate = (event) => {
+        if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            event: 'ice',
+            room_id: roomID,
+            user_id: myUserID,
+            payload: event.candidate.toJSON()
+          }));
+        }
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        console.log('[Host ICE Connection State]:', pc.iceConnectionState);
+        if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+          if (isHost && !isLeaving) {
+            addLog(`Host ICE state '${pc.iceConnectionState}'. Initiating auto-reconnect...`, 'warn');
+            clearTimeout(hostReconnectTimeout);
+            hostReconnectTimeout = setTimeout(reconnectHost, 1000);
+          }
+        }
+      };
+    }
+
+    // Host Auto-Reconnect Function
+    async function reconnectHost() {
+      if (!isHost || isLeaving || !currentRoomID || isReconnectingHost) return;
+      isReconnectingHost = true;
+      addLog('🔄 Auto-reconnecting Host to Room: ' + currentRoomID, 'info');
+
+      try {
+        await initWebSocket(currentRoomID, 'host');
+
+        // Verify or re-acquire media stream
+        if (!localStream || localStream.getTracks().length === 0 || !localStream.active) {
+          localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          const mainVideo = document.getElementById('mainVideo');
+          if (mainVideo) {
+            mainVideo.srcObject = localStream;
+            mainVideo.play().catch(() => {});
+          }
+        }
+
+        if (peerConnection) {
+          try { peerConnection.close(); } catch (_) {}
+          peerConnection = null;
+        }
+
+        const iceConfig = await fetchIceServersConfig();
+        peerConnection = new RTCPeerConnection(iceConfig);
+        setupHostPeerConnection(peerConnection, currentRoomID, currentRoomName);
+
+        // Re-attach tracks
+        localStream.getTracks().forEach(track => {
+          peerConnection.addTrack(track, localStream);
+          console.log('[Host Reconnect] Attached track:', track.kind, track.id);
+        });
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+
+        ws.send(JSON.stringify({
+          event: 'publish',
+          room_id: currentRoomID,
+          room_name: currentRoomName,
+          user_id: myUserID,
+          payload: {
+            sdp: offer.sdp,
+            type: offer.type
+          }
+        }));
+
+        addLog('🎉 Host successfully reconnected and stream published!', 'success');
+      } catch (err) {
+        addLog('Host auto-reconnect attempt failed: ' + err.message + '. Retrying in 3s...', 'error');
+        clearTimeout(hostReconnectTimeout);
+        hostReconnectTimeout = setTimeout(reconnectHost, 3000);
+      } finally {
+        isReconnectingHost = false;
+      }
     }
 
     function addLog(text, type = 'info') {

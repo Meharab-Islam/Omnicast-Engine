@@ -45,13 +45,28 @@ func TestRedisBroker_NilOperations(t *testing.T) {
 		t.Fatal("expected error on RegisterRoomOrigin of nil broker")
 	}
 
-	_, err = b.GetRoomOrigin("room-101")
-	if err == nil {
-		t.Fatal("expected error on GetRoomOrigin of nil broker")
-	}
-
 	err = b.RemoveRoomOrigin("room-101")
 	if err == nil {
 		t.Fatal("expected error on RemoveRoomOrigin of nil broker")
+	}
+
+	err = b.SaveRoomState(nil, nil)
+	if err == nil {
+		t.Fatal("expected error on SaveRoomState of nil broker")
+	}
+
+	_, err = b.GetRoomState(nil, "room-101")
+	if err == nil {
+		t.Fatal("expected error on GetRoomState of nil broker")
+	}
+
+	_, err = b.IncrementHostScore(nil, "room-101", 10)
+	if err == nil {
+		t.Fatal("expected error on IncrementHostScore of nil broker")
+	}
+
+	err = b.DeleteRoomState(nil, "room-101")
+	if err == nil {
+		t.Fatal("expected error on DeleteRoomState of nil broker")
 	}
 }

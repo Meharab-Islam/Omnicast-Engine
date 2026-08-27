@@ -3,25 +3,18 @@ package signaling
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 	"time"
 
-	"github.com/pion/webrtc/v3"
 	"live-media-server/internal/models"
 )
 
-// PKSession stores details of a PK battle session between two rooms
-type PKSession struct {
-	RoomID1   string    `json:"room_id_1"`
-	RoomID2   string    `json:"room_id_2"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-// PKManager manages live PK battle sessions and cross-routing media streams between rooms
+// PKManager manages live PK battle sessions, cross-room media track distribution, and real-time score syncing
 type PKManager struct {
 	roomManager *RoomManager
-	activePKs   map[string]*PKSession
+	activePKs   map[string]*models.PKSession
 	mu          sync.RWMutex
 }
 
@@ -29,12 +22,12 @@ type PKManager struct {
 func NewPKManager(rm *RoomManager) *PKManager {
 	return &PKManager{
 		roomManager: rm,
-		activePKs:   make(map[string]*PKSession),
+		activePKs:   make(map[string]*models.PKSession),
 	}
 }
 
-// StartPK establishes cross-routing between Room 1 and Room 2.
-// Room 1 Host's tracks are forwarded to Room 2 Viewers, and Room 2 Host's tracks are forwarded to Room 1 Viewers.
+// StartPK establishes cross-room routing and WebRTC renegotiation between Room 1 and Room 2.
+// Host 1's media tracks are forwarded to Room 2, and Host 2's media tracks are forwarded to Room 1.
 func (pkm *PKManager) StartPK(roomID1, roomID2 string) error {
 	if roomID1 == "" || roomID2 == "" {
 		return errors.New("both roomID1 and roomID2 must be specified")
@@ -46,7 +39,7 @@ func (pkm *PKManager) StartPK(roomID1, roomID2 string) error {
 	pkm.mu.Lock()
 	defer pkm.mu.Unlock()
 
-	// Check if any of the rooms are already in a PK session
+	// Check if any room is already in a PK session
 	if _, exists := pkm.activePKs[roomID1]; exists {
 		return errors.New("room1 is already engaged in a PK session")
 	}
@@ -65,165 +58,215 @@ func (pkm *PKManager) StartPK(roomID1, roomID2 string) error {
 		return errors.New("room2 not found: " + roomID2)
 	}
 
-	log.Printf("Starting PK battle cross-routing between Room '%s' and Room '%s'...\n", roomID1, roomID2)
-
-	// 1. Cross-route: Forward Room 1's Host tracks to Room 2 Viewers
-	for viewerID, v := range room2.Viewers {
-		if viewerClient, ok := v.(*Client); ok && viewerClient != nil {
-			addTracksToPeer(viewerClient, room1.VideoTrack, room1.AudioTrack)
-			log.Printf("Added Room 1 tracks to Viewer %s in Room 2\n", viewerID)
-		}
+	// Trigger Edge-to-Origin cascading logic if rooms are distributed across cluster nodes
+	if cascadeMgr := pkm.roomManager.GetCascadeManager(); cascadeMgr != nil {
+		_ = cascadeMgr.EnsureCascaded(room1)
+		_ = cascadeMgr.EnsureCascaded(room2)
 	}
 
-	// 2. Cross-route: Forward Room 2's Host tracks to Room 1 Viewers
-	for viewerID, v := range room1.Viewers {
-		if viewerClient, ok := v.(*Client); ok && viewerClient != nil {
-			addTracksToPeer(viewerClient, room2.VideoTrack, room2.AudioTrack)
-			log.Printf("Added Room 2 tracks to Viewer %s in Room 1\n", viewerID)
-		}
+	log.Printf("[PK Battle] Starting cross-room routing between Room '%s' (Host: %s) and Room '%s' (Host: %s)...\n", roomID1, room1.HostID, roomID2, room2.HostID)
+
+	// 1. Cross-route Host 1's video track into Room 2 viewers & host with dynamic renegotiation
+	if track1 := room1.GetDefaultViewerVideoTrack(); track1 != nil {
+		pkm.roomManager.AddTrackAndRenegotiate(roomID2, track1, "pk-"+room1.HostID)
+		log.Printf("[PK Battle] Injected Room 1 Host track into Room 2 viewers & host\n")
 	}
 
-	// Create and register the PK Session
-	session := &PKSession{
+	// 2. Cross-route Host 2's video track into Room 1 viewers & host with dynamic renegotiation
+	if track2 := room2.GetDefaultViewerVideoTrack(); track2 != nil {
+		pkm.roomManager.AddTrackAndRenegotiate(roomID1, track2, "pk-"+room2.HostID)
+		log.Printf("[PK Battle] Injected Room 2 Host track into Room 1 viewers & host\n")
+	}
+
+	// Create and register PK session
+	sessionID := fmt.Sprintf("%s_%s", roomID1, roomID2)
+	session := &models.PKSession{
+		SessionID: sessionID,
 		RoomID1:   roomID1,
 		RoomID2:   roomID2,
-		CreatedAt: time.Now(),
+		HostID1:   room1.HostID,
+		HostID2:   room2.HostID,
+		Score1:    int64(room1.GetHostScore()),
+		Score2:    int64(room2.GetHostScore()),
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
 	}
+
 	pkm.activePKs[roomID1] = session
 	pkm.activePKs[roomID2] = session
 
+	// Persist PKSession in Redis
+	if broker := pkm.roomManager.GetBroker(); broker != nil && broker.IsActive() {
+		_ = broker.SavePKSession(nil, session)
+	}
+
 	// Broadcast 'pk_started' signaling event to participants in both rooms
 	pkPayload, _ := json.Marshal(map[string]any{
-		"room_1":     roomID1,
-		"room_2":     roomID2,
-		"host_1":     room1.HostID,
-		"host_2":     room2.HostID,
-		"status":     "active",
-		"created_at": session.CreatedAt.Unix(),
+		"event":        "pk_started",
+		"session_id":   sessionID,
+		"room_1":       roomID1,
+		"room_2":       roomID2,
+		"room_a_id":    roomID1,
+		"room_b_id":    roomID2,
+		"host_1":       room1.HostID,
+		"host_2":       room2.HostID,
+		"host_1_score": session.Score1,
+		"host_2_score": session.Score2,
+		"status":       "active",
+		"created_at":   session.CreatedAt.Unix(),
 	})
 
-	pkm.broadcastToRoom(room1, &models.SignalingMessage{
+	startMsg1 := &models.SignalingMessage{
 		Event:   "pk_started",
 		RoomID:  roomID1,
 		Payload: pkPayload,
-	})
-
-	pkm.broadcastToRoom(room2, &models.SignalingMessage{
+	}
+	startMsg2 := &models.SignalingMessage{
 		Event:   "pk_started",
 		RoomID:  roomID2,
 		Payload: pkPayload,
-	})
+	}
+
+	_ = pkm.roomManager.BroadcastToRoom(roomID1, startMsg1)
+	_ = pkm.roomManager.BroadcastToRoom(roomID2, startMsg2)
 
 	log.Printf("PK battle successfully started between Room '%s' and Room '%s'.\n", roomID1, roomID2)
 	return nil
 }
 
-// StopPK ends an active PK battle session and notifies participants
+// SyncPKScore calculates and broadcasts the updated score to both rooms and the combined PK channel
+func (pkm *PKManager) SyncPKScore(roomID string, updatedScore int64) {
+	session, exists := pkm.GetPKSession(roomID)
+	if !exists || session == nil {
+		return
+	}
+
+	// Fetch current scores
+	var score1, score2 int64
+	broker := pkm.roomManager.GetBroker()
+
+	if broker != nil && broker.IsActive() {
+		score1, _ = broker.GetHostScore(nil, session.RoomID1)
+		score2, _ = broker.GetHostScore(nil, session.RoomID2)
+	}
+
+	if r1, ok := pkm.roomManager.GetRoom(session.RoomID1); ok && r1 != nil {
+		if score1 == 0 {
+			score1 = int64(r1.GetHostScore())
+		}
+	}
+	if r2, ok := pkm.roomManager.GetRoom(session.RoomID2); ok && r2 != nil {
+		if score2 == 0 {
+			score2 = int64(r2.GetHostScore())
+		}
+	}
+
+	scorePayload, _ := json.Marshal(map[string]any{
+		"event":        "pk_score_update",
+		"session_id":   session.SessionID,
+		"room_a_id":    session.RoomID1,
+		"room_b_id":    session.RoomID2,
+		"room_1":       session.RoomID1,
+		"room_2":       session.RoomID2,
+		"room_a_score": score1,
+		"room_b_score": score2,
+		"score_1":      score1,
+		"score_2":      score2,
+		"host_1_score": score1,
+		"host_2_score": score2,
+	})
+
+	scoreMsg := &models.SignalingMessage{
+		Event:   "pk_score_update",
+		RoomID:  session.RoomID1,
+		Payload: scorePayload,
+	}
+
+	_ = pkm.roomManager.BroadcastToRoom(session.RoomID1, scoreMsg)
+
+	scoreMsg2 := &models.SignalingMessage{
+		Event:   "pk_score_update",
+		RoomID:  session.RoomID2,
+		Payload: scorePayload,
+	}
+	_ = pkm.roomManager.BroadcastToRoom(session.RoomID2, scoreMsg2)
+
+	if broker != nil && broker.IsActive() {
+		_ = broker.PublishPKEvent(session.SessionID, scoreMsg)
+	}
+
+	log.Printf("[PK Score Sync] Session %s -> Room A (%s): %d | Room B (%s): %d\n", session.SessionID, session.RoomID1, score1, session.RoomID2, score2)
+}
+
+// StopPK ends an active PK battle session, cleans up cross-room tracks, and notifies participants
 func (pkm *PKManager) StopPK(roomID string) error {
 	pkm.mu.Lock()
-	defer pkm.mu.Unlock()
-
 	session, exists := pkm.activePKs[roomID]
 	if !exists {
+		pkm.mu.Unlock()
 		return errors.New("no active PK session found for room: " + roomID)
 	}
 
 	delete(pkm.activePKs, session.RoomID1)
 	delete(pkm.activePKs, session.RoomID2)
+	pkm.mu.Unlock()
 
-	endPayload, _ := json.Marshal(map[string]string{
-		"room_1": session.RoomID1,
-		"room_2": session.RoomID2,
-		"status": "ended",
+	// Clean up from Redis
+	if broker := pkm.roomManager.GetBroker(); broker != nil && broker.IsActive() {
+		_ = broker.DeletePKSession(nil, session.RoomID1, session.RoomID2)
+	}
+
+	// Remove cross-routed tracks
+	if r1, ok := pkm.roomManager.GetRoom(session.RoomID1); ok && r1 != nil {
+		pkm.roomManager.RemoveTrackAndRenegotiate(session.RoomID2, "pk-"+r1.HostID)
+	}
+	if r2, ok := pkm.roomManager.GetRoom(session.RoomID2); ok && r2 != nil {
+		pkm.roomManager.RemoveTrackAndRenegotiate(session.RoomID1, "pk-"+r2.HostID)
+	}
+
+	endPayload, _ := json.Marshal(map[string]any{
+		"event":      "pk_ended",
+		"session_id": session.SessionID,
+		"room_1":     session.RoomID1,
+		"room_2":     session.RoomID2,
+		"status":     "ended",
 	})
 
-	if room1, ok := pkm.roomManager.GetRoom(session.RoomID1); ok {
-		pkm.broadcastToRoom(room1, &models.SignalingMessage{
-			Event:   "pk_ended",
-			RoomID:  session.RoomID1,
-			Payload: endPayload,
-		})
-	}
+	_ = pkm.roomManager.BroadcastToRoom(session.RoomID1, &models.SignalingMessage{
+		Event:   "pk_ended",
+		RoomID:  session.RoomID1,
+		Payload: endPayload,
+	})
 
-	if room2, ok := pkm.roomManager.GetRoom(session.RoomID2); ok {
-		pkm.broadcastToRoom(room2, &models.SignalingMessage{
-			Event:   "pk_ended",
-			RoomID:  session.RoomID2,
-			Payload: endPayload,
-		})
-	}
+	_ = pkm.roomManager.BroadcastToRoom(session.RoomID2, &models.SignalingMessage{
+		Event:   "pk_ended",
+		RoomID:  session.RoomID2,
+		Payload: endPayload,
+	})
 
 	log.Printf("PK battle ended between Room '%s' and Room '%s'.\n", session.RoomID1, session.RoomID2)
 	return nil
 }
 
 // GetPKSession retrieves the active PK session for a room
-func (pkm *PKManager) GetPKSession(roomID string) (*PKSession, bool) {
+func (pkm *PKManager) GetPKSession(roomID string) (*models.PKSession, bool) {
 	pkm.mu.RLock()
-	defer pkm.mu.RUnlock()
 	session, exists := pkm.activePKs[roomID]
-	return session, exists
-}
+	pkm.mu.RUnlock()
 
-// addTracksToPeer safely adds video and audio tracks to a client's PeerConnection
-func addTracksToPeer(client *Client, videoTrack, audioTrack *webrtc.TrackLocalStaticRTP) {
-	if client == nil {
-		return
+	if exists && session != nil {
+		return session, true
 	}
 
-	client.mu.Lock()
-	pc := client.PeerConnection
-	client.mu.Unlock()
-
-	if pc == nil || pc.ConnectionState() == webrtc.PeerConnectionStateClosed {
-		return
-	}
-
-	if videoTrack != nil {
-		if sender, err := pc.AddTrack(videoTrack); err == nil {
-			go func() {
-				rtcpBuf := make([]byte, 1500)
-				for {
-					if _, _, rtcpErr := sender.Read(rtcpBuf); rtcpErr != nil {
-						return
-					}
-				}
-			}()
+	// Fallback to Redis
+	if broker := pkm.roomManager.GetBroker(); broker != nil && broker.IsActive() {
+		if redisSession, err := broker.GetPKSession(nil, roomID); err == nil && redisSession != nil {
+			pkm.mu.Lock()
+			pkm.activePKs[roomID] = redisSession
+			pkm.mu.Unlock()
+			return redisSession, true
 		}
 	}
 
-	if audioTrack != nil {
-		if sender, err := pc.AddTrack(audioTrack); err == nil {
-			go func() {
-				rtcpBuf := make([]byte, 1500)
-				for {
-					if _, _, rtcpErr := sender.Read(rtcpBuf); rtcpErr != nil {
-						return
-					}
-				}
-			}()
-		}
-	}
-}
-
-// broadcastToRoom sends a signaling message to all viewers in a given room
-func (pkm *PKManager) broadcastToRoom(room *models.Room, msg *models.SignalingMessage) {
-	if room == nil || msg == nil {
-		return
-	}
-
-	encoded, err := msg.Encode()
-	if err != nil {
-		return
-	}
-
-	for _, v := range room.Viewers {
-		if viewerClient, ok := v.(*Client); ok && viewerClient != nil {
-			select {
-			case viewerClient.Send <- encoded:
-			default:
-				log.Printf("Viewer %s buffer full during PK broadcast\n", viewerClient.ID)
-			}
-		}
-	}
+	return nil, false
 }

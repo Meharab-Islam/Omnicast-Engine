@@ -50,72 +50,62 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 		return nil, err
 	}
 
-	// Select optimal video track for viewer (Basic Adaptive Logic: prefer Medium 'h', fallback to Low 'q', High 'f', or room.VideoTrack)
+	// Select optimal video track for viewer (Medium 'h', then Low 'q', then Full 'f', then room.VideoTrack)
 	videoTrack := room.GetDefaultViewerVideoTrack()
 
-	// Determine assigned layer RID ('h', 'q', 'f', or 'default') and matching SSRC
-	assignedRID := "default"
+	var switcher *TrackSwitcher
 	if videoTrack != nil {
-		if room.GetVideoTrackByRID("h") == videoTrack {
-			assignedRID = "h"
-		} else if room.GetVideoTrackByRID("q") == videoTrack {
-			assignedRID = "q"
-		} else if room.GetVideoTrackByRID("f") == videoTrack {
-			assignedRID = "f"
-		}
-	}
-
-	assignedSSRC := room.GetVideoTrackSSRC(assignedRID)
-
-	// Helper to send immediate PLI (Picture Loss Indication) keyframe request to host for the assigned track
-	sendPLIToHost := func() {
-		hostPC := room.GetHostPeerConnection()
-		ssrc := assignedSSRC
-		if ssrc == 0 {
-			ssrc = room.GetHostVideoSSRC()
-		}
-		if hostPC != nil && videoTrack != nil && hostPC.ConnectionState() != webrtc.PeerConnectionStateClosed && ssrc != 0 {
-			err := hostPC.WriteRTCP([]rtcp.Packet{
-				&rtcp.PictureLossIndication{MediaSSRC: ssrc},
-			})
-			if err != nil {
-				log.Printf("Failed to write PLI RTCP to host (Room %s, RID '%s', SSRC %d): %v\n", room.RoomID, assignedRID, ssrc, err)
-			} else {
-				log.Printf("Sent PLI (Keyframe request) to Host for Room: %s (RID: '%s', SSRC: %d)\n", room.RoomID, assignedRID, ssrc)
-			}
-		}
-	}
-
-	if videoTrack != nil {
-		videoSender, trackErr := peerConnection.AddTrack(videoTrack)
+		// Create dedicated egress TrackLocalStaticRTP for this viewer
+		viewerVideoTrack, trackErr := webrtc.NewTrackLocalStaticRTP(
+			videoTrack.Codec(),
+			videoTrack.ID(),
+			videoTrack.StreamID(),
+		)
 		if trackErr != nil {
-			log.Printf("Failed to add video track to viewer PeerConnection (Room %s): %v\n", room.RoomID, trackErr)
+			log.Printf("Failed to create TrackLocalStaticRTP for viewer: %v\n", trackErr)
 			_ = peerConnection.Close()
 			return nil, trackErr
 		}
 
-		// 1. Send immediate PLI on track attachment
-		sendPLIToHost()
-
-		// 2. Start a background Goroutine with time.NewTicker(3 * time.Second) to request Keyframe
-		go func() {
-			ticker := time.NewTicker(3 * time.Second)
-			defer ticker.Stop()
-
-			for range ticker.C {
-				if peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
-					return
-				}
-				sendPLIToHost()
+		// Initialize TrackSwitcher with initial layer 'h' (Medium)
+		initialLayer := LayerMedium
+		if room.GetVideoTrackByRID(LayerMedium) == nil {
+			if room.GetVideoTrackByRID(LayerLow) != nil {
+				initialLayer = LayerLow
+			} else {
+				initialLayer = LayerHigh
 			}
-		}()
+		}
 
-		// Read incoming RTCP feedback from viewer (PLI/FIR/NACK/REMB) in background goroutine
+		switcher = NewTrackSwitcher(viewerVideoTrack, initialLayer)
+		viewerID := peerConnection.RemoteDescription().SDP
+		if viewerID == "" {
+			viewerID = viewerVideoTrack.ID()
+		}
+		room.RegisterTrackSwitcher(viewerID, switcher)
+
+		videoSender, addErr := peerConnection.AddTrack(viewerVideoTrack)
+		if addErr != nil {
+			log.Printf("Failed to add video track to viewer PeerConnection (Room %s): %v\n", room.RoomID, addErr)
+			room.UnregisterTrackSwitcher(viewerID)
+			_ = peerConnection.Close()
+			return nil, addErr
+		}
+
+		// 1. Send initial debounced PLI on track attachment
+		room.SendPLIThrottled(1500 * time.Millisecond)
+
+		// Read incoming RTCP feedback from viewer (PLI/FIR/NACK/REMB) in background goroutine with ABR auto-switching
+		abr := NewABRController()
 		go func() {
-			rtcpBuf := make([]byte, 1500)
+			rtcpBufPtr := GetRTPBuffer()
+			defer PutRTPBuffer(rtcpBufPtr)
+			rtcpBuf := *rtcpBufPtr
+
 			for {
 				n, _, rtcpErr := videoSender.Read(rtcpBuf)
 				if rtcpErr != nil {
+					room.UnregisterTrackSwitcher(viewerID)
 					return
 				}
 				pkts, unmarshalErr := rtcp.Unmarshal(rtcpBuf[:n])
@@ -123,18 +113,28 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 					for _, pkt := range pkts {
 						switch p := pkt.(type) {
 						case *rtcp.ReceiverEstimatedMaximumBitrate:
-							log.Printf("[Dynacast] Viewer REMB estimated bitrate for Room %s: %d bps (%.2f kbps)\n",
-								room.RoomID, uint64(p.Bitrate), float64(p.Bitrate)/1000.0)
+							estimatedBps := uint64(p.Bitrate)
+							optimalLayer := abr.EvaluateLayer(estimatedBps, 0.0)
+							if switcher != nil && switcher.GetCurrentLayer() != optimalLayer {
+								log.Printf("[ABR Auto-Switch] Room %s: Viewer switching layer %s -> %s (Bitrate: %d bps)\n",
+									room.RoomID, switcher.GetCurrentLayer(), optimalLayer, estimatedBps)
+								switcher.SwitchLayer(optimalLayer)
+								room.SendPLIThrottled(1000 * time.Millisecond)
+							}
+						case *rtcp.TransportLayerNack:
+							if switcher != nil && switcher.GetCurrentLayer() == LayerHigh {
+								log.Printf("[ABR Packet Loss] Room %s: NACK detected, downgrading to Medium '%s'\n", room.RoomID, LayerMedium)
+								switcher.SwitchLayer(LayerMedium)
+								room.SendPLIThrottled(1000 * time.Millisecond)
+							}
 						case *rtcp.PictureLossIndication, *rtcp.FullIntraRequest:
-							sendPLIToHost()
+							room.SendPLIThrottled(1500 * time.Millisecond)
 						}
 					}
-				} else {
-					sendPLIToHost()
 				}
 			}
 		}()
-		log.Printf("Attached host video track to viewer for Room: %s (Track ID: %s)\n", room.RoomID, videoTrack.ID())
+		log.Printf("Attached TrackSwitcher video track to viewer for Room: %s (Track ID: %s)\n", room.RoomID, viewerVideoTrack.ID())
 	}
 
 	// Add host's AudioTrack if available
@@ -148,7 +148,10 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 
 		// Read incoming RTCP feedback from viewer for audio
 		go func() {
-			rtcpBuf := make([]byte, 1500)
+			rtcpBufPtr := GetRTPBuffer()
+			defer PutRTPBuffer(rtcpBufPtr)
+			rtcpBuf := *rtcpBufPtr
+
 			for {
 				if _, _, rtcpErr := audioSender.Read(rtcpBuf); rtcpErr != nil {
 					return
@@ -182,14 +185,14 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		log.Printf("Viewer ICE Connection State (Room %s): %s\n", room.RoomID, connectionState.String())
 		if connectionState == webrtc.ICEConnectionStateConnected || connectionState == webrtc.ICEConnectionStateChecking {
-			sendPLIToHost()
+			room.SendPLIThrottled(1500 * time.Millisecond)
 		}
 	})
 
 	peerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
 		log.Printf("Viewer PeerConnection State (Room %s): %s\n", room.RoomID, state.String())
 		if state == webrtc.PeerConnectionStateConnected {
-			sendPLIToHost()
+			room.SendPLIThrottled(1500 * time.Millisecond)
 		}
 	})
 
@@ -198,12 +201,15 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 
 // EstimateViewerBandwidth (Dynacast helper stub): reads incoming RTCP feedback (REMB/TWCC)
 // from the viewer's RTPSender and estimates available bandwidth for future dynamic track switching (Dynacast).
-func EstimateViewerBandwidth(videoSender *webrtc.RTPSender, onBitrateEstimate func(bitrateBps uint64)) {
+func EstimateViewerBandwidth(videoSender *webrtc.RTPSender, room *models.Room, onBitrateEstimate func(bitrateBps uint64)) {
 	if videoSender == nil {
 		return
 	}
 	go func() {
-		rtcpBuf := make([]byte, 1500)
+		rtcpBufPtr := GetRTPBuffer()
+		defer PutRTPBuffer(rtcpBufPtr)
+		rtcpBuf := *rtcpBufPtr
+
 		for {
 			n, _, rtcpErr := videoSender.Read(rtcpBuf)
 			if rtcpErr != nil {
@@ -221,6 +227,10 @@ func EstimateViewerBandwidth(videoSender *webrtc.RTPSender, onBitrateEstimate fu
 						estimatedBps, float64(estimatedBps)/1000.0)
 					if onBitrateEstimate != nil {
 						onBitrateEstimate(estimatedBps)
+					}
+				case *rtcp.PictureLossIndication, *rtcp.FullIntraRequest:
+					if room != nil {
+						room.SendPLIThrottled(1500 * time.Millisecond)
 					}
 				}
 			}

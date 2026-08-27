@@ -233,6 +233,278 @@ func (rb *RedisBroker) RemoveRoomOrigin(roomID string) error {
 	return nil
 }
 
+// SaveRoomState serializes and caches the RoomState in Redis with a 24h TTL
+func (rb *RedisBroker) SaveRoomState(ctx context.Context, state *models.RoomState) error {
+	if rb == nil || !rb.IsActive() || state == nil {
+		return errors.New("redis broker is not active or state is nil")
+	}
+
+	key := fmt.Sprintf("room:%s:state", state.RoomID)
+	data, err := json.Marshal(state)
+	if err != nil {
+		return fmt.Errorf("failed to marshal room state: %w", err)
+	}
+
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(rb.ctx, 2*time.Second)
+		defer cancel()
+	}
+
+	return rb.client.Set(ctx, key, data, 24*time.Hour).Err()
+}
+
+// GetRoomState retrieves and deserializes the cached RoomState from Redis
+func (rb *RedisBroker) GetRoomState(ctx context.Context, roomID string) (*models.RoomState, error) {
+	if rb == nil || !rb.IsActive() {
+		return nil, errors.New("redis broker is not active")
+	}
+
+	key := fmt.Sprintf("room:%s:state", roomID)
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(rb.ctx, 2*time.Second)
+		defer cancel()
+	}
+
+	data, err := rb.client.Get(ctx, key).Bytes()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, errors.New("room state not found in redis: " + roomID)
+		}
+		return nil, fmt.Errorf("failed to get room state for %s: %w", roomID, err)
+	}
+
+	var state models.RoomState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal room state: %w", err)
+	}
+
+	return &state, nil
+}
+
+// GetRoomStatesBatch retrieves multiple RoomStates concurrently using a Redis Pipeline
+func (rb *RedisBroker) GetRoomStatesBatch(ctx context.Context, roomIDs []string) (map[string]*models.RoomState, error) {
+	if rb == nil || !rb.IsActive() {
+		return nil, errors.New("redis broker is not active")
+	}
+	if len(roomIDs) == 0 {
+		return make(map[string]*models.RoomState), nil
+	}
+
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(rb.ctx, 3*time.Second)
+		defer cancel()
+	}
+
+	pipe := rb.client.Pipeline()
+	cmds := make(map[string]*redis.StringCmd, len(roomIDs))
+	for _, id := range roomIDs {
+		key := fmt.Sprintf("room:%s:state", id)
+		cmds[id] = pipe.Get(ctx, key)
+	}
+
+	_, _ = pipe.Exec(ctx)
+
+	results := make(map[string]*models.RoomState, len(roomIDs))
+	for id, cmd := range cmds {
+		data, err := cmd.Bytes()
+		if err == nil {
+			var state models.RoomState
+			if unmarshalErr := json.Unmarshal(data, &state); unmarshalErr == nil {
+				results[id] = &state
+			}
+		}
+	}
+
+	return results, nil
+}
+
+// BatchIncrementScores atomically applies accumulated score deltas for multiple rooms using Redis Pipelining
+func (rb *RedisBroker) BatchIncrementScores(ctx context.Context, scoreDeltas map[string]int64) error {
+	if rb == nil || !rb.IsActive() || len(scoreDeltas) == 0 {
+		return nil
+	}
+
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(rb.ctx, 3*time.Second)
+		defer cancel()
+	}
+
+	pipe := rb.client.Pipeline()
+	for roomID, delta := range scoreDeltas {
+		if delta > 0 {
+			key := fmt.Sprintf("room:%s:score", roomID)
+			pipe.IncrBy(ctx, key, delta)
+		}
+	}
+
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// IncrementHostScore atomically increments the gift score for a room using Redis INCRBY
+func (rb *RedisBroker) IncrementHostScore(ctx context.Context, roomID string, coins int64) (int64, error) {
+	if rb == nil || !rb.IsActive() {
+		return 0, errors.New("redis broker is not active")
+	}
+
+	key := fmt.Sprintf("room:%s:score", roomID)
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(rb.ctx, 2*time.Second)
+		defer cancel()
+	}
+
+	newScore, err := rb.client.IncrBy(ctx, key, coins).Result()
+	if err != nil {
+		return 0, fmt.Errorf("failed to increment host score for %s: %w", roomID, err)
+	}
+
+	// Update cached RoomState if it exists in Redis
+	if state, err := rb.GetRoomState(ctx, roomID); err == nil && state != nil {
+		state.HostScore = newScore
+		_ = rb.SaveRoomState(ctx, state)
+	}
+
+	return newScore, nil
+}
+
+// GetHostScore fetches the current host score from Redis
+func (rb *RedisBroker) GetHostScore(ctx context.Context, roomID string) (int64, error) {
+	if rb == nil || !rb.IsActive() {
+		return 0, errors.New("redis broker is not active")
+	}
+
+	key := fmt.Sprintf("room:%s:score", roomID)
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(rb.ctx, 2*time.Second)
+		defer cancel()
+	}
+
+	score, err := rb.client.Get(ctx, key).Int64()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return 0, nil
+		}
+		return 0, err
+	}
+
+	return score, nil
+}
+
+// DeleteRoomState removes the cached RoomState and score from Redis
+func (rb *RedisBroker) DeleteRoomState(ctx context.Context, roomID string) error {
+	if rb == nil || !rb.IsActive() {
+		return errors.New("redis broker is not active")
+	}
+
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(rb.ctx, 2*time.Second)
+		defer cancel()
+	}
+
+	stateKey := fmt.Sprintf("room:%s:state", roomID)
+	scoreKey := fmt.Sprintf("room:%s:score", roomID)
+
+	return rb.client.Del(ctx, stateKey, scoreKey).Err()
+}
+
+// SavePKSession saves the active PK session linked to both rooms in Redis
+func (rb *RedisBroker) SavePKSession(ctx context.Context, session *models.PKSession) error {
+	if rb == nil || !rb.IsActive() || session == nil {
+		return errors.New("redis broker is not active or session is nil")
+	}
+
+	data, err := json.Marshal(session)
+	if err != nil {
+		return fmt.Errorf("failed to marshal pk session: %w", err)
+	}
+
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(rb.ctx, 2*time.Second)
+		defer cancel()
+	}
+
+	key1 := fmt.Sprintf("pk:session:%s", session.RoomID1)
+	key2 := fmt.Sprintf("pk:session:%s", session.RoomID2)
+
+	pipe := rb.client.Pipeline()
+	pipe.Set(ctx, key1, data, 2*time.Hour)
+	pipe.Set(ctx, key2, data, 2*time.Hour)
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+// GetPKSession retrieves the active PK session for a room from Redis
+func (rb *RedisBroker) GetPKSession(ctx context.Context, roomID string) (*models.PKSession, error) {
+	if rb == nil || !rb.IsActive() {
+		return nil, errors.New("redis broker is not active")
+	}
+
+	key := fmt.Sprintf("pk:session:%s", roomID)
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(rb.ctx, 2*time.Second)
+		defer cancel()
+	}
+
+	data, err := rb.client.Get(ctx, key).Bytes()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var session models.PKSession
+	if err := json.Unmarshal(data, &session); err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+// DeletePKSession removes PK session records for both rooms from Redis
+func (rb *RedisBroker) DeletePKSession(ctx context.Context, roomID1, roomID2 string) error {
+	if rb == nil || !rb.IsActive() {
+		return errors.New("redis broker is not active")
+	}
+
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(rb.ctx, 2*time.Second)
+		defer cancel()
+	}
+
+	key1 := fmt.Sprintf("pk:session:%s", roomID1)
+	key2 := fmt.Sprintf("pk:session:%s", roomID2)
+
+	return rb.client.Del(ctx, key1, key2).Err()
+}
+
+// PublishPKEvent publishes a signaling event to the combined PK session channel
+func (rb *RedisBroker) PublishPKEvent(sessionID string, msg *models.SignalingMessage) error {
+	if rb == nil || !rb.IsActive() {
+		return errors.New("redis broker is not active")
+	}
+
+	channel := fmt.Sprintf("pk:events:%s", sessionID)
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal pk message: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(rb.ctx, 2*time.Second)
+	defer cancel()
+
+	return rb.client.Publish(ctx, channel, data).Err()
+}
+
 // Close closes all active subscriptions and the Redis client connection
 func (rb *RedisBroker) Close() error {
 	if rb == nil {

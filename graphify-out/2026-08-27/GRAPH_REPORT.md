@@ -1,13 +1,18 @@
 # Graph Report - go_media_server  (2026-08-27)
 
 ## Corpus Check
-- 28 files · ~24,944 words
+- 41 files · ~38,746 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 264 nodes · 555 edges · 15 communities (10 shown, 5 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 18 edges (avg confidence: 0.85)
+- 407 nodes · 849 edges · 17 communities (12 shown, 5 thin omitted)
+- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 45 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
+
+## Graph Freshness
+- Built from commit: `47718b37`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - Room
@@ -16,27 +21,29 @@
 - RedisBroker
 - LiveMediaCore
 - WebhookDispatcher
-- PKManager
-- HandleCoHostConnection
+- turn_auth.go
+- sync.RWMutex
 - signaling.go
 - webrtc.go
 - models.go
 - RoomManager
 - main
-- HandleViewerConnection
+- 🚀 Go Live Media Server (SFU & Interactive Streaming)
+- CascadeManager
+- HandleCoHostConnection
 - live-media-server
 
 ## God Nodes (most connected - your core abstractions)
-1. `Room` - 63 edges
-2. `RoomManager` - 29 edges
-3. `Client` - 28 edges
-4. `RedisBroker` - 24 edges
-5. `SignalingMessage` - 19 edges
-6. `LiveMediaCore` - 18 edges
+1. `Room` - 77 edges
+2. `RoomManager` - 41 edges
+3. `RedisBroker` - 36 edges
+4. `Client` - 34 edges
+5. `SignalingMessage` - 26 edges
+6. `LiveMediaCore` - 25 edges
 7. `WebhookDispatcher` - 14 edges
 8. `CascadeManager` - 14 edges
-9. `main()` - 12 edges
-10. `Hub` - 12 edges
+9. `main()` - 13 edges
+10. `NewRoomManager()` - 13 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `main()` --calls--> `NewWebhookDispatcher()`  [EXTRACTED]
@@ -53,67 +60,75 @@
 ## Import Cycles
 - None detected.
 
-## Communities (15 total, 5 thin omitted)
+## Communities (17 total, 5 thin omitted)
 
 ### Community 0 - "Room"
-Cohesion: 0.12
+Cohesion: 0.10
 Nodes (6): time.Timer, Room, webrtc.PeerConnection, webrtc.TrackLocalStaticRTP, NewRoomWithName(), CoHostMedia
 
 ### Community 1 - "Client"
-Cohesion: 0.12
-Nodes (13): encoding/json.RawMessage, github.com/gofiber/contrib/websocket.Conn, sync.RWMutex, SignalingMessage, RoomManager, webrtc.API, webrtc.PeerConnection, NewClient() (+5 more)
+Cohesion: 0.10
+Nodes (17): encoding/json.RawMessage, github.com/gofiber/contrib/websocket.Conn, SignalingMessage, ParseSignalingMessage(), RoomManager, webrtc.API, webrtc.PeerConnection, NewClient() (+9 more)
 
 ### Community 2 - "testing.T"
-Cohesion: 0.10
-Nodes (19): testing.T, TestNewRedisBroker_EmptyAddr(), TestRedisBroker_NilOperations(), ParseSignalingMessage(), TestParseSignalingMessage(), TestSignalingMessageEncode(), NewRoom(), TestRoomCoHostTracks() (+11 more)
+Cohesion: 0.11
+Nodes (22): testing.T, TestNewRedisBroker_EmptyAddr(), TestRedisBroker_NilOperations(), TestParseSignalingMessage(), TestSignalingMessageEncode(), NewRoom(), TestRoomCoHostTracks(), TestRoomSimulcastTracks() (+14 more)
 
 ### Community 3 - "RedisBroker"
-Cohesion: 0.10
-Nodes (15): MessageHandler, context.CancelFunc, context.Context, github.com/fasthttp/websocket.Conn, sync.Mutex, time.Duration, RedisBroker, NewRedisBroker() (+7 more)
+Cohesion: 0.13
+Nodes (10): MessageHandler, context.Context, time.Time, RedisBroker, NewRedisBroker(), PKSession, MediaState, RoomState (+2 more)
 
 ### Community 5 - "WebhookDispatcher"
-Cohesion: 0.18
-Nodes (9): WebhookEvent, WebhookEventType, net/http.Client, sync.WaitGroup, GenerateSignature(), WebhookDispatcher, NewWebhookDispatcher(), TestWebhookDispatcher() (+1 more)
+Cohesion: 0.12
+Nodes (12): WebhookEvent, WebhookEventType, net/http.Client, sync.Once, sync.WaitGroup, GenerateSignature(), WebhookDispatcher, NewWebhookDispatcher() (+4 more)
 
-### Community 6 - "PKManager"
-Cohesion: 0.27
-Nodes (7): time.Time, addTracksToPeer(), RoomManager, webrtc.TrackLocalStaticRTP, NewPKManager(), PKManager, PKSession
+### Community 6 - "turn_auth.go"
+Cohesion: 0.33
+Nodes (7): GenerateTURNCredentials(), GetDefaultICEServers(), GetDefaultICEServersJSON(), TestGenerateTURNCredentials(), TestGetDefaultICEServers(), webrtc.ICEServer, ICEServerJSON
 
-### Community 7 - "HandleCoHostConnection"
-Cohesion: 0.43
-Nodes (6): webrtc.API, webrtc.Configuration, webrtc.PeerConnection, webrtc.TrackLocalStaticRTP, HandleCoHostConnection(), HandleHostConnection()
+### Community 7 - "sync.RWMutex"
+Cohesion: 0.09
+Nodes (12): github.com/pion/rtp.Packet, sync.RWMutex, NewABRController(), NewDynacastEngine(), TestABRController_Evaluation(), TestDynacastEngine_SubscriberTracking(), webrtc.TrackLocalStaticRTP, NewTrackSwitcher() (+4 more)
 
 ### Community 11 - "RoomManager"
-Cohesion: 0.13
-Nodes (5): github.com/pion/webrtc/v3.TrackLocalStaticRTP, broadcastToRoomInternal(), RoomInfo, RoomManager, RoomSummary
+Cohesion: 0.08
+Nodes (9): github.com/pion/webrtc/v3.TrackLocalStaticRTP, RoomManager, NewPKManager(), broadcastToRoomInternal(), syncRoomStateInternal(), PKManager, RoomInfo, RoomManager (+1 more)
 
 ### Community 12 - "main"
-Cohesion: 0.29
-Nodes (8): getEnv(), main(), GenerateToken(), GetJWTSecret(), TestJWTAuthentication(), ValidateToken(), jwt.RegisteredClaims, UserClaims
+Cohesion: 0.12
+Nodes (20): AuthHandler, ICEServerJSON, TokenRequest, TokenResponse, UserClaims, getEnv(), main(), fiber.Ctx (+12 more)
 
-### Community 15 - "HandleViewerConnection"
-Cohesion: 0.36
-Nodes (8): EstimateViewerBandwidth(), webrtc.API, webrtc.Configuration, webrtc.PeerConnection, HandleViewerConnection(), HandleViewerConnectionForRoom(), RoomManager, webrtc.RTPSender
+### Community 13 - "🚀 Go Live Media Server (SFU & Interactive Streaming)"
+Cohesion: 0.08
+Nodes (24): 1. Flutter (Dart) SDK Implementation, 2. React Native / TypeScript SDK Implementation, 3. iOS (Swift) SDK Implementation, 4. Android (Kotlin) SDK Implementation, 🚀 Go Live Media Server (SFU & Interactive Streaming), 🌐 REST API Endpoints, 🏗️ আর্কিটেকচার ওভারভিউ (Architecture Overview), ইভেন্ট রেফারেন্স টেবিল: (+16 more)
+
+### Community 14 - "CascadeManager"
+Cohesion: 0.18
+Nodes (8): context.CancelFunc, github.com/fasthttp/websocket.Conn, sync.Mutex, webrtc.API, webrtc.PeerConnection, NewCascadeManager(), CascadeManager, CascadeSession
+
+### Community 15 - "HandleCoHostConnection"
+Cohesion: 0.19
+Nodes (16): webrtc.API, webrtc.Configuration, webrtc.PeerConnection, webrtc.TrackLocalStaticRTP, HandleCoHostConnection(), HandleHostConnection(), GetRTPBuffer(), PutRTPBuffer() (+8 more)
 
 ## Knowledge Gaps
-- **2 isolated node(s):** `live-media-server`, `Participant`
+- **21 isolated node(s):** `live-media-server`, `TokenRequest`, `Participant`, `📑 সূচিপত্র (Table of Contents)`, `🔥 মূল ফিচারসমূহ:` (+16 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Room` connect `Room` to `Client`, `testing.T`, `RedisBroker`, `PKManager`, `HandleCoHostConnection`, `RoomManager`, `HandleViewerConnection`?**
-  _High betweenness centrality (0.356) - this node is a cross-community bridge._
-- **Why does `RoomManager` connect `RoomManager` to `Room`, `Client`, `testing.T`, `RedisBroker`, `WebhookDispatcher`?**
-  _High betweenness centrality (0.217) - this node is a cross-community bridge._
-- **Why does `RedisBroker` connect `RedisBroker` to `Client`, `RoomManager`?**
+- **Why does `Room` connect `Room` to `testing.T`, `RedisBroker`, `sync.RWMutex`, `RoomManager`, `CascadeManager`, `HandleCoHostConnection`?**
+  _High betweenness centrality (0.280) - this node is a cross-community bridge._
+- **Why does `RoomManager` connect `RoomManager` to `Room`, `testing.T`, `RedisBroker`, `WebhookDispatcher`, `sync.RWMutex`, `CascadeManager`?**
+  _High betweenness centrality (0.193) - this node is a cross-community bridge._
+- **Why does `RedisBroker` connect `RedisBroker` to `RoomManager`, `CascadeManager`, `sync.RWMutex`?**
   _High betweenness centrality (0.105) - this node is a cross-community bridge._
-- **What connects `live-media-server`, `Participant` to the rest of the system?**
-  _2 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **What connects `live-media-server`, `TokenRequest`, `Participant` to the rest of the system?**
+  _21 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Room` be split into smaller, more focused modules?**
-  _Cohesion score 0.11764705882352941 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09523809523809523 - nodes in this community are weakly interconnected._
 - **Should `Client` be split into smaller, more focused modules?**
-  _Cohesion score 0.12299465240641712 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0966183574879227 - nodes in this community are weakly interconnected._
 - **Should `testing.T` be split into smaller, more focused modules?**
-  _Cohesion score 0.10344827586206896 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.11264367816091954 - nodes in this community are weakly interconnected._

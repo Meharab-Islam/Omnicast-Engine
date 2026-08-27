@@ -52,4 +52,17 @@ func TestJWTAuthentication(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error validating empty token, got nil")
 	}
+
+	// 6. Test GenerateUserToken with profile claims
+	userToken, err := GenerateUserToken("u_bob", "Bob Smith", "https://img.com/bob.png", secret, 24*time.Hour)
+	if err != nil {
+		t.Fatalf("Failed to generate user token: %v", err)
+	}
+	userClaims, err := ValidateToken(userToken, secret)
+	if err != nil {
+		t.Fatalf("Failed to validate user token: %v", err)
+	}
+	if userClaims.UserID != "u_bob" || userClaims.UserName != "Bob Smith" || userClaims.AvatarURL != "https://img.com/bob.png" {
+		t.Fatalf("Unexpected user claims: %+v", userClaims)
+	}
 }

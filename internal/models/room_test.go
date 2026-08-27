@@ -87,3 +87,34 @@ func TestRoomSimulcastTracks(t *testing.T) {
 	}
 }
 
+func TestRoomState(t *testing.T) {
+	room := NewRoomWithName("state-room", "Studio A", "host-xyz")
+	room.SetHostScore(120)
+	room.SetActiveSeat("1", "cohost-1")
+	room.SetMediaState("host-xyz", MediaState{MutedAudio: false, MutedVideo: false})
+	room.SetMediaState("cohost-1", MediaState{MutedAudio: true, MutedVideo: false})
+
+	state := room.GetRoomState()
+	if state == nil {
+		t.Fatal("expected non-nil RoomState")
+	}
+	if state.RoomID != "state-room" || state.HostID != "host-xyz" {
+		t.Fatalf("unexpected room/host ID: %+v", state)
+	}
+	if state.HostScore != 120 {
+		t.Fatalf("expected host score 120, got %d", state.HostScore)
+	}
+	if state.ActiveSeats["1"] != "cohost-1" {
+		t.Fatalf("expected active seat 1 to be cohost-1, got %s", state.ActiveSeats["1"])
+	}
+	if !state.MediaStates["cohost-1"].MutedAudio {
+		t.Fatal("expected cohost-1 audio to be muted")
+	}
+
+	room.RemoveActiveSeat("1")
+	stateAfter := room.GetRoomState()
+	if _, exists := stateAfter.ActiveSeats["1"]; exists {
+		t.Fatal("expected seat 1 to be removed")
+	}
+}
+

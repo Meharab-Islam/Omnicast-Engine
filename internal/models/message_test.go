@@ -52,4 +52,14 @@ func TestSignalingMessageEncode(t *testing.T) {
 	if parsed.Event != EventAnswer {
 		t.Errorf("Expected event %s, got %s", EventAnswer, parsed.Event)
 	}
+
+	// Action format test
+	actionRaw := []byte(`{"action":"publish","room_id":"room-101","payload":{"sdp":"v=0..."}}`)
+	actionMsg, err := ParseSignalingMessage(actionRaw)
+	if err != nil {
+		t.Fatalf("Failed to parse action message: %v", err)
+	}
+	if actionMsg.Event != "publish" || actionMsg.Action != "publish" {
+		t.Fatalf("Expected action/event 'publish', got %s / %s", actionMsg.Action, actionMsg.Event)
+	}
 }

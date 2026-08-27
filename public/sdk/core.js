@@ -145,12 +145,16 @@ class LiveMediaCore extends EventEmitter {
     this.userId = options.userId || 'user-' + Math.random().toString(36).substring(2, 8);
     this.role = options.role || 'viewer';
 
-    this.rtcConfig = options.rtcConfig || {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    };
+    if (options.iceServers && Array.isArray(options.iceServers)) {
+      this.rtcConfig = { iceServers: options.iceServers };
+    } else {
+      this.rtcConfig = options.rtcConfig || {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      };
+    }
 
     /** @type {WebSocket|null} */
     this.ws = null;
@@ -307,10 +311,19 @@ class LiveMediaCore extends EventEmitter {
         });
         break;
 
-      // 4. Gift Received
+      // 4. Gift Processed & Received
+      case 'gift_processed':
       case 'gift_received':
+        this.emit('onGiftProcessed', {
+          sender: payload ? (payload.sender || payload.sender_id) : msg.user_id,
+          senderId: payload ? (payload.sender || payload.sender_id) : msg.user_id,
+          coins: payload ? (payload.coins || 10) : 10,
+          newScore: payload ? payload.new_score : 0,
+          giftId: payload ? payload.gift_id : 'rose',
+          raw: msg
+        });
         this.emit('onGiftReceived', {
-          senderId: payload ? payload.sender_id : msg.user_id,
+          senderId: payload ? (payload.sender || payload.sender_id) : msg.user_id,
           coins: payload ? (payload.coins || 10) : 10,
           newScore: payload ? payload.new_score : 0,
           raw: msg
@@ -334,17 +347,34 @@ class LiveMediaCore extends EventEmitter {
         this.emit('onViewerCount', count);
         break;
 
-      // 6. Late Joiner Room Info Sync
+      // 6. Late Joiner Room State & Info Sync
+      case 'room_info_sync':
       case 'room_info':
         if (payload) {
-          this.emit('onRoomInfo', {
+          const roomState = {
             roomId: payload.room_id || msg.room_id,
+            roomName: payload.room_name || '',
             hostId: payload.host_id,
+            totalViewers: payload.total_viewers !== undefined ? payload.total_viewers : (payload.viewer_count || 0),
             hostScore: payload.host_score || 0,
-            mainSeatId: payload.main_seat_id || payload.host_id,
-            activeCohosts: payload.active_cohosts || [],
-            viewerCount: payload.viewer_count || 0,
+            activeSeats: payload.active_seats || {},
+            mediaStates: payload.media_states || {},
             createdAt: payload.created_at,
+            raw: msg
+          };
+          this.emit('onRoomInfoSync', roomState);
+          this.emit('onRoomInfo', roomState);
+        }
+        break;
+
+      // 7. Media State Updated (Mute / Unmute)
+      case 'media_state_updated':
+        if (payload) {
+          this.emit('onMediaStateUpdated', {
+            userId: payload.user_id || msg.user_id,
+            mutedAudio: payload.muted_audio || false,
+            mutedVideo: payload.muted_video || false,
+            mediaStates: payload.media_states || {},
             raw: msg
           });
         }
@@ -380,17 +410,114 @@ class LiveMediaCore extends EventEmitter {
       case 'seat_accept':
         this.emit('onSeatAccept', {
           targetUser: msg.target_user || (payload && payload.target_user),
+          seatId: payload ? payload.seat_id : undefined,
           raw: msg
         });
         break;
 
-      // 11. Room Closed by Host
+      // 11. Seat Updated (Join, Leave, Kick)
+      case 'seat_updated':
+        if (payload) {
+          this.emit('onSeatUpdated', {
+            action: payload.action,
+            userId: payload.user_id || msg.user_id,
+            seatId: payload.seat_id,
+            activeSeats: payload.active_seats || {},
+            raw: msg
+          });
+        }
+        break;
+
+      // 12. Voluntary Seat Left
+      case 'seat_left':
+        this.emit('onSeatLeft', {
+          userId: payload ? payload.user_id : msg.user_id,
+          raw: msg
+        });
+        break;
+
+      // 13. Host Kicked from Seat
+      case 'seat_kicked':
+        this.emit('onSeatKicked', {
+          userId: payload ? payload.user_id : msg.user_id,
+          raw: msg
+        });
+        break;
+
+      // 14. Co-Host Left Room/Seat
+      case 'cohost_left':
+        this.emit('onCoHostLeft', {
+          cohostId: payload ? (payload.cohost_id || payload.user_id) : msg.user_id,
+          raw: msg
+        });
+        break;
+
+      // 15. PK Battle Invitation (received by Host B)
+      case 'pk_request':
+        this.emit('onPKRequest', {
+          fromRoomId: payload ? (payload.from_room_id || payload.room_a_id) : msg.room_id,
+          fromHostId: payload ? payload.from_host_id : msg.user_id,
+          raw: msg
+        });
+        break;
+
+      // 16. PK Battle Started
+      case 'pk_started':
+        this.emit('onPKStarted', {
+          sessionId: payload ? payload.session_id : undefined,
+          room1: payload ? payload.room_1 : undefined,
+          room2: payload ? payload.room_2 : undefined,
+          host1: payload ? payload.host_1 : undefined,
+          host2: payload ? payload.host_2 : undefined,
+          score1: payload ? payload.host_1_score : 0,
+          score2: payload ? payload.host_2_score : 0,
+          raw: msg
+        });
+        break;
+
+      // 17. PK Score Update (Real-time Cross-Room Sync)
+      case 'pk_score_update':
+        this.emit('onPKScoreUpdate', {
+          sessionId: payload ? payload.session_id : undefined,
+          room1: payload ? (payload.room_a_id || payload.room_1) : undefined,
+          room2: payload ? (payload.room_b_id || payload.room_2) : undefined,
+          score1: payload ? (payload.room_a_score ?? payload.score_1 ?? payload.host_1_score) : 0,
+          score2: payload ? (payload.room_b_score ?? payload.score_2 ?? payload.host_2_score) : 0,
+          raw: msg
+        });
+        break;
+
+      // 18. PK Battle Ended
+      case 'pk_ended':
+        this.emit('onPKEnded', {
+          sessionId: payload ? payload.session_id : undefined,
+          raw: msg
+        });
+        break;
+
+      // 19. Room Closed by Host
       case 'room_closed':
         this.emit('onRoomClosed', {
           roomId: msg.room_id,
           raw: msg
         });
         break;
+
+      // 20. Dynacast Layer Pause (Host Upstream Bandwidth Saving)
+      case 'dynacast_pause_layer': {
+        const layer = payload ? (payload.layer || payload.rid) : (msg.layer || msg.rid);
+        this._setLayerActive(layer, false);
+        this.emit('onDynacastLayerPaused', { layer, raw: msg });
+        break;
+      }
+
+      // 21. Dynacast Layer Resume
+      case 'dynacast_resume_layer': {
+        const layer = payload ? (payload.layer || payload.rid) : (msg.layer || msg.rid);
+        this._setLayerActive(layer, true);
+        this.emit('onDynacastLayerResumed', { layer, raw: msg });
+        break;
+      }
 
       // 12. Host Reconnecting (Grace Period)
       case 'host_reconnecting':
@@ -481,10 +608,28 @@ class LiveMediaCore extends EventEmitter {
     await this.fetchIceServers();
     this._initPeerConnection();
 
-    // 1. অফার তৈরির আগেই Track অ্যাড করো (খুবই জরুরি):
-    localStream.getTracks().forEach(track => {
-      this.peerConnection.addTrack(track, localStream);
-    });
+    // 1. Configure Simulcast Video Transceiver with 3 quality layers (High 'f', Med 'h', Low 'q')
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (videoTrack) {
+      this.videoTransceiver = this.peerConnection.addTransceiver(videoTrack, {
+        direction: 'sendonly',
+        streams: [localStream],
+        sendEncodings: [
+          { rid: 'f', active: true, maxBitrate: 1200000 },
+          { rid: 'h', active: true, maxBitrate: 500000, scaleResolutionDownBy: 2 },
+          { rid: 'q', active: true, maxBitrate: 150000, scaleResolutionDownBy: 4 }
+        ]
+      });
+    }
+
+    // Add Audio Track
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (audioTrack) {
+      this.peerConnection.addTransceiver(audioTrack, {
+        direction: 'sendonly',
+        streams: [localStream]
+      });
+    }
 
     // 2. এরপর Offer তৈরি করো:
     const offer = await this.peerConnection.createOffer();
@@ -584,6 +729,32 @@ class LiveMediaCore extends EventEmitter {
     };
   }
 
+  /**
+   * Dynamically toggles active status for a simulcast encoding layer on the Host transceiver (Dynacast)
+   * @param {string} rid - Layer RID ('f', 'h', 'q')
+   * @param {boolean} active - Active status
+   */
+  async _setLayerActive(rid, active) {
+    if (!this.videoTransceiver || !this.videoTransceiver.sender) return;
+    try {
+      const params = this.videoTransceiver.sender.getParameters();
+      if (!params || !params.encodings) return;
+      let modified = false;
+      params.encodings.forEach(enc => {
+        if (enc.rid === rid && enc.active !== active) {
+          enc.active = active;
+          modified = true;
+          console.log(`[Dynacast] Set encoding RID '${rid}' active: ${active}`);
+        }
+      });
+      if (modified) {
+        await this.videoTransceiver.sender.setParameters(params);
+      }
+    } catch (err) {
+      console.warn(`[Dynacast Error] Failed to update layer ${rid} active status:`, err);
+    }
+  }
+
   // ==========================================================================
   // 3. INTERACTION HELPERS (Chat, Gifting, Seat & Main Stage)
   // ==========================================================================
@@ -628,6 +799,59 @@ class LiveMediaCore extends EventEmitter {
   setMainSeat(targetUserId) {
     if (!targetUserId) return;
     this.sendSignalingMessage('set_main_seat', { target_id: targetUserId }, targetUserId);
+  }
+
+  /**
+   * Broadcasts mute/unmute state changes for audio and video to the room
+   * @param {boolean} mutedAudio
+   * @param {boolean} mutedVideo
+   */
+  setMediaState(mutedAudio, mutedVideo) {
+    this.sendSignalingMessage('media_state', {
+      muted_audio: !!mutedAudio,
+      muted_video: !!mutedVideo
+    });
+  }
+
+  /**
+   * Steps down from the Co-Host seat voluntarily
+   */
+  leaveSeat() {
+    this.sendSignalingMessage('leave_seat', {});
+  }
+
+  /**
+   * Host kicks a Co-Host from their seat
+   * @param {string} targetUserId - The Co-Host's user ID to kick
+   */
+  kickSeat(targetUserId) {
+    if (!targetUserId) return;
+    this.sendSignalingMessage('kick_seat', { target_user: targetUserId }, targetUserId);
+  }
+
+  /**
+   * Sends a PK battle request to an opponent room
+   * @param {string} targetRoomId - Opponent Room ID
+   */
+  requestPK(targetRoomId) {
+    if (!targetRoomId) return;
+    this.sendSignalingMessage('pk_request', { target_room: targetRoomId }, targetRoomId);
+  }
+
+  /**
+   * Accepts a PK battle request from an opponent room
+   * @param {string} fromRoomId - Opponent Room ID
+   */
+  acceptPK(fromRoomId) {
+    if (!fromRoomId) return;
+    this.sendSignalingMessage('pk_accept', { target_room: fromRoomId }, fromRoomId);
+  }
+
+  /**
+   * Ends the active PK battle session
+   */
+  stopPK() {
+    this.sendSignalingMessage('pk_stop', {});
   }
 
   // ==========================================================================

@@ -21,15 +21,58 @@ type RoomManager struct {
 	webhookDispatcher *api.WebhookDispatcher
 	broker            *broker.RedisBroker
 	cascadeManager    *internalWebRTC.CascadeManager
+	pkManager         *PKManager
+	workerPool        *WorkerPool
 	serverRole        string
 	serverAddr        string
+	pendingScores     map[string]int64
+	pendingScoreMu    sync.Mutex
 	mu                sync.RWMutex
 }
 
-// NewRoomManager initializes and returns a new RoomManager instance
+// NewRoomManager initializes and returns a new RoomManager instance with WorkerPool and background flusher
 func NewRoomManager() *RoomManager {
-	return &RoomManager{
-		activeRooms: make(map[string]*models.Room),
+	rm := &RoomManager{
+		activeRooms:   make(map[string]*models.Room),
+		workerPool:    NewWorkerPool(64, 32768),
+		pendingScores: make(map[string]int64),
+	}
+	rm.startBatchFlusher()
+	return rm
+}
+
+// startBatchFlusher starts a background goroutine to flush accumulated gift scores and debounced state to Redis every 2s
+func (rm *RoomManager) startBatchFlusher() {
+	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			rm.flushPendingScores()
+		}
+	}()
+}
+
+// flushPendingScores flushes in-memory score deltas to Redis using pipeline INCRBY
+func (rm *RoomManager) flushPendingScores() {
+	rm.pendingScoreMu.Lock()
+	if len(rm.pendingScores) == 0 {
+		rm.pendingScoreMu.Unlock()
+		return
+	}
+	deltas := make(map[string]int64, len(rm.pendingScores))
+	for k, v := range rm.pendingScores {
+		deltas[k] = v
+	}
+	rm.pendingScores = make(map[string]int64)
+	rm.pendingScoreMu.Unlock()
+
+	rm.mu.RLock()
+	activeBroker := rm.broker
+	rm.mu.RUnlock()
+
+	if activeBroker != nil && activeBroker.IsActive() {
+		_ = activeBroker.BatchIncrementScores(nil, deltas)
 	}
 }
 
@@ -38,6 +81,20 @@ func (rm *RoomManager) SetWebhookDispatcher(d *api.WebhookDispatcher) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 	rm.webhookDispatcher = d
+}
+
+// SetPKManager attaches a PKManager instance
+func (rm *RoomManager) SetPKManager(pkm *PKManager) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	rm.pkManager = pkm
+}
+
+// GetPKManager retrieves the attached PKManager
+func (rm *RoomManager) GetPKManager() *PKManager {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	return rm.pkManager
 }
 
 // SetBroker attaches a RedisBroker instance and registers distributed Pub/Sub handler
@@ -138,6 +195,9 @@ func (rm *RoomManager) CreateRoom(roomID, hostID string) (*models.Room, error) {
 		})
 	}
 
+	// Synchronize initial RoomState to Redis without re-locking rm.mu
+	syncRoomStateInternal(room, rm.broker)
+
 	return room, nil
 }
 
@@ -191,6 +251,9 @@ func (rm *RoomManager) JoinViewer(roomID string, viewerClient *Client) error {
 	}
 	_ = rm.BroadcastToRoom(roomID, updateMsg)
 
+	// Sync updated viewer count and seats to Redis RoomState
+	rm.SyncRoomState(roomID)
+
 	return nil
 }
 
@@ -236,6 +299,9 @@ func (rm *RoomManager) RemoveViewer(roomID, viewerID string) {
 		Payload:      payload,
 	}
 	_ = rm.BroadcastToRoom(roomID, updateMsg)
+
+	// Sync updated viewer state to Redis RoomState
+	rm.SyncRoomState(roomID)
 }
 
 // GetRoom retrieves an active room by roomID in a thread-safe manner
@@ -255,6 +321,7 @@ func (rm *RoomManager) RemoveRoom(roomID string) {
 	if rm.broker != nil && rm.broker.IsActive() {
 		rm.broker.UnsubscribeRoom(roomID)
 		_ = rm.broker.RemoveRoomOrigin(roomID)
+		_ = rm.broker.DeleteRoomState(nil, roomID)
 	}
 
 	if room, exists := rm.activeRooms[roomID]; exists {
@@ -296,8 +363,6 @@ func broadcastToRoomInternal(room *models.Room, msg *models.SignalingMessage) er
 	}
 
 	room.RLock()
-	defer room.RUnlock()
-
 	// Forward message to Host if connected
 	if room.HostClient != nil {
 		if hostClient, ok := room.HostClient.(*Client); ok && hostClient != nil {
@@ -309,14 +374,20 @@ func broadcastToRoomInternal(room *models.Room, msg *models.SignalingMessage) er
 		}
 	}
 
-	// Forward message to all Viewers
-	for viewerID, v := range room.Viewers {
+	// Collect Viewers to avoid holding lock while sending
+	targets := make([]*Client, 0, len(room.Viewers))
+	for _, v := range room.Viewers {
 		if viewerClient, ok := v.(*Client); ok && viewerClient != nil {
-			select {
-			case viewerClient.Send <- encoded:
-			default:
-				log.Printf("Viewer client %s send buffer full\n", viewerID)
-			}
+			targets = append(targets, viewerClient)
+		}
+	}
+	room.RUnlock()
+
+	// Forward message to all Viewers
+	for _, client := range targets {
+		select {
+		case client.Send <- encoded:
+		default:
 		}
 	}
 
@@ -413,7 +484,27 @@ func (rm *RoomManager) AddTrackAndRenegotiate(roomID string, track *pionWebRTC.T
 	}
 }
 
-// SendPLIToHost sends an immediate Picture Loss Indication (Keyframe request) to the Room's Host
+// RemoveTrackAndRenegotiate removes a Co-Host's media track from the room and updates seats & Redis
+func (rm *RoomManager) RemoveTrackAndRenegotiate(roomID, coHostID string) {
+	rm.mu.RLock()
+	room, exists := rm.activeRooms[roomID]
+	activeBroker := rm.broker
+	rm.mu.RUnlock()
+
+	if !exists || room == nil {
+		return
+	}
+
+	room.RemoveCoHostTrack(coHostID)
+	room.RemoveUserFromSeats(coHostID)
+	syncRoomStateInternal(room, activeBroker)
+
+	// Send PLI to Host to keep streams clean
+	rm.SendPLIToHost(roomID)
+	log.Printf("[Seat Management] Removed CoHost %s tracks & seat from Room %s\n", coHostID, roomID)
+}
+
+// SendPLIToHost sends an immediate Picture Loss Indication (Keyframe request) to the Room's Host with debouncing
 func (rm *RoomManager) SendPLIToHost(roomID string) {
 	rm.mu.RLock()
 	room, exists := rm.activeRooms[roomID]
@@ -423,14 +514,7 @@ func (rm *RoomManager) SendPLIToHost(roomID string) {
 		return
 	}
 
-	hostPC := room.GetHostPeerConnection()
-	ssrc := room.GetHostVideoSSRC()
-	if hostPC != nil && ssrc != 0 && hostPC.ConnectionState() != pionWebRTC.PeerConnectionStateClosed {
-		_ = hostPC.WriteRTCP([]rtcp.Packet{
-			&rtcp.PictureLossIndication{MediaSSRC: ssrc},
-		})
-		log.Printf("[Force PLI] Dispatched keyframe request to Host for Room: %s (SSRC: %d)\n", roomID, ssrc)
-	}
+	room.SendPLIThrottled(1500 * time.Millisecond)
 }
 
 // HandleClientDisconnect handles cleanup and notification when a Host or Viewer disconnects
@@ -506,6 +590,9 @@ func (rm *RoomManager) HandleClientDisconnect(client *Client) {
 				if rm.broker != nil && rm.broker.IsActive() {
 					_ = rm.broker.PublishRoomEvent(roomID, updateMsg)
 				}
+
+				// Synchronize updated RoomState to Redis
+				syncRoomStateInternal(room, rm.broker)
 			}
 		}
 	}
@@ -653,6 +740,90 @@ func (rm *RoomManager) GetRoomSummary(roomID string) (*RoomSummary, bool) {
 		CreatedAt:    room.CreatedAt.Format(time.RFC3339),
 		ViewersCount: room.ViewersCount(),
 	}, true
+}
+
+// syncRoomStateInternal writes the room state snapshot to Redis without acquiring rm.mu
+func syncRoomStateInternal(room *models.Room, activeBroker *broker.RedisBroker) {
+	if room == nil {
+		return
+	}
+	state := room.GetRoomState()
+	if activeBroker != nil && activeBroker.IsActive() {
+		_ = activeBroker.SaveRoomState(nil, state)
+	}
+}
+
+// SyncRoomState saves the latest RoomState snapshot of a room to Redis
+func (rm *RoomManager) SyncRoomState(roomID string) {
+	rm.mu.RLock()
+	room, exists := rm.activeRooms[roomID]
+	activeBroker := rm.broker
+	rm.mu.RUnlock()
+
+	if exists && room != nil {
+		syncRoomStateInternal(room, activeBroker)
+	}
+}
+
+// GetRoomState fetches the current RoomState from Redis (with in-memory fallback)
+func (rm *RoomManager) GetRoomState(roomID string) *models.RoomState {
+	rm.mu.RLock()
+	room, exists := rm.activeRooms[roomID]
+	activeBroker := rm.broker
+	rm.mu.RUnlock()
+
+	// 1. Try fetching from Redis first
+	if activeBroker != nil && activeBroker.IsActive() {
+		if state, err := activeBroker.GetRoomState(nil, roomID); err == nil && state != nil {
+			return state
+		}
+	}
+
+	// 2. Fallback to in-memory room state
+	if exists && room != nil {
+		return room.GetRoomState()
+	}
+
+	return nil
+}
+
+// AddGiftScore atomically updates the gift score in memory and batches increments for Redis pipeline flushing
+func (rm *RoomManager) AddGiftScore(roomID string, coins int64) int64 {
+	rm.mu.RLock()
+	room, exists := rm.activeRooms[roomID]
+	rm.mu.RUnlock()
+
+	var newScore int64
+	if exists && room != nil {
+		newScore = int64(room.AddHostScore(int(coins)))
+	}
+
+	// Buffer score delta in memory for periodic Redis INCRBY pipeline flush (Pillar 4)
+	rm.pendingScoreMu.Lock()
+	rm.pendingScores[roomID] += coins
+	rm.pendingScoreMu.Unlock()
+
+	// If the room is engaged in a live PK battle, sync scores across both rooms
+	rm.mu.RLock()
+	pkm := rm.pkManager
+	rm.mu.RUnlock()
+	if pkm != nil {
+		pkm.SyncPKScore(roomID, newScore)
+	}
+
+	return newScore
+}
+
+// SetMediaState updates user's media mute state in the room and synchronizes to Redis
+func (rm *RoomManager) SetMediaState(roomID, userID string, state models.MediaState) {
+	rm.mu.RLock()
+	room, exists := rm.activeRooms[roomID]
+	rm.mu.RUnlock()
+
+	if exists && room != nil {
+		room.SetMediaState(userID, state)
+		rm.SyncRoomState(roomID)
+	}
 }
 
 // ActiveRoomsCount returns the total number of currently active rooms
