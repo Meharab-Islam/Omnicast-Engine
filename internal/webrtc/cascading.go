@@ -17,8 +17,8 @@ import (
 	"github.com/fasthttp/websocket"
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"
-	"live-media-server/internal/broker"
-	"live-media-server/internal/models"
+	"omnicast/internal/broker"
+	"omnicast/internal/models"
 )
 
 // DefaultCascadeRTCConfiguration provides default STUN configuration for inter-server connections

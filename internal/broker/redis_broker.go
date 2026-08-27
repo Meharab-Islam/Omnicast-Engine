@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"live-media-server/internal/models"
+	"omnicast/internal/models"
 )
 
 // MessageHandler is the callback function invoked when a Redis message is received

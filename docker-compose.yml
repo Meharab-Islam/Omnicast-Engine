@@ -1,9 +1,27 @@
 services:
-  media-server:
-    build: .
-    container_name: live-media-server
+  caddy:
+    image: caddy:alpine
+    container_name: omnicast_caddy
+    restart: unless-stopped
     ports:
-      - "${PORT:-8080}:8080" # HTTP & WebSocket
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3 QUIC
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      - omnicast-engine
+
+  omnicast-engine:
+    build: .
+    container_name: omnicast_engine
+    # Port 8080 is internal only (proxied by Caddy). Only WebRTC UDP media ports exposed directly.
+    ports:
       - "50000-50050:50000-50050/udp" # WebRTC Media Ports
     volumes:
       - ./config:/app/config
@@ -13,24 +31,24 @@ services:
         required: false
     environment:
       - PORT=8080
-      - REDIS_ADDR=${REDIS_ADDR:-redis:6379}
+      - REDIS_ADDR=${REDIS_ADDR:-omnicast-redis:6379}
     depends_on:
-      - redis
-      - coturn
+      - omnicast-redis
+      - omnicast-coturn
     restart: unless-stopped
 
-  redis:
+  omnicast-redis:
     image: redis:7-alpine
-    container_name: live-media-redis
+    container_name: omnicast_redis
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
     restart: unless-stopped
 
-  coturn:
+  omnicast-coturn:
     image: coturn/coturn
-    container_name: coturn-server
+    container_name: omnicast_coturn
     ports:
       - "3478:3478"
       - "3478:3478/udp"
@@ -56,3 +74,5 @@ services:
 
 volumes:
   redis-data:
+  caddy_data:
+  caddy_config:

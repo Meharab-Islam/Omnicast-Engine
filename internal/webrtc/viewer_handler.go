@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"live-media-server/internal/models"
+	"omnicast/internal/models"
 
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"

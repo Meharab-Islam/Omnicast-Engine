@@ -10,7 +10,7 @@ import (
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3"
-	"live-media-server/internal/models"
+	"omnicast/internal/models"
 )
 
 // HandleHostConnection creates a WebRTC PeerConnection for the broadcaster/host,

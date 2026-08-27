@@ -12,11 +12,11 @@ import (
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"live-media-server/internal/api"
-	"live-media-server/internal/broker"
-	"live-media-server/internal/config"
-	"live-media-server/internal/signaling"
-	"live-media-server/internal/webrtc"
+	"omnicast/internal/api"
+	"omnicast/internal/broker"
+	"omnicast/internal/config"
+	"omnicast/internal/signaling"
+	"omnicast/internal/webrtc"
 )
 
 func main() {
@@ -65,7 +65,7 @@ func main() {
 	go hub.Run()
 
 	app := fiber.New(fiber.Config{
-		AppName: "Live Media Server v1.0",
+		AppName: "OmniCast Engine v1.0",
 	})
 
 	// CORS Middleware to allow Flutter, React, and other frontends to communicate

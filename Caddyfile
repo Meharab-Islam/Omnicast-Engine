@@ -1,0 +1,32 @@
+# OmniCast Engine - Caddy Zero-Config Automatic HTTPS / WSS Reverse Proxy
+# When DOMAIN_NAME is provided (e.g. live.mydomain.com), Caddy automatically provisions and renews Let's Encrypt / ZeroSSL certificates.
+# If no domain is configured, it defaults to :80 / :443.
+
+{$DOMAIN_NAME:localhost} {
+    # Reverse proxy to OmniCast Engine internal Go container
+    # Note: Caddy automatically manages WebSocket upgrade headers (Upgrade, Connection) by default.
+    reverse_proxy omnicast_engine:8080 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # Enable Gzip and Zstandard compression for static assets
+    encode gzip zstd
+
+    # Security Headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        X-XSS-Protection "1; mode=block"
+        -Server
+    }
+
+    # Logging
+    log {
+        output stdout
+        format console
+    }
+}

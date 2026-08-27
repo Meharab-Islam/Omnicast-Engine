@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"live-media-server/internal/models"
+	"omnicast/internal/models"
 )
 
 // PKManager manages live PK battle sessions, cross-room media track distribution, and real-time score syncing

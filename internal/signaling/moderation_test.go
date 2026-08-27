@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"live-media-server/internal/models"
+	"omnicast/internal/models"
 )
 
 func TestRoom_BannedUser(t *testing.T) {

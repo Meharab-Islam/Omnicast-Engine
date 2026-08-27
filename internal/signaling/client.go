@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"live-media-server/internal/api"
-	"live-media-server/internal/config"
-	"live-media-server/internal/models"
-	internalWebRTC "live-media-server/internal/webrtc"
+	"omnicast/internal/api"
+	"omnicast/internal/config"
+	"omnicast/internal/models"
+	internalWebRTC "omnicast/internal/webrtc"
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/google/uuid"

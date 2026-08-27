@@ -1,7 +1,7 @@
 # Graph Report - go_media_server  (2026-08-27)
 
 ## Corpus Check
-- 47 files · ~54,845 words
+- 47 files · ~55,028 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `67287386`
+- Built from commit: `203c75ed`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -33,7 +33,7 @@
 - HandleCoHostConnection
 - LiveRoomClient
 - main
-- live-media-server
+- omnicast
 - LiveRoomClient
 
 ## God Nodes (most connected - your core abstractions)
@@ -122,7 +122,7 @@ Cohesion: 0.12
 Nodes (25): getEnv(), main(), CascadingYAML, CoHostingYAML, Config, InteractionsYAML, ModerationYAML, PKBattleYAML (+17 more)
 
 ## Knowledge Gaps
-- **25 isolated node(s):** `live-media-server`, `TokenRequest`, `Participant`, `SDKConfig`, `PublishOptions` (+20 more)
+- **25 isolated node(s):** `omnicast`, `TokenRequest`, `Participant`, `SDKConfig`, `PublishOptions` (+20 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **6 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -135,7 +135,7 @@ _Questions this graph is uniquely positioned to answer:_
   _High betweenness centrality (0.145) - this node is a cross-community bridge._
 - **Why does `RedisBroker` connect `RedisBroker` to `RoomManager`, `CascadeManager`, `sync.RWMutex`?**
   _High betweenness centrality (0.074) - this node is a cross-community bridge._
-- **What connects `live-media-server`, `TokenRequest`, `Participant` to the rest of the system?**
+- **What connects `omnicast`, `TokenRequest`, `Participant` to the rest of the system?**
   _25 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Room` be split into smaller, more focused modules?**
   _Cohesion score 0.08955223880597014 - nodes in this community are weakly interconnected._

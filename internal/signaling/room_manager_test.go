@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"live-media-server/internal/models"
+	"omnicast/internal/models"
 )
 
 func TestRoomManager(t *testing.T) {

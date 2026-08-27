@@ -9,11 +9,11 @@ import (
 
 	"github.com/pion/rtcp"
 	pionWebRTC "github.com/pion/webrtc/v3"
-	"live-media-server/internal/api"
-	"live-media-server/internal/broker"
-	"live-media-server/internal/config"
-	"live-media-server/internal/models"
-	internalWebRTC "live-media-server/internal/webrtc"
+	"omnicast/internal/api"
+	"omnicast/internal/broker"
+	"omnicast/internal/config"
+	"omnicast/internal/models"
+	internalWebRTC "omnicast/internal/webrtc"
 )
 
 // RoomManager manages all active streaming rooms and provides thread-safe operations

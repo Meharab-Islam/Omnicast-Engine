@@ -115,7 +115,7 @@ func GenerateUserToken(userID, userName, avatarURL, secret string, duration time
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
-			Issuer:    "live-media-server",
+			Issuer:    "omnicast",
 		},
 	}
 

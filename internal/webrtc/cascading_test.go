@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/pion/webrtc/v3"
-	"live-media-server/internal/models"
+	"omnicast/internal/models"
 )
 
 func TestCascadeManager_Initialization(t *testing.T) {

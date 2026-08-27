@@ -1,4 +1,4 @@
-module live-media-server
+module omnicast
 
 go 1.22
 

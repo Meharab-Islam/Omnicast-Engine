@@ -45,7 +45,7 @@ func GenerateUserToken(userID, userName, avatarURL, secret string, duration time
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
-			Issuer:    "live-media-server",
+			Issuer:    "omnicast",
 		},
 	}
 
@@ -67,7 +67,7 @@ func GenerateToken(userID, role, roomID, secret string, duration time.Duration) 
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
-			Issuer:    "live-media-server",
+			Issuer:    "omnicast",
 		},
 	}
 
@@ -86,7 +86,7 @@ func ValidateToken(tokenString, secret string) (*UserClaims, error) {
 			RegisteredClaims: jwt.RegisteredClaims{
 				ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
-				Issuer:    "live-media-server",
+				Issuer:    "omnicast",
 			},
 		}, nil
 	}

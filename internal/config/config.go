@@ -123,6 +123,7 @@ cascading:
 // Config holds both runtime environment secrets and parsed YAML rules
 type Config struct {
 	Port         string
+	DomainName   string
 	HostDomain   string
 	PublicIP     string
 	APIKey       string
@@ -340,9 +341,14 @@ func LoadOrGenerateConfig() *Config {
 	}
 	cfg.Port = getVal("PORT", portStr)
 
-	cfg.HostDomain = getVal("HOST_DOMAIN", "")
+	cfg.DomainName = getVal("DOMAIN_NAME", "")
+	if cfg.DomainName == "" {
+		cfg.DomainName = getVal("HOST_DOMAIN", "")
+	}
+	cfg.HostDomain = cfg.DomainName
+
 	publicIP := getVal("PUBLIC_IP", "")
-	if publicIP == "" && cfg.HostDomain == "" {
+	if publicIP == "" && cfg.DomainName == "" {
 		detected := DetectPublicIP()
 		if detected != "" {
 			publicIP = detected
@@ -350,16 +356,16 @@ func LoadOrGenerateConfig() *Config {
 		} else {
 			publicIP = "127.0.0.1"
 		}
-	} else if publicIP == "" && cfg.HostDomain != "" {
-		publicIP = cfg.HostDomain
+	} else if publicIP == "" && cfg.DomainName != "" {
+		publicIP = cfg.DomainName
 	}
 	_ = os.Setenv("PUBLIC_IP", publicIP)
 	cfg.PublicIP = publicIP
 
 	turnRealm := getVal("TURN_REALM", "")
 	if turnRealm == "" {
-		if cfg.HostDomain != "" {
-			turnRealm = cfg.HostDomain
+		if cfg.DomainName != "" {
+			turnRealm = cfg.DomainName
 		} else {
 			turnRealm = fmt.Sprintf("turn.%s", cfg.PublicIP)
 		}
@@ -376,8 +382,9 @@ func LoadOrGenerateConfig() *Config {
 	// 6. Save auto-generated secrets to .env
 	if generatedAny || len(envMap) == 0 {
 		_ = os.MkdirAll(filepath.Dir(selectedEnvPath), 0755)
-		content := fmt.Sprintf(`# Live Media Server - Auto-Generated Zero-Config Environment
+		content := fmt.Sprintf(`# OmniCast Engine - Auto-Generated Zero-Config Environment
 PORT=%s
+DOMAIN_NAME=%s
 PUBLIC_IP=%s
 HOST_DOMAIN=%s
 TURN_REALM=%s
@@ -390,7 +397,7 @@ REDIS_PASSWORD=%s
 SERVER_ROLE=%s
 SERVER_ID=%s
 WEBHOOK_TARGET_URL=%s
-`, cfg.Port, cfg.PublicIP, cfg.HostDomain, cfg.TurnRealm, cfg.APIKey, cfg.APISecret, cfg.JWTSecret, cfg.TurnSecret, cfg.RedisAddr, cfg.RedisPass, cfg.ServerRole, cfg.ServerID, cfg.WebhookURL)
+`, cfg.Port, cfg.DomainName, cfg.PublicIP, cfg.HostDomain, cfg.TurnRealm, cfg.APIKey, cfg.APISecret, cfg.JWTSecret, cfg.TurnSecret, cfg.RedisAddr, cfg.RedisPass, cfg.ServerRole, cfg.ServerID, cfg.WebhookURL)
 
 		if err := os.WriteFile(selectedEnvPath, []byte(content), 0600); err == nil {
 			log.Printf("[Zero-Config] Persisted auto-generated credentials to %s\n", selectedEnvPath)
@@ -401,13 +408,8 @@ WEBHOOK_TARGET_URL=%s
 	return cfg
 }
 
-// PrintStartupBanner logs a styled, high-visibility banner with SDK connection strings
+// PrintStartupBanner logs a styled, high-visibility banner with dynamic SSL / domain connection strings
 func PrintStartupBanner(cfg *Config) {
-	hostDisplay := cfg.PublicIP
-	if cfg.HostDomain != "" {
-		hostDisplay = cfg.HostDomain
-	}
-
 	viewersCap := "UNLIMITED"
 	if cfg.YAML.RoomManagement.MaxViewersPerRoom > 0 {
 		viewersCap = fmt.Sprintf("%d", cfg.YAML.RoomManagement.MaxViewersPerRoom)
@@ -418,10 +420,37 @@ func PrintStartupBanner(cfg *Config) {
 		seatsCap = fmt.Sprintf("%d", cfg.YAML.CoHosting.MaxActiveSeats)
 	}
 
-	banner := fmt.Sprintf(`
+	var banner string
+	if cfg.DomainName != "" {
+		// Custom Domain SSL Enabled Display (Auto-SSL via Caddy)
+		banner = fmt.Sprintf(`
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║                                                                          ║
-║   🚀  LIVE MEDIA SERVER IS READY! (Zero-Config Plug & Play)              ║
+║   🚀  OMNICAST ENGINE IS ONLINE & READY! (Auto-SSL Enabled)              ║
+║                                                                          ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                          ║
+║   🌐  HOST URL     : wss://%s/ws
+║   🌍  API URL      : https://%s/api
+║   💻  WEB PORTAL   : https://%s
+║   🔑  API KEY      : %s
+║   🔒  API SECRET   : %s
+║   🛡️  JWT SECRET   : %s
+║   📡  COTURN REALM : %s
+║   👥  VIEWERS CAP  : %s
+║   🪑  CO-HOST CAP  : %s
+║                                                                          ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║  👉 Copy API_KEY & API_SECRET into your OmniCast Flutter / Mobile SDK!   ║
+╚══════════════════════════════════════════════════════════════════════════╝
+`, cfg.DomainName, cfg.DomainName, cfg.DomainName, cfg.APIKey, cfg.APISecret, cfg.JWTSecret, cfg.TurnRealm, viewersCap, seatsCap)
+	} else {
+		// Local / Direct IP Display
+		hostDisplay := cfg.PublicIP
+		banner = fmt.Sprintf(`
+╔══════════════════════════════════════════════════════════════════════════╗
+║                                                                          ║
+║   🚀  OMNICAST ENGINE IS ONLINE & READY! (Zero-Config Plug & Play)       ║
 ║                                                                          ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║                                                                          ║
@@ -435,9 +464,10 @@ func PrintStartupBanner(cfg *Config) {
 ║   🪑  CO-HOST CAP  : %s
 ║                                                                          ║
 ╠══════════════════════════════════════════════════════════════════════════╣
-║  👉 Copy API_KEY & API_SECRET into your Flutter / Mobile / Web SDK!      ║
+║  👉 Copy API_KEY & API_SECRET into your OmniCast Flutter / Mobile SDK!   ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 `, hostDisplay, cfg.Port, hostDisplay, cfg.Port, cfg.APIKey, cfg.APISecret, cfg.JWTSecret, cfg.TurnRealm, viewersCap, seatsCap)
+	}
 
 	fmt.Println(banner)
 }

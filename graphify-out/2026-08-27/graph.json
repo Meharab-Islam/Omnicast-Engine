@@ -1493,17 +1493,6 @@
       "source_location": ""
     },
     {
-      "id": "internal_models_room",
-      "label": "room.go",
-      "_origin": "ast",
-      "community": 0,
-      "community_name": "Room",
-      "file_type": "code",
-      "norm_label": "room.go",
-      "source_file": "internal/models/room.go",
-      "source_location": "L1"
-    },
-    {
       "id": "internal_models_room_go_models_room",
       "label": "Room",
       "_origin": "ast",
@@ -1535,17 +1524,6 @@
       "norm_label": "webrtc.tracklocalstaticrtp",
       "source_file": "",
       "source_location": ""
-    },
-    {
-      "id": "internal_models_room_newroomwithname",
-      "label": "NewRoomWithName()",
-      "_origin": "ast",
-      "community": 0,
-      "community_name": "Room",
-      "file_type": "code",
-      "norm_label": "newroomwithname()",
-      "source_file": "internal/models/room.go",
-      "source_location": "L69"
     },
     {
       "id": "models_cohostmedia",
@@ -2439,6 +2417,17 @@
       "source_location": "L18"
     },
     {
+      "id": "internal_signaling_room_manager_broadcasttoroominternal",
+      "label": "broadcastToRoomInternal()",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "Client",
+      "file_type": "code",
+      "norm_label": "broadcasttoroominternal()",
+      "source_file": "internal/signaling/room_manager.go",
+      "source_location": "L428"
+    },
+    {
       "id": "internal_webrtc_turn_auth_getdynamicrtcconfiguration",
       "label": "GetDynamicRTCConfiguration()",
       "_origin": "ast",
@@ -2802,6 +2791,39 @@
       "source_location": "L40"
     },
     {
+      "id": "signaling_roommanager_broadcasttoroom",
+      "label": ".BroadcastToRoom()",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "Client",
+      "file_type": "code",
+      "norm_label": ".broadcasttoroom()",
+      "source_file": "internal/signaling/room_manager.go",
+      "source_location": "L408"
+    },
+    {
+      "id": "signaling_roommanager_handleclientdisconnect",
+      "label": ".HandleClientDisconnect()",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "Client",
+      "file_type": "code",
+      "norm_label": ".handleclientdisconnect()",
+      "source_file": "internal/signaling/room_manager.go",
+      "source_location": "L594"
+    },
+    {
+      "id": "signaling_roommanager_joinviewer",
+      "label": ".JoinViewer()",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "Client",
+      "file_type": "code",
+      "norm_label": ".joinviewer()",
+      "source_file": "internal/signaling/room_manager.go",
+      "source_location": "L241"
+    },
+    {
       "id": "userclaims",
       "label": "UserClaims",
       "_origin": "ast",
@@ -2890,17 +2912,6 @@
       "source_location": "L1"
     },
     {
-      "id": "internal_signaling_room_manager_broadcasttoroominternal",
-      "label": "broadcastToRoomInternal()",
-      "_origin": "ast",
-      "community": 11,
-      "community_name": "RoomManager",
-      "file_type": "code",
-      "norm_label": "broadcasttoroominternal()",
-      "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L428"
-    },
-    {
       "id": "internal_signaling_room_manager_syncroomstateinternal",
       "label": "syncRoomStateInternal()",
       "_origin": "ast",
@@ -2909,7 +2920,7 @@
       "file_type": "code",
       "norm_label": "syncroomstateinternal()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L879"
+      "source_location": "L884"
     },
     {
       "id": "signaling_pkmanager",
@@ -2975,7 +2986,7 @@
       "file_type": "code",
       "norm_label": "roominfo",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L802"
+      "source_location": "L807"
     },
     {
       "id": "signaling_roommanager",
@@ -2997,7 +3008,7 @@
       "file_type": "code",
       "norm_label": ".activeroomscount()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L963"
+      "source_location": "L968"
     },
     {
       "id": "signaling_roommanager_addgiftscore",
@@ -3008,7 +3019,7 @@
       "file_type": "code",
       "norm_label": ".addgiftscore()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L924"
+      "source_location": "L929"
     },
     {
       "id": "signaling_roommanager_addtrackandrenegotiate",
@@ -3022,17 +3033,6 @@
       "source_location": "L472"
     },
     {
-      "id": "signaling_roommanager_broadcasttoroom",
-      "label": ".BroadcastToRoom()",
-      "_origin": "ast",
-      "community": 11,
-      "community_name": "RoomManager",
-      "file_type": "code",
-      "norm_label": ".broadcasttoroom()",
-      "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L408"
-    },
-    {
       "id": "signaling_roommanager_closeroomandnotify",
       "label": ".CloseRoomAndNotify()",
       "_origin": "ast",
@@ -3041,7 +3041,7 @@
       "file_type": "code",
       "norm_label": ".closeroomandnotify()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L689"
+      "source_location": "L694"
     },
     {
       "id": "signaling_roommanager_closeroomandnotifywithreason",
@@ -3052,7 +3052,7 @@
       "file_type": "code",
       "norm_label": ".closeroomandnotifywithreason()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L695"
+      "source_location": "L700"
     },
     {
       "id": "signaling_roommanager_createroom",
@@ -3064,6 +3064,17 @@
       "norm_label": ".createroom()",
       "source_file": "internal/signaling/room_manager.go",
       "source_location": "L200"
+    },
+    {
+      "id": "signaling_roommanager_destroyroominstant",
+      "label": ".destroyRoomInstant()",
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "RoomManager",
+      "file_type": "code",
+      "norm_label": ".destroyroominstant()",
+      "source_file": "internal/signaling/room_manager.go",
+      "source_location": "L681"
     },
     {
       "id": "signaling_roommanager_flushpendingscores",
@@ -3085,7 +3096,7 @@
       "file_type": "code",
       "norm_label": ".forceendroom()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L681"
+      "source_location": "L686"
     },
     {
       "id": "signaling_roommanager_getallrooms",
@@ -3096,7 +3107,7 @@
       "file_type": "code",
       "norm_label": ".getallrooms()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L810"
+      "source_location": "L815"
     },
     {
       "id": "signaling_roommanager_getallroomssummary",
@@ -3107,7 +3118,7 @@
       "file_type": "code",
       "norm_label": ".getallroomssummary()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L838"
+      "source_location": "L843"
     },
     {
       "id": "signaling_roommanager_getbroker",
@@ -3151,7 +3162,7 @@
       "file_type": "code",
       "norm_label": ".getroomstate()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L902"
+      "source_location": "L907"
     },
     {
       "id": "signaling_roommanager_getroomsummary",
@@ -3162,7 +3173,7 @@
       "file_type": "code",
       "norm_label": ".getroomsummary()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L858"
+      "source_location": "L863"
     },
     {
       "id": "signaling_roommanager_getserverconfig",
@@ -3174,28 +3185,6 @@
       "norm_label": ".getserverconfig()",
       "source_file": "internal/signaling/room_manager.go",
       "source_location": "L165"
-    },
-    {
-      "id": "signaling_roommanager_handleclientdisconnect",
-      "label": ".HandleClientDisconnect()",
-      "_origin": "ast",
-      "community": 11,
-      "community_name": "RoomManager",
-      "file_type": "code",
-      "norm_label": ".handleclientdisconnect()",
-      "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L594"
-    },
-    {
-      "id": "signaling_roommanager_joinviewer",
-      "label": ".JoinViewer()",
-      "_origin": "ast",
-      "community": 11,
-      "community_name": "RoomManager",
-      "file_type": "code",
-      "norm_label": ".joinviewer()",
-      "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L241"
     },
     {
       "id": "signaling_roommanager_refreshactiveroomsttl",
@@ -3272,7 +3261,7 @@
       "file_type": "code",
       "norm_label": ".setmediastate()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L951"
+      "source_location": "L956"
     },
     {
       "id": "signaling_roommanager_setpkmanager",
@@ -3327,7 +3316,7 @@
       "file_type": "code",
       "norm_label": ".syncroomstate()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L890"
+      "source_location": "L895"
     },
     {
       "id": "signaling_roomsummary",
@@ -3338,7 +3327,7 @@
       "file_type": "code",
       "norm_label": "roomsummary",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L827"
+      "source_location": "L832"
     },
     {
       "id": "api_authhandler",
@@ -4543,14 +4532,14 @@
       "source_location": "L15"
     },
     {
-      "id": "pkg_live_media_server",
-      "label": "live-media-server",
+      "id": "pkg_omnicast",
+      "label": "omnicast",
       "_origin": "ast",
       "community": 18,
-      "community_name": "live-media-server",
+      "community_name": "omnicast",
       "ecosystem": "go",
       "file_type": "code",
-      "norm_label": "live-media-server",
+      "norm_label": "omnicast",
       "source_file": "go.mod",
       "source_location": "L1",
       "type": "package"
@@ -4600,6 +4589,17 @@
       "source_location": "L20"
     },
     {
+      "id": "internal_models_room",
+      "label": "room.go",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "testing.T",
+      "file_type": "code",
+      "norm_label": "room.go",
+      "source_file": "internal/models/room.go",
+      "source_location": "L1"
+    },
+    {
       "id": "internal_models_room_newroom",
       "label": "NewRoom()",
       "_origin": "ast",
@@ -4609,6 +4609,17 @@
       "norm_label": "newroom()",
       "source_file": "internal/models/room.go",
       "source_location": "L48"
+    },
+    {
+      "id": "internal_models_room_newroomwithname",
+      "label": "NewRoomWithName()",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "testing.T",
+      "file_type": "code",
+      "norm_label": "newroomwithname()",
+      "source_file": "internal/models/room.go",
+      "source_location": "L69"
     },
     {
       "id": "internal_models_room_test",
@@ -5048,7 +5059,7 @@
       "file_type": "code",
       "norm_label": ".batchrefreshroomttls()",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L561"
+      "source_location": "L586"
     },
     {
       "id": "broker_redisbroker_close",
@@ -5059,7 +5070,7 @@
       "file_type": "code",
       "norm_label": ".close()",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L590"
+      "source_location": "L615"
     },
     {
       "id": "broker_redisbroker_deletepksession",
@@ -5070,7 +5081,7 @@
       "file_type": "code",
       "norm_label": ".deletepksession()",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L473"
+      "source_location": "L498"
     },
     {
       "id": "broker_redisbroker_deleteroomstate",
@@ -5103,7 +5114,7 @@
       "file_type": "code",
       "norm_label": ".getpksession()",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L445"
+      "source_location": "L470"
     },
     {
       "id": "broker_redisbroker_getroomorigin",
@@ -5180,7 +5191,7 @@
       "file_type": "code",
       "norm_label": ".publishpkevent()",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L491"
+      "source_location": "L516"
     },
     {
       "id": "broker_redisbroker_publishroomevent",
@@ -5202,7 +5213,7 @@
       "file_type": "code",
       "norm_label": ".pushchatmessage()",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L509"
+      "source_location": "L534"
     },
     {
       "id": "broker_redisbroker_refreshroomttl",
@@ -5213,7 +5224,7 @@
       "file_type": "code",
       "norm_label": ".refreshroomttl()",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L535"
+      "source_location": "L560"
     },
     {
       "id": "broker_redisbroker_registerroomorigin",
@@ -5246,7 +5257,7 @@
       "file_type": "code",
       "norm_label": ".savepksession()",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L418"
+      "source_location": "L443"
     },
     {
       "id": "broker_redisbroker_saveroomstate",
@@ -5280,6 +5291,17 @@
       "norm_label": ".subscriberoom()",
       "source_file": "internal/broker/redis_broker.go",
       "source_location": "L109"
+    },
+    {
+      "id": "broker_redisbroker_unlinkallroomkeys",
+      "label": ".UnlinkAllRoomKeys()",
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "RedisBroker",
+      "file_type": "code",
+      "norm_label": ".unlinkallroomkeys()",
+      "source_file": "internal/broker/redis_broker.go",
+      "source_location": "L418"
     },
     {
       "id": "broker_redisbroker_unsubscriberoom",
@@ -6179,7 +6201,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L562",
+      "source_location": "L587",
       "weight": 1.0
     },
     {
@@ -6191,7 +6213,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L474",
+      "source_location": "L499",
       "weight": 1.0
     },
     {
@@ -6227,7 +6249,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L446",
+      "source_location": "L471",
       "weight": 1.0
     },
     {
@@ -6311,7 +6333,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L492",
+      "source_location": "L517",
       "weight": 1.0
     },
     {
@@ -6335,7 +6357,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L510",
+      "source_location": "L535",
       "weight": 1.0
     },
     {
@@ -6347,7 +6369,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L536",
+      "source_location": "L561",
       "weight": 1.0
     },
     {
@@ -6383,7 +6405,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L419",
+      "source_location": "L444",
       "weight": 1.0
     },
     {
@@ -6420,6 +6442,18 @@
       "context": "call",
       "source_file": "internal/broker/redis_broker.go",
       "source_location": "L126",
+      "weight": 1.0
+    },
+    {
+      "source": "broker_redisbroker_unlinkallroomkeys",
+      "target": "broker_redisbroker_isactive",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "internal/broker/redis_broker.go",
+      "source_location": "L419",
       "weight": 1.0
     },
     {
@@ -6755,7 +6789,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L883",
+      "source_location": "L888",
       "weight": 1.0
     },
     {
@@ -9395,7 +9429,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L690",
+      "source_location": "L695",
       "weight": 1.0
     },
     {
@@ -9407,7 +9441,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L772",
+      "source_location": "L777",
       "weight": 1.0
     },
     {
@@ -9435,6 +9469,18 @@
       "weight": 1.0
     },
     {
+      "source": "signaling_roommanager_destroyroominstant",
+      "target": "signaling_roommanager_closeroomandnotifywithreason",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "internal/signaling/room_manager.go",
+      "source_location": "L682",
+      "weight": 1.0
+    },
+    {
       "source": "signaling_roommanager_forceendroom",
       "target": "signaling_roommanager_closeroomandnotifywithreason",
       "relation": "calls",
@@ -9443,7 +9489,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L685",
+      "source_location": "L690",
       "weight": 1.0
     },
     {
@@ -9532,7 +9578,7 @@
     },
     {
       "source": "signaling_roommanager_joinviewer",
-      "target": "signaling_roommanager_closeroomandnotify",
+      "target": "signaling_roommanager_destroyroominstant",
       "relation": "calls",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -9611,7 +9657,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L958",
+      "source_location": "L963",
       "weight": 1.0
     },
     {
@@ -9647,7 +9693,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L897",
+      "source_location": "L902",
       "weight": 1.0
     },
     {
@@ -10607,7 +10653,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L561",
+      "source_location": "L586",
       "weight": 1.0
     },
     {
@@ -10619,7 +10665,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L473",
+      "source_location": "L498",
       "weight": 1.0
     },
     {
@@ -10655,7 +10701,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L445",
+      "source_location": "L470",
       "weight": 1.0
     },
     {
@@ -10715,7 +10761,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L491",
+      "source_location": "L516",
       "weight": 1.0
     },
     {
@@ -10739,7 +10785,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L509",
+      "source_location": "L534",
       "weight": 1.0
     },
     {
@@ -10751,7 +10797,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L509",
+      "source_location": "L534",
       "weight": 1.0
     },
     {
@@ -10763,7 +10809,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L535",
+      "source_location": "L560",
       "weight": 1.0
     },
     {
@@ -10787,7 +10833,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L418",
+      "source_location": "L443",
       "weight": 1.0
     },
     {
@@ -10799,7 +10845,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L418",
+      "source_location": "L443",
       "weight": 1.0
     },
     {
@@ -10836,6 +10882,18 @@
       "context": "parameter_type",
       "source_file": "internal/broker/redis_broker.go",
       "source_location": "L70",
+      "weight": 1.0
+    },
+    {
+      "source": "broker_redisbroker_unlinkallroomkeys",
+      "target": "go_type_context_context",
+      "relation": "references",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "parameter_type",
+      "source_file": "internal/broker/redis_broker.go",
+      "source_location": "L418",
       "weight": 1.0
     },
     {
@@ -11255,7 +11313,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L879",
+      "source_location": "L884",
       "weight": 1.0
     },
     {
@@ -11267,7 +11325,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L879",
+      "source_location": "L884",
       "weight": 1.0
     },
     {
@@ -12155,7 +12213,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L951",
+      "source_location": "L956",
       "weight": 1.0
     },
     {
@@ -12263,7 +12321,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L445",
+      "source_location": "L470",
       "weight": 1.0
     },
     {
@@ -12827,7 +12885,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L810",
+      "source_location": "L815",
       "weight": 1.0
     },
     {
@@ -12839,7 +12897,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L838",
+      "source_location": "L843",
       "weight": 1.0
     },
     {
@@ -12899,7 +12957,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L902",
+      "source_location": "L907",
       "weight": 1.0
     },
     {
@@ -12911,7 +12969,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L858",
+      "source_location": "L863",
       "weight": 1.0
     },
     {
@@ -13782,7 +13840,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L802",
+      "source_location": "L807",
       "weight": 1.0
     },
     {
@@ -13793,7 +13851,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L827",
+      "source_location": "L832",
       "weight": 1.0
     },
     {
@@ -13804,7 +13862,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L879",
+      "source_location": "L884",
       "weight": 1.0
     },
     {
@@ -14964,7 +15022,7 @@
     },
     {
       "source": "internal_broker_redis_broker_go_broker_redisbroker",
-      "target": "broker_redisbroker_savepksession",
+      "target": "broker_redisbroker_unlinkallroomkeys",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -14975,13 +15033,24 @@
     },
     {
       "source": "internal_broker_redis_broker_go_broker_redisbroker",
+      "target": "broker_redisbroker_savepksession",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/broker/redis_broker.go",
+      "source_location": "L443",
+      "weight": 1.0
+    },
+    {
+      "source": "internal_broker_redis_broker_go_broker_redisbroker",
       "target": "broker_redisbroker_getpksession",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L445",
+      "source_location": "L470",
       "weight": 1.0
     },
     {
@@ -14992,7 +15061,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L473",
+      "source_location": "L498",
       "weight": 1.0
     },
     {
@@ -15003,7 +15072,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L491",
+      "source_location": "L516",
       "weight": 1.0
     },
     {
@@ -15014,7 +15083,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L509",
+      "source_location": "L534",
       "weight": 1.0
     },
     {
@@ -15025,7 +15094,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L535",
+      "source_location": "L560",
       "weight": 1.0
     },
     {
@@ -15036,7 +15105,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L561",
+      "source_location": "L586",
       "weight": 1.0
     },
     {
@@ -15047,7 +15116,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/broker/redis_broker.go",
-      "source_location": "L590",
+      "source_location": "L615",
       "weight": 1.0
     },
     {
@@ -17527,7 +17596,7 @@
     },
     {
       "source": "signaling_roommanager",
-      "target": "signaling_roommanager_forceendroom",
+      "target": "signaling_roommanager_destroyroominstant",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -17538,13 +17607,24 @@
     },
     {
       "source": "signaling_roommanager",
+      "target": "signaling_roommanager_forceendroom",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/signaling/room_manager.go",
+      "source_location": "L686",
+      "weight": 1.0
+    },
+    {
+      "source": "signaling_roommanager",
       "target": "signaling_roommanager_closeroomandnotify",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L689",
+      "source_location": "L694",
       "weight": 1.0
     },
     {
@@ -17555,7 +17635,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L695",
+      "source_location": "L700",
       "weight": 1.0
     },
     {
@@ -17577,7 +17657,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L810",
+      "source_location": "L815",
       "weight": 1.0
     },
     {
@@ -17588,7 +17668,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L838",
+      "source_location": "L843",
       "weight": 1.0
     },
     {
@@ -17599,7 +17679,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L858",
+      "source_location": "L863",
       "weight": 1.0
     },
     {
@@ -17610,7 +17690,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L890",
+      "source_location": "L895",
       "weight": 1.0
     },
     {
@@ -17621,7 +17701,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L902",
+      "source_location": "L907",
       "weight": 1.0
     },
     {
@@ -17632,7 +17712,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L924",
+      "source_location": "L929",
       "weight": 1.0
     },
     {
@@ -17654,7 +17734,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L951",
+      "source_location": "L956",
       "weight": 1.0
     },
     {
@@ -17665,7 +17745,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L963",
+      "source_location": "L968",
       "weight": 1.0
     },
     {
@@ -18478,5 +18558,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "67287386c6bb426558e5ece44f755099a76149a8"
+  "built_at_commit": "203c75ed301c59a252366d68ffaad168ebb8faaa"
 }

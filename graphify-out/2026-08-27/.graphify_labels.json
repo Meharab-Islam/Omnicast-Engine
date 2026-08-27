@@ -17,6 +17,6 @@
   "15": "HandleCoHostConnection",
   "16": "LiveRoomClient",
   "17": "main",
-  "18": "live-media-server",
+  "18": "omnicast",
   "19": "LiveRoomClient"
 }

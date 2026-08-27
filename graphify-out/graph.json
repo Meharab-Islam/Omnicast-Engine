@@ -2249,7 +2249,7 @@
       "file_type": "code",
       "norm_label": "getappconfig()",
       "source_file": "internal/config/config.go",
-      "source_location": "L151"
+      "source_location": "L152"
     },
     {
       "id": "internal_models_message",
@@ -4364,7 +4364,7 @@
       "file_type": "code",
       "norm_label": "detectpublicip()",
       "source_file": "internal/config/config.go",
-      "source_location": "L176"
+      "source_location": "L177"
     },
     {
       "id": "internal_config_config_generaterandomkey",
@@ -4375,7 +4375,7 @@
       "file_type": "code",
       "norm_label": "generaterandomkey()",
       "source_file": "internal/config/config.go",
-      "source_location": "L167"
+      "source_location": "L168"
     },
     {
       "id": "internal_config_config_loadorgenerateconfig",
@@ -4386,7 +4386,7 @@
       "file_type": "code",
       "norm_label": "loadorgenerateconfig()",
       "source_file": "internal/config/config.go",
-      "source_location": "L206"
+      "source_location": "L207"
     },
     {
       "id": "internal_config_config_printstartupbanner",
@@ -4397,7 +4397,7 @@
       "file_type": "code",
       "norm_label": "printstartupbanner()",
       "source_file": "internal/config/config.go",
-      "source_location": "L405"
+      "source_location": "L412"
     },
     {
       "id": "internal_config_config_test",
@@ -4532,14 +4532,14 @@
       "source_location": "L15"
     },
     {
-      "id": "pkg_live_media_server",
-      "label": "live-media-server",
+      "id": "pkg_omnicast",
+      "label": "omnicast",
       "_origin": "ast",
       "community": 18,
-      "community_name": "live-media-server",
+      "community_name": "omnicast",
       "ecosystem": "go",
       "file_type": "code",
-      "norm_label": "live-media-server",
+      "norm_label": "omnicast",
       "source_file": "go.mod",
       "source_location": "L1",
       "type": "package"
@@ -6669,7 +6669,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/config/config.go",
-      "source_location": "L304",
+      "source_location": "L305",
       "weight": 1.0
     },
     {
@@ -6681,7 +6681,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/config/config.go",
-      "source_location": "L346",
+      "source_location": "L352",
       "weight": 1.0
     },
     {
@@ -9789,7 +9789,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "internal/config/config.go",
-      "source_location": "L142",
+      "source_location": "L143",
       "weight": 1.0
     },
     {
@@ -10965,7 +10965,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/config/config.go",
-      "source_location": "L405",
+      "source_location": "L412",
       "weight": 1.0
     },
     {
@@ -12393,7 +12393,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "internal/config/config.go",
-      "source_location": "L151",
+      "source_location": "L152",
       "weight": 1.0
     },
     {
@@ -12405,7 +12405,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "internal/config/config.go",
-      "source_location": "L206",
+      "source_location": "L207",
       "weight": 1.0
     },
     {
@@ -13257,7 +13257,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/config/config.go",
-      "source_location": "L151",
+      "source_location": "L152",
       "weight": 1.0
     },
     {
@@ -13268,7 +13268,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/config/config.go",
-      "source_location": "L167",
+      "source_location": "L168",
       "weight": 1.0
     },
     {
@@ -13279,7 +13279,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/config/config.go",
-      "source_location": "L176",
+      "source_location": "L177",
       "weight": 1.0
     },
     {
@@ -13301,7 +13301,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/config/config.go",
-      "source_location": "L206",
+      "source_location": "L207",
       "weight": 1.0
     },
     {
@@ -13334,7 +13334,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/config/config.go",
-      "source_location": "L405",
+      "source_location": "L412",
       "weight": 1.0
     },
     {
@@ -18558,5 +18558,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "67287386c6bb426558e5ece44f755099a76149a8"
+  "built_at_commit": "203c75ed301c59a252366d68ffaad168ebb8faaa"
 }
