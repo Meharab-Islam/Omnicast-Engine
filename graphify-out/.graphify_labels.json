@@ -18,5 +18,7 @@
   "16": "LiveRoomClient",
   "17": "main",
   "18": "omnicast",
-  "19": "LiveRoomClient"
+  "19": "LiveRoomClient",
+  "20": "turn_auth.go",
+  "21": "entrypoint.sh"
 }

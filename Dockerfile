@@ -1,40 +1,45 @@
 # ==============================================================================
-# Stage 1: Build the Go Media Server binary
+# Stage 1: Build the OmniCast Engine binary
 # ==============================================================================
 FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
-# Install git and build dependencies
-RUN apk add --no-cache git ca-certificates
+# Install git, ca-certificates, and build tools
+RUN apk add --no-cache git ca-certificates tzdata
 
-# Copy go module definitions and pre-download dependencies for layer caching
+# Cache go modules
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code into the container
+# Copy source code
 COPY . .
 
-# Compile optimized, statically linked binary for Linux
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o media-server ./cmd/main.go
+# Compile optimized static binary (-w -s strips debug information and symbol table for minimal size)
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s -extldflags '-static'" -o omnicast-engine ./cmd/main.go
 
 # ==============================================================================
-# Stage 2: Minimal Runtime Container
+# Stage 2: Ultra-Minimal Production Runner Image (< 30MB)
 # ==============================================================================
-FROM alpine:latest AS runner
+FROM alpine:3.20 AS runner
 
 WORKDIR /app
 
-# Install CA root certificates (for secure TLS outbound calls) and tzdata
-RUN apk add --no-cache ca-certificates tzdata
+# Install essential runtime dependencies: CA certificates for HTTPS/WSS and tzdata for timestamps
+RUN apk add --no-cache ca-certificates tzdata \
+    && addgroup -S omnicast && adduser -S omnicast -G omnicast \
+    && mkdir -p /app/data /app/config && chown -R omnicast:omnicast /app
 
-# Copy compiled binary and static assets from builder stage
-COPY --from=builder /app/media-server .
-COPY --from=builder /app/public ./public
+# Copy compiled Go binary and public frontend assets only (no source code)
+COPY --from=builder /app/omnicast-engine /app/omnicast-engine
+COPY --from=builder /app/public /app/public
 
-# Expose HTTP / WebSocket signaling port and WebRTC UDP media port range
+# Run as non-root user for security
+USER omnicast:omnicast
+
+# Expose internal signaling port and WebRTC UDP media port range
 EXPOSE 8080
 EXPOSE 50000-50050/udp
 
-# Set binary execution entrypoint
-CMD ["./media-server"]
+# Set execution entrypoint
+ENTRYPOINT ["/app/omnicast-engine"]

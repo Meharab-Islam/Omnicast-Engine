@@ -2285,39 +2285,6 @@
       "source_location": "L37"
     },
     {
-      "id": "internal_models_message_test",
-      "label": "message_test.go",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "Client",
-      "file_type": "code",
-      "norm_label": "message_test.go",
-      "source_file": "internal/models/message_test.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "internal_models_message_test_testparsesignalingmessage",
-      "label": "TestParseSignalingMessage()",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "Client",
-      "file_type": "code",
-      "norm_label": "testparsesignalingmessage()",
-      "source_file": "internal/models/message_test.go",
-      "source_location": "L8"
-    },
-    {
-      "id": "internal_models_message_test_testsignalingmessageencode",
-      "label": "TestSignalingMessageEncode()",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "Client",
-      "file_type": "code",
-      "norm_label": "testsignalingmessageencode()",
-      "source_file": "internal/models/message_test.go",
-      "source_location": "L35"
-    },
-    {
       "id": "internal_signaling_client",
       "label": "client.go",
       "_origin": "ast",
@@ -4589,6 +4556,39 @@
       "source_location": "L20"
     },
     {
+      "id": "internal_models_message_test",
+      "label": "message_test.go",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "testing.T",
+      "file_type": "code",
+      "norm_label": "message_test.go",
+      "source_file": "internal/models/message_test.go",
+      "source_location": "L1"
+    },
+    {
+      "id": "internal_models_message_test_testparsesignalingmessage",
+      "label": "TestParseSignalingMessage()",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "testing.T",
+      "file_type": "code",
+      "norm_label": "testparsesignalingmessage()",
+      "source_file": "internal/models/message_test.go",
+      "source_location": "L8"
+    },
+    {
+      "id": "internal_models_message_test_testsignalingmessageencode",
+      "label": "TestSignalingMessageEncode()",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "testing.T",
+      "file_type": "code",
+      "norm_label": "testsignalingmessageencode()",
+      "source_file": "internal/models/message_test.go",
+      "source_location": "L35"
+    },
+    {
       "id": "internal_models_room",
       "label": "room.go",
       "_origin": "ast",
@@ -4933,8 +4933,8 @@
       "id": "internal_webrtc_turn_auth",
       "label": "turn_auth.go",
       "_origin": "ast",
-      "community": 2,
-      "community_name": "testing.T",
+      "community": 20,
+      "community_name": "turn_auth.go",
       "file_type": "code",
       "norm_label": "turn_auth.go",
       "source_file": "internal/webrtc/turn_auth.go",
@@ -4944,8 +4944,8 @@
       "id": "internal_webrtc_turn_auth_generateturncredentials",
       "label": "GenerateTURNCredentials()",
       "_origin": "ast",
-      "community": 2,
-      "community_name": "testing.T",
+      "community": 20,
+      "community_name": "turn_auth.go",
       "file_type": "code",
       "norm_label": "generateturncredentials()",
       "source_file": "internal/webrtc/turn_auth.go",
@@ -4955,8 +4955,8 @@
       "id": "internal_webrtc_turn_auth_getdefaulticeservers",
       "label": "GetDefaultICEServers()",
       "_origin": "ast",
-      "community": 2,
-      "community_name": "testing.T",
+      "community": 20,
+      "community_name": "turn_auth.go",
       "file_type": "code",
       "norm_label": "getdefaulticeservers()",
       "source_file": "internal/webrtc/turn_auth.go",
@@ -4966,8 +4966,8 @@
       "id": "internal_webrtc_turn_auth_getdefaulticeserversjson",
       "label": "GetDefaultICEServersJSON()",
       "_origin": "ast",
-      "community": 2,
-      "community_name": "testing.T",
+      "community": 20,
+      "community_name": "turn_auth.go",
       "file_type": "code",
       "norm_label": "getdefaulticeserversjson()",
       "source_file": "internal/webrtc/turn_auth.go",
@@ -4977,8 +4977,8 @@
       "id": "internal_webrtc_turn_auth_test",
       "label": "turn_auth_test.go",
       "_origin": "ast",
-      "community": 2,
-      "community_name": "testing.T",
+      "community": 20,
+      "community_name": "turn_auth.go",
       "file_type": "code",
       "norm_label": "turn_auth_test.go",
       "source_file": "internal/webrtc/turn_auth_test.go",
@@ -4988,8 +4988,8 @@
       "id": "internal_webrtc_turn_auth_test_testgenerateturncredentials",
       "label": "TestGenerateTURNCredentials()",
       "_origin": "ast",
-      "community": 2,
-      "community_name": "testing.T",
+      "community": 20,
+      "community_name": "turn_auth.go",
       "file_type": "code",
       "norm_label": "testgenerateturncredentials()",
       "source_file": "internal/webrtc/turn_auth_test.go",
@@ -4999,8 +4999,8 @@
       "id": "internal_webrtc_turn_auth_test_testgetdefaulticeservers",
       "label": "TestGetDefaultICEServers()",
       "_origin": "ast",
-      "community": 2,
-      "community_name": "testing.T",
+      "community": 20,
+      "community_name": "turn_auth.go",
       "file_type": "code",
       "norm_label": "testgetdefaulticeservers()",
       "source_file": "internal/webrtc/turn_auth_test.go",
@@ -5010,8 +5010,8 @@
       "id": "webrtc_iceserver",
       "label": "webrtc.ICEServer",
       "_origin": "ast",
-      "community": 2,
-      "community_name": "testing.T",
+      "community": 20,
+      "community_name": "turn_auth.go",
       "file_type": "code",
       "norm_label": "webrtc.iceserver",
       "source_file": "",
@@ -5021,12 +5021,57 @@
       "id": "webrtc_iceserverjson",
       "label": "ICEServerJSON",
       "_origin": "ast",
-      "community": 2,
-      "community_name": "testing.T",
+      "community": 20,
+      "community_name": "turn_auth.go",
       "file_type": "code",
       "norm_label": "iceserverjson",
       "source_file": "internal/webrtc/turn_auth.go",
       "source_location": "L22"
+    },
+    {
+      "id": "entrypoint",
+      "label": "entrypoint.sh",
+      "_origin": "ast",
+      "community": 21,
+      "community_name": "entrypoint.sh",
+      "file_type": "code",
+      "metadata": {
+        "language": "bash",
+        "kind": "file"
+      },
+      "norm_label": "entrypoint.sh",
+      "source_file": "entrypoint.sh",
+      "source_location": "L1"
+    },
+    {
+      "id": "entrypoint_redis_addr",
+      "label": "REDIS_ADDR",
+      "_origin": "ast",
+      "community": 21,
+      "community_name": "entrypoint.sh",
+      "file_type": "code",
+      "metadata": {
+        "language": "bash",
+        "kind": "code"
+      },
+      "norm_label": "redis_addr",
+      "source_file": "entrypoint.sh",
+      "source_location": "L14"
+    },
+    {
+      "id": "entrypoint_sh__entry",
+      "label": "entrypoint.sh script",
+      "_origin": "ast",
+      "community": 21,
+      "community_name": "entrypoint.sh",
+      "file_type": "code",
+      "metadata": {
+        "language": "bash",
+        "kind": "bash_entrypoint"
+      },
+      "norm_label": "entrypoint.sh script",
+      "source_file": "entrypoint.sh",
+      "source_location": "L1"
     },
     {
       "id": "broker_messagehandler",
@@ -13019,6 +13064,17 @@
       "weight": 1.0
     },
     {
+      "source": "entrypoint",
+      "target": "entrypoint_sh__entry",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "entrypoint.sh",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
       "source": "internal_api_auth",
       "target": "internal_api_auth_generateusertoken",
       "relation": "contains",
@@ -14765,6 +14821,17 @@
       "confidence_score": 1.0,
       "source_file": "README.md",
       "source_location": "L563",
+      "weight": 1.0
+    },
+    {
+      "source": "entrypoint",
+      "target": "entrypoint_redis_addr",
+      "relation": "defines",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "entrypoint.sh",
+      "source_location": "L14",
       "weight": 1.0
     },
     {
@@ -18558,5 +18625,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "203c75ed301c59a252366d68ffaad168ebb8faaa"
+  "built_at_commit": "64cf2c293f02293806c2762adeb85cdbe66bd5cd"
 }

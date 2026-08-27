@@ -150,9 +150,9 @@
     "semantic_hash": ""
   },
   "docker-compose.yml": {
-    "mtime": 1787846157.8727317,
-    "seen": 1787846306.0664032,
-    "ast_hash": "406452b787bc90006d1151f7dd1cafb1",
+    "mtime": 1787846781.2546592,
+    "seen": 1787846796.16844,
+    "ast_hash": "d4c1fdef63fb0a4e1247466ce411b07e",
     "semantic_hash": ""
   },
   "internal/broker/redis_broker.go": {
@@ -294,9 +294,9 @@
     "semantic_hash": ""
   },
   "internal/config/config.go": {
-    "mtime": 1787846140.169259,
-    "seen": 1787846306.066381,
-    "ast_hash": "6e1f3b5d9cc728908186f58bc4d5f299",
+    "mtime": 1787846764.6241977,
+    "seen": 1787846796.1684191,
+    "ast_hash": "f7e5aad1797524ae3845fe48bb7ea665",
     "semantic_hash": ""
   },
   "internal/config/config_test.go": {
@@ -315,6 +315,18 @@
     "mtime": 1787846046.757399,
     "seen": 1787846306.066389,
     "ast_hash": "ebd363521fda1bf35d2208cde28c8f33",
+    "semantic_hash": ""
+  },
+  ".github/workflows/docker-publish.yml": {
+    "mtime": 1787847328.092121,
+    "seen": 1787847336.3117929,
+    "ast_hash": "bfcac36049a2cbd4cc6e95c39e88c9f4",
+    "semantic_hash": ""
+  },
+  "docker-compose.production.yml": {
+    "mtime": 1787847321.257002,
+    "seen": 1787847336.3117938,
+    "ast_hash": "617ab3a65ab427255fb5529821f06636",
     "semantic_hash": ""
   }
 }

@@ -1,0 +1,87 @@
+# ==============================================================================
+# OmniCast Engine - Production Docker Compose (VPS Deployment)
+# Pulls pre-built images from Docker Hub (meharab/omnicast_engine:latest)
+# ==============================================================================
+
+services:
+  # Caddy Automatic HTTPS / WSS Reverse Proxy
+  caddy:
+    image: caddy:alpine
+    container_name: omnicast_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3 QUIC support
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      - omnicast-engine
+
+  # OmniCast Go WebRTC SFU & Signaling Engine
+  omnicast-engine:
+    image: meharab/omnicast_engine:latest
+    container_name: omnicast_engine
+    restart: unless-stopped
+    # Port 8080 is internal only (proxied by Caddy). Only WebRTC UDP media ports exposed directly.
+    ports:
+      - "50000-50050:50000-50050/udp"
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - PORT=8080
+      - REDIS_ADDR=${REDIS_ADDR:-omnicast-redis:6379}
+    depends_on:
+      - omnicast-redis
+      - omnicast-coturn
+
+  # Redis Cluster Broker (State Caching & Late Joiner Sync)
+  omnicast-redis:
+    image: redis:7-alpine
+    container_name: omnicast_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  # Coturn NAT Traversal (STUN / Dynamic TURN REST API)
+  omnicast-coturn:
+    image: coturn/coturn:latest
+    container_name: omnicast_coturn
+    restart: unless-stopped
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "49152-49250:49152-49250/udp"
+    env_file:
+      - path: .env
+        required: false
+    command:
+      - turnserver
+      - --log-file=stdout
+      - --external-ip=${PUBLIC_IP:-127.0.0.1}
+      - --use-auth-secret
+      - --static-auth-secret=${TURN_SECRET:-turn_default_secret_999}
+      - --realm=${TURN_REALM:-live.myvps.com}
+      - --total-quota=100
+      - --min-port=49152
+      - --max-port=49250
+      - -v
+      - -n
+      - --no-tls
+      - --no-dtls
+
+volumes:
+  redis-data:
+  caddy_data:
+  caddy_config:

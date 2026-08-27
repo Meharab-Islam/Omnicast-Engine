@@ -316,5 +316,23 @@
     "seen": 1787846306.066389,
     "ast_hash": "ebd363521fda1bf35d2208cde28c8f33",
     "semantic_hash": ""
+  },
+  ".github/workflows/docker-publish.yml": {
+    "mtime": 1787848704.360658,
+    "seen": 1787848713.721188,
+    "ast_hash": "81ed3831506cc728cb9958771ff82701",
+    "semantic_hash": ""
+  },
+  "docker-compose.production.yml": {
+    "mtime": 1787847321.257002,
+    "seen": 1787847336.3117938,
+    "ast_hash": "617ab3a65ab427255fb5529821f06636",
+    "semantic_hash": ""
+  },
+  "entrypoint.sh": {
+    "mtime": 1787848669.8709462,
+    "seen": 1787848713.72116,
+    "ast_hash": "3cbb0b63c8c494a8998ec911a42f6d53",
+    "semantic_hash": ""
   }
 }

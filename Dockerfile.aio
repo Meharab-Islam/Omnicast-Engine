@@ -1,0 +1,63 @@
+# ==============================================================================
+# OmniCast Engine - All-In-One (AIO) Monolithic Dockerfile
+# Bundles Go Engine + Embedded Redis + Coturn STUN/TURN + Caddy Auto-SSL
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Stage 1: Build the Go Media Server binary
+# ------------------------------------------------------------------------------
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates tzdata
+
+# Cache Go modules
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code and build statically linked binary
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s -extldflags '-static'" -o omnicast-engine ./cmd/main.go
+
+# ------------------------------------------------------------------------------
+# Stage 2: Monolithic All-In-One Runner
+# ------------------------------------------------------------------------------
+FROM alpine:3.20 AS runner
+
+WORKDIR /app
+
+# Install all required services & tools: Redis, Coturn, Caddy, Bash, Curl, OpenSSL, CA Certs, Tzdata
+RUN apk add --no-cache \
+    redis \
+    coturn \
+    caddy \
+    bash \
+    curl \
+    openssl \
+    ca-certificates \
+    tzdata \
+    && mkdir -p /app/data /app/config /etc/caddy
+
+# Copy compiled Go binary and frontend assets
+COPY --from=builder /app/omnicast-engine /app/omnicast-engine
+COPY --from=builder /app/public /app/public
+
+# Copy process supervisor entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Expose all necessary networking ports:
+# 80/443: Caddy Auto-SSL HTTPS/WSS
+# 8080: Internal Go Engine / Direct HTTP/WS fallback
+# 3478 (TCP/UDP): Coturn STUN/TURN
+# 49152-49250/udp: Coturn Relay Ports
+# 50000-50050/udp: WebRTC Media RTP/RTCP Ports
+EXPOSE 80 443 443/udp 8080 3478 3478/udp 49152-49250/udp 50000-50050/udp
+
+# Set working directory & volumes for persistence
+VOLUME ["/app/config", "/app/data", "/data"]
+
+# Entrypoint executes the process supervisor
+ENTRYPOINT ["/bin/bash", "/app/entrypoint.sh"]
