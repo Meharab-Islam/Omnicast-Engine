@@ -5,7 +5,7 @@
   "3": "RedisBroker",
   "4": "LiveMediaCore",
   "5": "WebhookDispatcher",
-  "6": "turn_auth.go",
+  "6": ".emit",
   "7": "sync.RWMutex",
   "8": "signaling.go",
   "9": "webrtc.go",
@@ -15,5 +15,7 @@
   "13": "🚀 Go Live Media Server (SFU & Interactive Streaming)",
   "14": "CascadeManager",
   "15": "HandleCoHostConnection",
+  "16": "LiveRoomClient",
+  "17": "LiveRoomClient",
   "18": "live-media-server"
 }

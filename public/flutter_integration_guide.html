@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flutter WebRTC লাইভ স্ট্রিমিং SDK ইন্টিগ্রেশন গাইড</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070a13;
+      --sidebar-bg: #0d1322;
+      --card-bg: #131c2e;
+      --card-bg-elevated: #1a263e;
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-purple: #9d4edd;
+      --accent-pink: #ec4899;
+      --accent-gold: #fbbf24;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --border: rgba(255, 255, 255, 0.08);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --sidebar-width: 310px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Hind Siliguri', 'Plus Jakarta Sans', -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      display: flex;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* সাইডবার নেভিগেশন */
+    .sidebar {
+      width: var(--sidebar-width);
+      background-color: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      overflow-y: auto;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 8px;
+      margin-bottom: 8px;
+    }
+
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #02569B, #0175C2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: #fff;
+      font-size: 18px;
+    }
+
+    .brand-text {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav-group-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      padding: 8px 12px 4px 12px;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-decoration: none;
+      border-radius: var(--radius-sm);
+      transition: all 0.15s ease;
+    }
+
+    .nav-link:hover, .nav-link.active {
+      color: #fff;
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-link.active {
+      color: var(--accent-cyan);
+      background-color: rgba(0, 242, 254, 0.1);
+      border-left: 3px solid var(--accent-cyan);
+    }
+
+    .nav-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+    }
+
+    /* মূল কনটেন্ট এরিয়া */
+    .content {
+      margin-left: var(--sidebar-width);
+      flex: 1;
+      padding: 40px 48px 80px 48px;
+      max-width: 1150px;
+    }
+
+    .manual-header {
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tag-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      background: rgba(1, 117, 194, 0.15);
+      color: #4facfe;
+      border: 1px solid rgba(1, 117, 194, 0.4);
+      margin-bottom: 16px;
+    }
+
+    h1.title {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      line-height: 1.3;
+      margin-bottom: 14px;
+    }
+
+    h1.title .gradient-text {
+      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 50%, #0075eb 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .lead-text {
+      font-size: 17px;
+      color: var(--text-muted);
+      max-width: 880px;
+      line-height: 1.8;
+    }
+
+    /* সেকশন কার্ড */
+    .section-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 36px;
+      margin-bottom: 36px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .section-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #02569B, #0175C2);
+      color: #fff;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 800;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .section-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .section-desc {
+      font-size: 15.5px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      line-height: 1.8;
+    }
+
+    /* কোড ব্লক */
+    .code-box {
+      background: #040711;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-sm);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+
+    .code-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 8px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim);
+    }
+
+    pre {
+      margin: 0;
+      padding: 20px;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #e2e8f0;
+    }
+
+    /* সিনট্যাক্স হাইলাইটিং */
+    .k { color: #38bdf8; font-weight: 600; } /* keyword */
+    .s { color: #a5f3fc; } /* string */
+    .n { color: #fbbf24; } /* number */
+    .b { color: #ec4899; } /* boolean */
+    .c { color: #64748b; font-style: italic; } /* comment */
+    .t { color: #c084fc; font-weight: 600; } /* type / class */
+
+    /* কল-আউট ও অ্যালার্ট */
+    .callout {
+      border-radius: var(--radius-sm);
+      padding: 18px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      font-size: 14.5px;
+      line-height: 1.7;
+    }
+
+    .callout-rule {
+      background: rgba(0, 242, 254, 0.05);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      border-left: 4px solid var(--accent-cyan);
+    }
+
+    .callout-warning {
+      background: rgba(239, 68, 68, 0.05);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-left: 4px solid var(--accent-red);
+    }
+
+    .callout-icon {
+      font-size: 22px;
+      flex-shrink: 0;
+      line-height: 1;
+      margin-top: 2px;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 6px;
+      font-size: 15.5px;
+    }
+
+    /* গ্রিড লেআউট */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .info-card {
+      background: var(--card-bg-elevated);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+    }
+
+    .info-card h4 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .info-card p {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========================================================================= -->
+  <!-- SIDEBAR NAVIGATION                                                        -->
+  <!-- ========================================================================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">🪶</div>
+      <div class="brand-text">Flutter Live SDK</div>
+    </div>
+
+    <div class="nav-group-title">Flutter ইন্টিগ্রেশন সেকশন</div>
+    <nav class="nav-links">
+      <a href="#sec-setup" class="nav-link active">
+        <span>১. প্রজেক্ট সেটআপ ও ডিপেনডেন্সি</span>
+        <span class="nav-badge">pubspec</span>
+      </a>
+      <a href="#sec-auth-ws" class="nav-link">
+        <span>২. REST Auth ও WebSocket</span>
+        <span class="nav-badge">Auth</span>
+      </a>
+      <a href="#sec-publishing" class="nav-link">
+        <span>৩. ভিডিও পাবলিশিং ও Simulcast</span>
+        <span class="nav-badge">WebRTC</span>
+      </a>
+      <a href="#sec-mic-control" class="nav-link">
+        <span>৪. অডিও কন্ট্রোল ও মিউট স্টেট</span>
+        <span class="nav-badge">Media</span>
+      </a>
+      <a href="#sec-seats" class="nav-link">
+        <span>৫. সিটে ওঠা ও Renegotiation</span>
+        <span class="nav-badge">8-Seat</span>
+      </a>
+      <a href="#sec-pk-battle" class="nav-link">
+        <span>৬. পিকে ব্যাটল (Split-Screen)</span>
+        <span class="nav-badge">PK</span>
+      </a>
+      <a href="#sec-state-ui" class="nav-link">
+        <span>৭. চ্যাট, গিফট ও লেট জয়েনার</span>
+        <span class="nav-badge">State</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- ========================================================================= -->
+  <!-- MAIN CONTENT CONTAINER                                                    -->
+  <!-- ========================================================================= -->
+  <main class="content">
+
+    <header class="manual-header">
+      <div class="tag-badge">Flutter WebRTC &amp; WebSocket Developer Guide</div>
+      <h1 class="title">Flutter মোবাইল <span class="gradient-text">লাইভ স্ট্রিমিং SDK ম্যানুয়াল</span></h1>
+      <p class="lead-text">
+        আমাদের Go (Pion WebRTC + Fiber + Redis) ব্যাকএন্ডের সাথে Flutter ক্লায়েন্ট ইন্টিগ্রেট করার সম্পূর্ণ ডেভেলপার গাইড। এই গাইডে <code>flutter_webrtc</code> এবং <code>web_socket_channel</code> প্যাকেজ ব্যবহার করে ক্যামেরা পাবলিশিং (৩-লেয়ার সিমুলকাস্ট), ডাইনামিক SDP Renegotiation, কো-হোস্ট সিট ম্যানেজমেন্ট, পিকে ব্যাটল স্প্লিট স্ক্রিন এবং লেট জয়েনার স্টেট সিঙ্ক বাস্তবায়নের কার্যকর ডার্ট (Dart) কোড প্রদান করা হয়েছে।
+      </p>
+    </header>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 1: SETUP & DEPENDENCIES                                           -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-setup">
+      <div class="section-header">
+        <div class="section-number">১</div>
+        <h2 class="section-title">প্রজেক্ট সেটআপ ও প্যাকেজ (Setup &amp; Dependencies)</h2>
+      </div>
+      <p class="section-desc">
+        আপনার Flutter অ্যাপে রিয়েল-টাইম অডিও/ভিডিও স্ট্রিমিং এবং সিগন্যালিং পরিচালনা করার জন্য নিচের প্যাকেজগুলো <code>pubspec.yaml</code> ফাইলে যুক্ত করুন:
+      </p>
+
+      <div class="code-box">
+        <div class="code-top"><span>pubspec.yaml</span><span>ডিপেনডেন্সি কনফিগারেশন</span></div>
+        <pre><code><span class="k">dependencies:</span>
+  <span class="k">flutter:</span>
+    <span class="k">sdk:</span> flutter
+  <span class="k">flutter_webrtc:</span> ^0.12.5       <span class="c"># WebRTC PeerConnection, Transceiver এবং RTCVideoRenderer</span>
+  <span class="k">web_socket_channel:</span> ^3.0.1   <span class="c"># রিয়েল-টাইম সিগন্যালিং, চ্যাট এবং গিফট ইভেন্টের জন্য</span>
+  <span class="k">http:</span> ^1.2.1                 <span class="c"># REST API (/api/auth/token) কল করার জন্য</span></code></pre>
+      </div>
+
+      <div class="callout callout-rule">
+        <div class="callout-icon">📱</div>
+        <div>
+          <div class="callout-title">ক্যামেরা ও মাইক্রোফোন পারমিশন (Android &amp; iOS)</div>
+          <div>
+            <strong>Android (<code>AndroidManifest.xml</code>):</strong><br>
+            <code>&lt;uses-permission android:name="android.permission.CAMERA" /&gt;</code><br>
+            <code>&lt;uses-permission android:name="android.permission.RECORD_AUDIO" /&gt;</code><br>
+            <code>&lt;uses-permission android:name="android.permission.INTERNET" /&gt;</code><br><br>
+            <strong>iOS (<code>Info.plist</code>):</strong><br>
+            <code>&lt;key&gt;NSCameraUsageDescription&lt;/key&gt;&lt;string&gt;লাইভ স্ট্রিমিংয়ের জন্য ক্যামেরা প্রয়োজন&lt;/string&gt;</code><br>
+            <code>&lt;key&gt;NSMicrophoneUsageDescription&lt;/key&gt;&lt;string&gt;লাইভ কথা বলার জন্য মাইক্রোফোন প্রয়োজন&lt;/string&gt;</code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 2: REST AUTH & WEBSOCKET                                          -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-auth-ws">
+      <div class="section-header">
+        <div class="section-number">২</div>
+        <h2 class="section-title">সার্ভার কানেকশন (REST Auth &amp; WebSocket)</h2>
+      </div>
+      <p class="section-desc">
+        ক্লায়েন্ট SDK প্রথমে <code>POST /api/auth/token</code>-এ কল করে signed JWT টোকেন এবং Coturn STUN/TURN ক্রেডেনশিয়াল সংগ্রহ করে। এরপর সেই টোকেন দিয়ে WebSocket কানেকশন তৈরি করে।
+      </p>
+
+      <div class="code-box">
+        <div class="code-top"><span>auth_and_signaling.dart</span><span>Dart Implementation</span></div>
+        <pre><code><span class="k">import</span> <span class="s">'dart:convert'</span>;
+<span class="k">import</span> <span class="s">'package:http/http.dart'</span> <span class="k">as</span> http;
+<span class="k">import</span> <span class="s">'package:web_socket_channel/web_socket_channel.dart'</span>;
+<span class="k">import</span> <span class="s">'package:web_socket_channel/io.dart'</span>;
+
+<span class="k">class</span> <span class="t">AuthResponse</span> {
+  <span class="k">final</span> <span class="t">String</span> token;
+  <span class="k">final</span> <span class="t">List</span>&lt;<span class="t">Map</span>&lt;<span class="t">String</span>, <span class="t">dynamic</span>&gt;&gt; iceServers;
+
+  <span class="t">AuthResponse</span>({<span class="k">required</span> <span class="k">this</span>.token, <span class="k">required</span> <span class="k">this</span>.iceServers});
+}
+
+<span class="c">/// ১. REST API থেকে JWT এবং ডাইনামিক Coturn ICE সার্ভার সংগ্রহ করা</span>
+<span class="t">Future</span>&lt;<span class="t">AuthResponse</span>&gt; authenticateSDK({
+  <span class="k">required</span> <span class="t">String</span> hostUrl,
+  <span class="k">required</span> <span class="t">String</span> apiKey,
+  <span class="k">required</span> <span class="t">String</span> apiSecret,
+  <span class="k">required</span> <span class="t">String</span> userId,
+  <span class="t">String</span> userName = <span class="s">'Flutter User'</span>,
+}) <span class="k">async</span> {
+  <span class="k">final</span> url = <span class="t">Uri</span>.parse(<span class="s">'$hostUrl/api/auth/token'</span>);
+  <span class="k">final</span> res = <span class="k">await</span> http.post(
+    url,
+    headers: {<span class="s">'Content-Type'</span>: <span class="s">'application/json'</span>},
+    body: jsonEncode({
+      <span class="s">'api_key'</span>: apiKey,
+      <span class="s">'api_secret'</span>: apiSecret,
+      <span class="s">'user_id'</span>: userId,
+      <span class="s">'user_name'</span>: userName,
+    }),
+  );
+
+  <span class="k">if</span> (res.statusCode != <span class="n">200</span>) {
+    <span class="k">throw</span> <span class="t">Exception</span>(<span class="s">'Auth failed: ${res.body}'</span>);
+  }
+
+  <span class="k">final</span> data = jsonDecode(res.body);
+  <span class="k">final</span> rawIce = (data[<span class="s">'ice_servers'</span>] <span class="k">as</span> <span class="t">List</span>? ?? []);
+  <span class="k">final</span> iceServers = rawIce.map((e) =&gt; <span class="t">Map</span>&lt;<span class="t">String</span>, <span class="t">dynamic</span>&gt;.from(e)).toList();
+
+  <span class="k">return</span> <span class="t">AuthResponse</span>(token: data[<span class="s">'token'</span>], iceServers: iceServers);
+}
+
+<span class="c">/// ২. WebSocketChannel কানেক্ট করা</span>
+<span class="t">WebSocketChannel</span> connectSignaling({
+  <span class="k">required</span> <span class="t">String</span> hostUrl,
+  <span class="k">required</span> <span class="t">String</span> token,
+}) {
+  <span class="k">final</span> wsProtocol = hostUrl.startsWith(<span class="s">'https'</span>) ? <span class="s">'wss'</span> : <span class="s">'ws'</span>;
+  <span class="k">final</span> cleanHost = hostUrl.replaceAll(<span class="t">RegExp</span>(<span class="s">r'^https?://'</span>), <span class="s">''</span>).replaceAll(<span class="s">'/'</span>, <span class="s">''</span>);
+  <span class="k">final</span> wsUri = <span class="t">Uri</span>.parse(<span class="s">'$wsProtocol://$cleanHost/ws?token=$token'</span>);
+
+  <span class="k">return</span> <span class="t">IOWebSocketChannel</span>.connect(wsUri);
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 3: PUBLISHING & SIMULCAST                                         -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-publishing">
+      <div class="section-header">
+        <div class="section-number">৩</div>
+        <h2 class="section-title">ভিডিও পাবলিশিং ও WebRTC (Publishing Video &amp; Simulcast)</h2>
+      </div>
+      <p class="section-desc">
+        লাইভ ব্রডকাস্টিংয়ে ব্যান্ডউইথ অপ্টিমাইজেশনের জন্য হোস্ট ৩টি সিমুলকাস্ট এনকোডিং লেয়ার (High <code>f</code>, Medium <code>h</code>, Low <code>q</code>) পাবলিশ করে।
+      </p>
+
+      <div class="callout callout-warning">
+        <div class="callout-icon">🚨</div>
+        <div>
+          <div class="callout-title">মাস্টার রুল: Offer তৈরির আগেই Transceiver যুক্ত করতে হবে!</div>
+          <div>
+            <code>createOffer()</code> কল করার পূর্বে অবশ্যই <code>addTransceiver</code> দিয়ে এনকোডিং লেয়ারগুলো রেজিস্টার করতে হবে, যেন উৎপন্ন SDP অফারে ভিডিওর ৩টি লেয়ার (f, h, q) অন্তর্ভুক্ত থাকে।
+          </div>
+        </div>
+      </div>
+
+      <div class="code-box">
+        <div class="code-top"><span>video_publisher.dart</span><span>Simulcast Publishing Implementation</span></div>
+        <pre><code><span class="k">import</span> <span class="s">'dart:convert'</span>;
+<span class="k">import</span> <span class="s">'package:flutter_webrtc/flutter_webrtc.dart'</span>;
+<span class="k">import</span> <span class="s">'package:web_socket_channel/web_socket_channel.dart'</span>;
+
+<span class="k">class</span> <span class="t">LiveHostEngine</span> {
+  <span class="k">final</span> <span class="t">WebSocketChannel</span> channel;
+  <span class="k">final</span> <span class="t">List</span>&lt;<span class="t">Map</span>&lt;<span class="t">String</span>, <span class="t">dynamic</span>&gt;&gt; iceServers;
+  <span class="k">final</span> <span class="t">String</span> roomId;
+  <span class="k">final</span> <span class="t">String</span> userId;
+
+  <span class="t">RTCPeerConnection</span>? peerConnection;
+  <span class="t">MediaStream</span>? localStream;
+  <span class="k">final</span> <span class="t">RTCVideoRenderer</span> localRenderer = <span class="t">RTCVideoRenderer</span>();
+
+  <span class="t">LiveHostEngine</span>({
+    <span class="k">required</span> <span class="k">this</span>.channel,
+    <span class="k">required</span> <span class="k">this</span>.iceServers,
+    <span class="k">required</span> <span class="k">this</span>.roomId,
+    <span class="k">required</span> <span class="k">this</span>.userId,
+  });
+
+  <span class="t">Future</span>&lt;<span class="t">void</span>&gt; startBroadcast() <span class="k">async</span> {
+    <span class="c">// ১. RTCVideoRenderer ইনিশিয়ালাইজ করা</span>
+    <span class="k">await</span> localRenderer.initialize();
+
+    <span class="c">// ২. ক্যামেরা ও মাইক থেকে মিডিয়া স্ট্রিম সংগ্রহ</span>
+    localStream = <span class="k">await</span> navigator.mediaDevices.getUserMedia({
+      <span class="s">'audio'</span>: <span class="b">true</span>,
+      <span class="s">'video'</span>: {
+        <span class="s">'facingMode'</span>: <span class="s">'user'</span>,
+        <span class="s">'width'</span>: <span class="n">1280</span>,
+        <span class="s">'height'</span>: <span class="n">720</span>,
+      }
+    });
+    localRenderer.srcObject = localStream;
+
+    <span class="c">// ৩. PeerConnection তৈরি করা</span>
+    <span class="k">final</span> config = {
+      <span class="s">'iceServers'</span>: iceServers,
+      <span class="s">'sdpSemantics'</span>: <span class="s">'unified-plan'</span>,
+    };
+    peerConnection = <span class="k">await</span> createPeerConnection(config);
+
+    <span class="c">// ICE ক্যান্ডিডেট সার্ভারে পাঠানো</span>
+    peerConnection!.onIceCandidate = (<span class="t">RTCIceCandidate</span> candidate) {
+      <span class="k">if</span> (candidate.candidate != <span class="k">null</span>) {
+        channel.sink.add(jsonEncode({
+          <span class="s">'action'</span>: <span class="s">'ice'</span>,
+          <span class="s">'room_id'</span>: roomId,
+          <span class="s">'user_id'</span>: userId,
+          <span class="s">'payload'</span>: candidate.toMap(),
+        }));
+      }
+    };
+
+    <span class="c">// ৪. CRITICAL: ৩টি সিমুলকাস্ট লেয়ার (f, h, q) সহ Transceiver যোগ করা</span>
+    <span class="k">final</span> videoTrack = localStream!.getVideoTracks().first;
+    <span class="k">await</span> peerConnection!.addTransceiver(
+      track: videoTrack,
+      init: <span class="t">RTCRtpTransceiverInit</span>(
+        direction: <span class="t">TransceiverDirection</span>.SendOnly,
+        streams: [localStream!],
+        sendEncodings: [
+          <span class="t">RTCRtpEncoding</span>(rid: <span class="s">'f'</span>, active: <span class="b">true</span>, maxBitrate: <span class="n">1200000</span>),                         <span class="c">// High (720p/1080p)</span>
+          <span class="t">RTCRtpEncoding</span>(rid: <span class="s">'h'</span>, active: <span class="b">true</span>, maxBitrate: <span class="n">500000</span>, scaleResolutionDownBy: <span class="n">2.0</span>), <span class="c">// Medium (480p)</span>
+          <span class="t">RTCRtpEncoding</span>(rid: <span class="s">'q'</span>, active: <span class="b">true</span>, maxBitrate: <span class="n">150000</span>, scaleResolutionDownBy: <span class="n">4.0</span>), <span class="c">// Low (240p)</span>
+        ],
+      ),
+    );
+
+    <span class="c">// অডিও ট্রান্সসিভার যোগ করা</span>
+    <span class="k">final</span> audioTrack = localStream!.getAudioTracks().first;
+    <span class="k">await</span> peerConnection!.addTransceiver(
+      track: audioTrack,
+      init: <span class="t">RTCRtpTransceiverInit</span>(
+        direction: <span class="t">TransceiverDirection</span>.SendOnly,
+        streams: [localStream!],
+      ),
+    );
+
+    <span class="c">// ৫. SDP Offer তৈরি ও লোকাল ডেসক্রিপশন সেট করা</span>
+    <span class="k">final</span> offer = <span class="k">await</span> peerConnection!.createOffer();
+    <span class="k">await</span> peerConnection!.setLocalDescription(offer);
+
+    <span class="c">// ৬. সার্ভারে publish অফার মেসেজ পাঠানো</span>
+    channel.sink.add(jsonEncode({
+      <span class="s">'action'</span>: <span class="s">'publish'</span>,
+      <span class="s">'room_id'</span>: roomId,
+      <span class="s">'user_id'</span>: userId,
+      <span class="s">'payload'</span>: {
+        <span class="s">'sdp'</span>: offer.sdp,
+        <span class="s">'type'</span>: offer.type,
+      }
+    }));
+  }
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 4: MIC CONTROL & MEDIA STATE                                      -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-mic-control">
+      <div class="section-header">
+        <div class="section-number">৪</div>
+        <h2 class="section-title">অডিও কন্ট্রোল ও মিউট স্টেট (Mic Control &amp; Speaking Signal)</h2>
+      </div>
+      <p class="section-desc">
+        মাইক্রোফোন মিউট/আনমিউট হ্যান্ডেল করার সঠিক পদ্ধতি হলো লোকাল অডিও ট্র্যাকের <code>enabled</code> প্রোপার্টি টগল করা এবং সার্ভারে <code>media_state</code> ইভেন্ট পাঠানো।
+      </p>
+
+      <div class="code-box">
+        <div class="code-top"><span>audio_control.dart</span><span>Mic Toggle &amp; State Synchronization</span></div>
+        <pre><code><span class="k">class</span> <span class="t">MediaController</span> {
+  <span class="k">final</span> <span class="t">MediaStream</span>? localStream;
+  <span class="k">final</span> <span class="t">WebSocketChannel</span> channel;
+  <span class="k">final</span> <span class="t">String</span> roomId;
+  <span class="k">final</span> <span class="t">String</span> userId;
+
+  <span class="t">bool</span> isMicMuted = <span class="b">false</span>;
+  <span class="t">bool</span> isCameraMuted = <span class="b">false</span>;
+
+  <span class="t">MediaController</span>({
+    <span class="k">required</span> <span class="k">this</span>.localStream,
+    <span class="k">required</span> <span class="k">this</span>.channel,
+    <span class="k">required</span> <span class="k">this</span>.roomId,
+    <span class="k">required</span> <span class="k">this</span>.userId,
+  });
+
+  <span class="c">/// মাইক্রোফোন মিউট/আনমিউট টগল</span>
+  <span class="t">void</span> toggleMicrophone() {
+    <span class="k">if</span> (localStream == <span class="k">null</span>) <span class="k">return</span>;
+    <span class="k">final</span> audioTrack = localStream!.getAudioTracks().firstOrNull;
+    <span class="k">if</span> (audioTrack != <span class="k">null</span>) {
+      isMicMuted = !isMicMuted;
+      audioTrack.enabled = !isMicMuted; <span class="c">// WebRTC অডিও ফ্রেম পাঠানো বন্ধ/চালু</span>
+
+      <span class="c">// সার্ভারে মিডিয়া স্টেট আপডেট পাঠানো</span>
+      channel.sink.add(jsonEncode({
+        <span class="s">'action'</span>: <span class="s">'media_state'</span>,
+        <span class="s">'room_id'</span>: roomId,
+        <span class="s">'user_id'</span>: userId,
+        <span class="s">'payload'</span>: {
+          <span class="s">'muted_audio'</span>: isMicMuted,
+          <span class="s">'muted_video'</span>: isCameraMuted,
+        }
+      }));
+    }
+  }
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 5: SEAT MANAGEMENT & RENEGOTIATION                                -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-seats">
+      <div class="section-header">
+        <div class="section-number">৫</div>
+        <h2 class="section-title">সিটে ওঠা ও কো-হোস্টিং (Seat Management &amp; Dynamic Renegotiation)</h2>
+      </div>
+      <p class="section-desc">
+        কো-হোস্টিং সিস্টেমে যখন একজন দর্শক সিটে ওঠে, তখন সার্ভার সমস্ত দর্শকের কাছে একটি নতুন <strong>SDP Offer</strong> পাঠায়। ক্লায়েন্ট SDK সেই অফারটি <code>setRemoteDescription</code>-এ সেট করে এবং নতুন কো-হোস্টের ভিডিও ফ্রেম স্ক্রিনে রেন্ডার করে।
+      </p>
+
+      <div class="code-box">
+        <div class="code-top"><span>cohost_and_renegotiation.dart</span><span>Viewer Dynamic Track Handling</span></div>
+        <pre><code><span class="k">class</span> <span class="t">LiveViewerEngine</span> {
+  <span class="k">final</span> <span class="t">WebSocketChannel</span> channel;
+  <span class="t">RTCPeerConnection</span>? peerConnection;
+  <span class="k">final</span> <span class="t">RTCVideoRenderer</span> mainHostRenderer = <span class="t">RTCVideoRenderer</span>();
+  <span class="k">final</span> <span class="t">Map</span>&lt;<span class="t">String</span>, <span class="t">RTCVideoRenderer</span>&gt; coHostRenderers = {};
+
+  <span class="c">/// দর্শক সিটের জন্য রিকোয়েস্ট পাঠানো</span>
+  <span class="t">void</span> requestSeat(<span class="t">int</span> seatId, <span class="t">String</span> roomId, <span class="t">String</span> userId) {
+    channel.sink.add(jsonEncode({
+      <span class="s">'action'</span>: <span class="s">'seat_request'</span>,
+      <span class="s">'room_id'</span>: roomId,
+      <span class="s">'user_id'</span>: userId,
+      <span class="s">'payload'</span>: {<span class="s">'seat_id'</span>: <span class="s">'$seatId'</span>}
+    }));
+  }
+
+  <span class="c">/// WebSocket থেকে ইনকামিং সিগন্যালিং মেসেজ হ্যান্ডেল করা</span>
+  <span class="t">Future</span>&lt;<span class="t">void</span>&gt; handleSignalingMessage(<span class="t">Map</span>&lt;<span class="t">String</span>, <span class="t">dynamic</span>&gt; msg) <span class="k">async</span> {
+    <span class="k">final</span> action = msg[<span class="s">'action'</span>] ?? msg[<span class="s">'event'</span>];
+    <span class="k">final</span> payload = msg[<span class="s">'payload'</span>] ?? msg[<span class="s">'data'</span>] ?? {};
+
+    <span class="c">// ১. ডাইনামিক Renegotiation অফার আসলে (কো-হোস্ট সিটে যুক্ত হলে)</span>
+    <span class="k">if</span> (action == <span class="s">'offer'</span> || action == <span class="s">'renegotiate'</span>) {
+      <span class="k">final</span> sdp = payload[<span class="s">'sdp'</span>];
+      <span class="k">final</span> type = payload[<span class="s">'type'</span>] ?? <span class="s">'offer'</span>;
+
+      <span class="k">await</span> peerConnection!.setRemoteDescription(<span class="t">RTCSessionDescription</span>(sdp, type));
+      <span class="k">final</span> answer = <span class="k">await</span> peerConnection!.createAnswer();
+      <span class="k">await</span> peerConnection!.setLocalDescription(answer);
+
+      channel.sink.add(jsonEncode({
+        <span class="s">'action'</span>: <span class="s">'answer'</span>,
+        <span class="s">'payload'</span>: {<span class="s">'sdp'</span>: answer.sdp, <span class="s">'type'</span>: answer.type}
+      }));
+    }
+
+    <span class="c">// ২. সিট খালি হলে কো-হোস্ট রেন্ডারার ক্লিনআপ</span>
+    <span class="k">if</span> (action == <span class="s">'seat_left'</span> || action == <span class="s">'cohost_left'</span>) {
+      <span class="k">final</span> userId = payload[<span class="s">'user_id'</span>];
+      <span class="k">if</span> (coHostRenderers.containsKey(userId)) {
+        coHostRenderers[userId]!.srcObject = <span class="k">null</span>;
+        coHostRenderers.remove(userId);
+      }
+    }
+  }
+
+  <span class="c">/// WebRTC OnTrack লিসেনার: হোস্ট এবং কো-হোস্টের ট্র্যাক ডাইনামিকভাবে বাইন্ড করা</span>
+  <span class="t">void</span> setupTrackListeners() {
+    peerConnection!.onTrack = (<span class="t">RTCTrackEvent</span> event) <span class="k">async</span> {
+      <span class="k">if</span> (event.track.kind == <span class="s">'video'</span>) {
+        <span class="k">if</span> (mainHostRenderer.srcObject == <span class="k">null</span>) {
+          mainHostRenderer.srcObject = event.streams.first;
+        } <span class="k">else</span> {
+          <span class="c">// নতুন কো-হোস্টের জন্য ডাইনামিক রেন্ডারার তৈরি</span>
+          <span class="k">final</span> coHostRenderer = <span class="t">RTCVideoRenderer</span>();
+          <span class="k">await</span> coHostRenderer.initialize();
+          coHostRenderer.srcObject = event.streams.first;
+          coHostRenderers[event.track.id!] = coHostRenderer;
+        }
+      }
+    };
+  }
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 6: PK BATTLE (SPLIT-SCREEN)                                       -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-pk-battle">
+      <div class="section-header">
+        <div class="section-number">৬</div>
+        <h2 class="section-title">পিকে ব্যাটল ইন্টিগ্রেশন (PK Battle &amp; Split-Screen UI)</h2>
+      </div>
+      <p class="section-desc">
+        পিকে ব্যাটলের সময় দুটি পৃথক রুমের হোস্টকে পাশাপাশি স্প্লিট-স্ক্রিনে রেন্ডার করতে হবে এবং রিয়েল-টাইমে স্কোর প্রগ্রেস বার প্রদর্শন করতে হবে:
+      </p>
+
+      <div class="code-box">
+        <div class="code-top"><span>pk_battle_widget.dart</span><span>Flutter Split-Screen &amp; Dual Progress Bar</span></div>
+        <pre><code><span class="k">import</span> <span class="s">'package:flutter/material.dart'</span>;
+<span class="k">import</span> <span class="s">'package:flutter_webrtc/flutter_webrtc.dart'</span>;
+
+<span class="k">class</span> <span class="t">PKBattleSplitView</span> <span class="k">extends</span> <span class="t">StatelessWidget</span> {
+  <span class="k">final</span> <span class="t">RTCVideoRenderer</span> host1Renderer;
+  <span class="k">final</span> <span class="t">RTCVideoRenderer</span> host2Renderer;
+  <span class="k">final</span> <span class="t">int</span> score1;
+  <span class="k">final</span> <span class="t">int</span> score2;
+
+  <span class="k">const</span> <span class="t">PKBattleSplitView</span>({
+    <span class="k">super</span>.key,
+    <span class="k">required</span> <span class="k">this</span>.host1Renderer,
+    <span class="k">required</span> <span class="k">this</span>.host2Renderer,
+    <span class="k">required</span> <span class="k">this</span>.score1,
+    <span class="k">required</span> <span class="k">this</span>.score2,
+  });
+
+  @override
+  <span class="t">Widget</span> build(<span class="t">BuildContext</span> context) {
+    <span class="k">final</span> total = (score1 + score2) == <span class="n">0</span> ? <span class="n">1</span> : (score1 + score2);
+    <span class="k">final</span> ratio1 = score1 / total;
+
+    <span class="k">return</span> <span class="t">Column</span>(
+      children: [
+        <span class="c">// ১. রিয়েল-টাইম পিকে ডুয়াল প্রগ্রেস বার</span>
+        <span class="t">Container</span>(
+          height: <span class="n">12</span>,
+          margin: <span class="k">const</span> <span class="t">EdgeInsets</span>.symmetric(horizontal: <span class="n">16</span>, vertical: <span class="n">8</span>),
+          decoration: <span class="t">BoxDecoration</span>(
+            borderRadius: <span class="t">BorderRadius</span>.circular(<span class="n">6</span>),
+            color: <span class="t">Colors</span>.blue,
+          ),
+          child: <span class="t">Row</span>(
+            children: [
+              <span class="t">Expanded</span>(
+                flex: (ratio1 * <span class="n">100</span>).toInt().clamp(<span class="n">5</span>, <span class="n">95</span>),
+                child: <span class="t">Container</span>(color: <span class="t">Colors</span>.redAccent),
+              ),
+              <span class="t">Expanded</span>(
+                flex: ((<span class="n">1</span> - ratio1) * <span class="n">100</span>).toInt().clamp(<span class="n">5</span>, <span class="n">95</span>),
+                child: <span class="t">Container</span>(color: <span class="t">Colors</span>.blueAccent),
+              ),
+            ],
+          ),
+        ),
+
+        <span class="c">// ২. স্প্লিট স্ক্রিন পাশাপাশি দুটি ভিডিও ভিউ</span>
+        <span class="t">Expanded</span>(
+          child: <span class="t">Row</span>(
+            children: [
+              <span class="t">Expanded</span>(
+                child: <span class="t">RTCVideoView</span>(host1Renderer, objectFit: <span class="t">RTCVideoViewObjectFit</span>.RTCVideoViewObjectFitCover),
+              ),
+              <span class="k">const</span> <span class="t">VerticalDivider</span>(width: <span class="n">2</span>, color: <span class="t">Colors</span>.white24),
+              <span class="t">Expanded</span>(
+                child: <span class="t">RTCVideoView</span>(host2Renderer, objectFit: <span class="t">RTCVideoViewObjectFit</span>.RTCVideoViewObjectFitCover),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 7: STATE MANAGEMENT & UI                                          -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-state-ui">
+      <div class="section-header">
+        <div class="section-number">৭</div>
+        <h2 class="section-title">চ্যাট, গিফট ও লেট জয়েনার স্টেট (State Management &amp; UI)</h2>
+      </div>
+      <p class="section-desc">
+        <code>room_info_sync</code> মেসেজ হ্যান্ডেল করে অ্যাপের স্টেট রিঅ্যাক্টিভলি পরিচালনা করার পূর্ণাঙ্গ ডার্ট কোড:
+      </p>
+
+      <div class="code-box">
+        <div class="code-top"><span>live_state_manager.dart</span><span>ChangeNotifier State Store</span></div>
+        <pre><code><span class="k">import</span> <span class="s">'dart:convert'</span>;
+<span class="k">import</span> <span class="s">'package:flutter/foundation.dart'</span>;
+<span class="k">import</span> <span class="s">'package:web_socket_channel/web_socket_channel.dart'</span>;
+
+<span class="k">class</span> <span class="t">LiveRoomState</span> <span class="k">extends</span> <span class="t">ChangeNotifier</span> {
+  <span class="t">String</span> roomId = <span class="s">''</span>;
+  <span class="t">String</span> hostId = <span class="s">''</span>;
+  <span class="t">int</span> totalViewers = <span class="n">0</span>;
+  <span class="t">int</span> hostScore = <span class="n">0</span>;
+  <span class="t">Map</span>&lt;<span class="t">String</span>, <span class="t">String</span>&gt; activeSeats = {};
+  <span class="k">final</span> <span class="t">List</span>&lt;<span class="t">Map</span>&lt;<span class="t">String</span>, <span class="t">dynamic</span>&gt;&gt; chatMessages = [];
+
+  <span class="c">/// WebSocket স্ট্রিম লিসেন করা</span>
+  <span class="t">void</span> bindSignalingStream(<span class="t">WebSocketChannel</span> channel) {
+    channel.stream.listen((rawData) {
+      <span class="k">try</span> {
+        <span class="k">final</span> msg = jsonDecode(rawData <span class="k">as</span> <span class="t">String</span>);
+        <span class="k">final</span> action = msg[<span class="s">'action'</span>] ?? msg[<span class="s">'event'</span>];
+        <span class="k">final</span> payload = msg[<span class="s">'payload'</span>] ?? msg[<span class="s">'data'</span>] ?? {};
+
+        <span class="c">// ১. লেট জয়েনার স্ন্যাপশট দিয়ে স্টেট পূরণ</span>
+        <span class="k">if</span> (action == <span class="s">'room_info_sync'</span> || action == <span class="s">'room_state'</span>) {
+          roomId = payload[<span class="s">'room_id'</span>] ?? roomId;
+          hostId = payload[<span class="s">'host_id'</span>] ?? hostId;
+          totalViewers = payload[<span class="s">'total_viewers'</span>] ?? <span class="n">0</span>;
+          hostScore = payload[<span class="s">'host_score'</span>] ?? <span class="n">0</span>;
+          activeSeats = <span class="t">Map</span>&lt;<span class="t">String</span>, <span class="t">String</span>&gt;.from(payload[<span class="s">'active_seats'</span>] ?? {});
+          notifyListeners();
+        }
+
+        <span class="c">// ২. গিফট প্রসেস হলে রিয়েল-টাইম ডায়মন্ড স্কোর আপডেট</span>
+        <span class="k">if</span> (action == <span class="s">'gift_processed'</span> || action == <span class="s">'score_updated'</span>) {
+          <span class="k">if</span> (payload[<span class="s">'new_score'</span>] != <span class="k">null</span>) {
+            hostScore = payload[<span class="s">'new_score'</span>];
+            notifyListeners();
+          }
+        }
+
+        <span class="c">// ৩. ইনকামিং চ্যাট মেসেজ লিস্টে যুক্ত করা</span>
+        <span class="k">if</span> (action == <span class="s">'chat'</span>) {
+          chatMessages.add(payload);
+          notifyListeners();
+        }
+      } <span class="k">catch</span> (e) {
+        <span class="c">// Parse error</span>
+      }
+    });
+  }
+
+  <span class="c">/// গিফট পাঠানো</span>
+  <span class="t">void</span> sendGift(<span class="t">WebSocketChannel</span> channel, <span class="t">String</span> giftName, <span class="t">int</span> coins, <span class="t">String</span> userId) {
+    channel.sink.add(jsonEncode({
+      <span class="s">'action'</span>: <span class="s">'gift'</span>,
+      <span class="s">'room_id'</span>: roomId,
+      <span class="s">'user_id'</span>: userId,
+      <span class="s">'payload'</span>: {
+        <span class="s">'gift_name'</span>: giftName,
+        <span class="s">'coins'</span>: coins,
+      }
+    }));
+  }
+}</code></pre>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>

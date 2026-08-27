@@ -149,6 +149,61 @@ func main() {
 		return c.Status(fiber.StatusOK).JSON(rooms)
 	})
 
+	// GET /api/admin/rooms - Secured Admin Endpoint to fetch server-wide stats, active room details, user counts, and session uptimes
+	app.Get("/api/admin/rooms", func(c *fiber.Ctx) error {
+		apiKey := c.Get("X-API-Key")
+		if apiKey == "" {
+			apiKey = c.Query("api_key")
+		}
+		expectedKey := os.Getenv("API_KEY")
+		if expectedKey == "" {
+			expectedKey = "dev_api_key_123"
+		}
+
+		if apiKey != expectedKey {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"status": "error",
+				"error":  "Unauthorized: valid X-API-Key header or api_key query param required",
+			})
+		}
+
+		rooms := roomManager.GetAllRoomsSummary()
+		type AdminRoomStat struct {
+			RoomID        string `json:"room_id"`
+			RoomName      string `json:"room_name"`
+			HostID        string `json:"host_id"`
+			TotalViewers  int    `json:"total_viewers"`
+			HostScore     int    `json:"host_score"`
+			CreatedAt     string `json:"created_at"`
+			UptimeSeconds int64  `json:"uptime_seconds"`
+		}
+
+		var stats []AdminRoomStat
+		now := time.Now().UTC()
+		for _, r := range rooms {
+			var uptime int64
+			if parsedTime, err := time.Parse(time.RFC3339, r.CreatedAt); err == nil {
+				uptime = int64(now.Sub(parsedTime).Seconds())
+			}
+			stats = append(stats, AdminRoomStat{
+				RoomID:        r.RoomID,
+				RoomName:      r.RoomName,
+				HostID:        r.HostID,
+				TotalViewers:  r.ViewersCount,
+				HostScore:     r.HostScore,
+				CreatedAt:     r.CreatedAt,
+				UptimeSeconds: uptime,
+			})
+		}
+
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"status":             "success",
+			"total_active_rooms": len(stats),
+			"timestamp":          now.Unix(),
+			"rooms":              stats,
+		})
+	})
+
 	// GET /room/:id - Return details for a specific active room
 	app.Get("/room/:id", func(c *fiber.Ctx) error {
 		roomID := c.Params("id")

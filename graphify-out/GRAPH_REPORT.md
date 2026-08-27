@@ -1,7 +1,7 @@
 # Graph Report - go_media_server  (2026-08-27)
 
 ## Corpus Check
-- 43 files · ~41,540 words
+- 43 files · ~44,472 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `47718b37`
+- Built from commit: `2a534fa8`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 

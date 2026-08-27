@@ -3294,7 +3294,7 @@
       "file_type": "code",
       "norm_label": "getenv()",
       "source_file": "cmd/main.go",
-      "source_location": "L285"
+      "source_location": "L340"
     },
     {
       "id": "cmd_main_main",
@@ -5984,18 +5984,6 @@
     },
     {
       "source": "cmd_main_main",
-      "target": "internal_signaling_auth_validatetoken",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "cmd/main.go",
-      "source_location": "L223",
-      "weight": 1.0
-    },
-    {
-      "source": "cmd_main_main",
       "target": "internal_webrtc_engine_initwebrtc",
       "relation": "calls",
       "_origin": "ast",
@@ -6008,14 +5996,14 @@
     },
     {
       "source": "cmd_main_main",
-      "target": "internal_signaling_client_newclientwithclaims",
+      "target": "internal_signaling_auth_validatetoken",
       "relation": "calls",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "cmd/main.go",
-      "source_location": "L240",
+      "source_location": "L278",
       "weight": 1.0
     },
     {
@@ -6028,6 +6016,18 @@
       "context": "call",
       "source_file": "cmd/main.go",
       "source_location": "L29",
+      "weight": 1.0
+    },
+    {
+      "source": "cmd_main_main",
+      "target": "internal_signaling_client_newclientwithclaims",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "cmd/main.go",
+      "source_location": "L295",
       "weight": 1.0
     },
     {
@@ -11809,7 +11809,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "cmd/main.go",
-      "source_location": "L285",
+      "source_location": "L340",
       "weight": 1.0
     },
     {
@@ -16886,5 +16886,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "47718b37a0833679ea000333a4f048d58f46a5a8"
+  "built_at_commit": "2a534fa86ab346737bc0086e403aff7e8b7c2f1a"
 }

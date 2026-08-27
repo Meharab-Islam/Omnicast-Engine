@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>লাইভ মিডিয়া সার্ভার - মাস্টার SDK ইন্টিগ্রেশন ম্যানুয়াল</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070a13;
+      --sidebar-bg: #0d1322;
+      --card-bg: #131c2e;
+      --card-bg-elevated: #1a263e;
+      --card-hover: #223252;
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-purple: #9d4edd;
+      --accent-pink: #ec4899;
+      --accent-gold: #fbbf24;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(0, 242, 254, 0.4);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --sidebar-width: 300px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Hind Siliguri', 'Plus Jakarta Sans', -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      display: flex;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* সাইডবার নেভিগেশন */
+    .sidebar {
+      width: var(--sidebar-width);
+      background-color: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      overflow-y: auto;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 8px;
+      margin-bottom: 8px;
+    }
+
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: #000;
+      font-size: 18px;
+    }
+
+    .brand-text {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav-group-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      padding: 8px 12px 4px 12px;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-decoration: none;
+      border-radius: var(--radius-sm);
+      transition: all 0.15s ease;
+    }
+
+    .nav-link:hover, .nav-link.active {
+      color: #fff;
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-link.active {
+      color: var(--accent-cyan);
+      background-color: rgba(0, 242, 254, 0.1);
+      border-left: 3px solid var(--accent-cyan);
+    }
+
+    .nav-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+    }
+
+    /* মূল কনটেন্ট এরিয়া */
+    .content {
+      margin-left: var(--sidebar-width);
+      flex: 1;
+      padding: 40px 48px 80px 48px;
+      max-width: 1150px;
+    }
+
+    .manual-header {
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tag-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      background: rgba(0, 242, 254, 0.1);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.25);
+      margin-bottom: 16px;
+    }
+
+    h1.title {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      line-height: 1.3;
+      margin-bottom: 14px;
+    }
+
+    h1.title .gradient-text {
+      background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 50%, var(--accent-purple) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .lead-text {
+      font-size: 17px;
+      color: var(--text-muted);
+      max-width: 860px;
+      line-height: 1.8;
+    }
+
+    /* সেকশন কার্ড */
+    .section-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 36px;
+      margin-bottom: 36px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .section-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      color: #000;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 800;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .section-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .section-desc {
+      font-size: 15.5px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      line-height: 1.8;
+    }
+
+    /* এন্ডপয়েন্ট বক্স */
+    .endpoint-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13.5px;
+    }
+
+    .method-badge {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .method-post { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); border: 1px solid rgba(34, 197, 94, 0.4); }
+    .method-get { background: rgba(79, 172, 254, 0.2); color: var(--accent-blue); border: 1px solid rgba(79, 172, 254, 0.4); }
+    .method-ws { background: rgba(157, 78, 221, 0.2); color: var(--accent-purple); border: 1px solid rgba(157, 78, 221, 0.4); }
+
+    /* কোড ব্লক */
+    .code-box {
+      background: #040711;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-sm);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+
+    .code-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 8px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim);
+    }
+
+    pre {
+      margin: 0;
+      padding: 20px;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #e2e8f0;
+    }
+
+    /* সিনট্যাক্স হাইলাইটিং */
+    .k { color: #38bdf8; } /* key */
+    .s { color: #a5f3fc; } /* string */
+    .n { color: #fbbf24; } /* number */
+    .b { color: #ec4899; } /* boolean */
+    .c { color: #64748b; font-style: italic; } /* comment */
+
+    /* কল-আউট ও অ্যালার্ট */
+    .callout {
+      border-radius: var(--radius-sm);
+      padding: 18px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      font-size: 14.5px;
+      line-height: 1.7;
+    }
+
+    .callout-rule {
+      background: rgba(0, 242, 254, 0.05);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      border-left: 4px solid var(--accent-cyan);
+    }
+
+    .callout-warning {
+      background: rgba(239, 68, 68, 0.05);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-left: 4px solid var(--accent-red);
+    }
+
+    .callout-icon {
+      font-size: 22px;
+      flex-shrink: 0;
+      line-height: 1;
+      margin-top: 2px;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 6px;
+      font-size: 15.5px;
+    }
+
+    /* গ্রিড লেআউট */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .info-card {
+      background: var(--card-bg-elevated);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+    }
+
+    .info-card h4 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .info-card p {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* স্টেপ ফ্লো */
+    .step-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .flow-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 14px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 14.5px;
+    }
+
+    .flow-badge {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--accent-blue);
+      font-weight: 800;
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========================================================================= -->
+  <!-- SIDEBAR NAVIGATION                                                        -->
+  <!-- ========================================================================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div class="brand-text">LiveMedia SFU</div>
+    </div>
+
+    <div class="nav-group-title">SDK গাইড ও ডকুমেন্টস</div>
+    <nav class="nav-links">
+      <a href="#sec-arch" class="nav-link active">
+        <span>১. সিস্টেম আর্কিটেকচার</span>
+        <span class="nav-badge">SFU</span>
+      </a>
+      <a href="#sec-auth" class="nav-link">
+        <span>২. অথেনটিকেশন ও API</span>
+        <span class="nav-badge">REST</span>
+      </a>
+      <a href="#sec-ws" class="nav-link">
+        <span>৩. ওয়েবসকেট কানেকশন</span>
+        <span class="nav-badge">WS</span>
+      </a>
+      <a href="#sec-late-joiner" class="nav-link">
+        <span>৪. লেট জয়েনার সিঙ্ক</span>
+        <span class="nav-badge">CRITICAL</span>
+      </a>
+      <a href="#sec-lifecycle" class="nav-link">
+        <span>৫. রুম লাইফসাইকেল</span>
+        <span class="nav-badge">Core</span>
+      </a>
+      <a href="#sec-economy" class="nav-link">
+        <span>৬. ইকোনমি ও চ্যাট</span>
+        <span class="nav-badge">State</span>
+      </a>
+      <a href="#sec-cohost" class="nav-link">
+        <span>৭. কো-হোস্ট ও সিট</span>
+        <span class="nav-badge">WebRTC</span>
+      </a>
+      <a href="#sec-pk" class="nav-link">
+        <span>৮. পিকে ব্যাটল (Cross-Room)</span>
+        <span class="nav-badge">Cascade</span>
+      </a>
+      <a href="#sec-webrtc-rules" class="nav-link">
+        <span>৯. WebRTC পাবলিশিং রুলস</span>
+        <span class="nav-badge">Rules</span>
+      </a>
+      <a href="#sec-reconnect" class="nav-link">
+        <span>১০. গ্রেস পিরিয়ড ও রিকানেক্ট</span>
+        <span class="nav-badge">25s Timer</span>
+      </a>
+      <a href="#sec-sdk-arch" class="nav-link">
+        <span>১১. ক্লায়েন্ট SDK স্ট্রাকচার</span>
+        <span class="nav-badge">Flutter/RN</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- ========================================================================= -->
+  <!-- MAIN CONTENT CONTAINER                                                    -->
+  <!-- ========================================================================= -->
+  <main class="content">
+
+    <header class="manual-header">
+      <div class="tag-badge">Developer Relations & Architecture Manual</div>
+      <h1 class="title">লাইভ মিডিয়া সার্ভার <span class="gradient-text">SDK ইন্টিগ্রেশন ম্যানুয়াল</span></h1>
+      <p class="lead-text">
+        আমাদের Go (Fiber + Pion WebRTC + Redis) ভিত্তিক আল্ট্রা-হাই পারফরম্যান্স লাইভ মিডিয়া সার্ভারের সম্পূর্ণ আর্কিটেকচারাল এবং ক্লায়েন্ট SDK ইন্টিগ্রেশন গাইড। এই ম্যানুয়ালটি যেকোনো প্ল্যাটফর্মে (Flutter, React Native, iOS, Android) সম্পূর্ণ নির্ভরযোগ্য এবং ল্যাগ-মুক্ত SDK তৈরির জন্য প্রস্তুত করা হয়েছে।
+      </p>
+    </header>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 1: SYSTEM ARCHITECTURE                                            -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-arch">
+      <div class="section-header">
+        <div class="section-number">১</div>
+        <h2 class="section-title">সিস্টেম আর্কিটেকচার (SFU Cascading & Ultra-Optimization)</h2>
+      </div>
+      <p class="section-desc">
+        আমাদের লাইভ মিডিয়া সার্ভারটি কোনো সাধারণ মনোলিথিক ওয়েব সার্ভার নয়; এটি লক্ষ লক্ষ কনকারেন্ট ব্যবহারকারীকে মিলি-সেকেন্ড লেটেন্সিতে সেবা দেওয়ার জন্য ৪টি মূল পারফরম্যান্স পিলারের ওপর নির্মিত:
+      </p>
+
+      <div class="grid-2">
+        <div class="info-card">
+          <h4>🚀 Zero-Allocation Memory Pooling</h4>
+          <p>
+            প্রতিটি ভিডিও ফ্রেমে নতুন মেমোরি অ্যালোকেশন এড়াতে Go-এর <code>sync.Pool</code> ব্যবহার করা হয়েছে। 1500-byte MTU RTP বাফার পুনঃব্যবহারের মাধ্যমে গারবেজ কালেক্টর (GC Pause) চাপ শূন্যের কোঠায় নামিয়ে আনা হয়েছে।
+          </p>
+        </div>
+        <div class="info-card">
+          <h4>⚡ Goroutine Worker Pool</h4>
+          <p>
+            প্রতিটি ভিউয়ারের জন্য পৃথক গোরুটিন না তৈরি করে একটি কেন্দ্রীয় 64-ওয়ার্কার বাউন্ডেড পুলের মাধ্যমে মেসেজ ও RTP প্যাকেট ফ্যান-আউট করা হয়। ফলে মেমোরি ও CPU থ্রেড ওভারহেড বাঁচে।
+          </p>
+        </div>
+        <div class="info-card">
+          <h4>🌐 SFU Cascading (Origin-Edge)</h4>
+          <p>
+            হোস্ট যেখানেই থাকুক না কেন, ভিডিও স্ট্রিম ব্যাকবোন নেটওয়ার্ক দিয়ে এজ সার্ভারে ক্যাসকেডিং হয়। ফলে কোটি ভিউয়ারের ক্ষেত্রেও হোস্টের আপলোড ব্যান্ডউইথ মাত্র একটি স্ট্রিমের সমান (1.2 Mbps) থাকে।
+          </p>
+        </div>
+        <div class="info-card">
+          <h4>🔄 Redis Pipeline Batching</h4>
+          <p>
+            প্রতিটি গিফট বা লাইভ ইভেন্টে সাথে সাথে ডাটাবেজে হিট না করে RAM-এ ডেল্টা স্কোর জমা করে প্রতি ২ সেকেন্ড পর পর Redis Pipeline (<code>INCRBY</code>) দিয়ে ব্যাচ আপডেট করা হয়।
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 2: AUTH & API                                                     -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-auth">
+      <div class="section-header">
+        <div class="section-number">২</div>
+        <h2 class="section-title">অথেনটিকেশন ও API (SDK Init &amp; Coturn Credentials)</h2>
+      </div>
+      <p class="section-desc">
+        ক্লায়েন্ট SDK-কে WebSocket বা WebRTC কানেকশন তৈরির পূর্বে সার্ভারের REST API-তে রিকোয়েস্ট পাঠিয়ে নিজেকে যাচাই করতে হয়। এটি নিশ্চিত করে যে শুধুমাত্র বৈধ ব্যবহারকারীরাই লাইভ রুম তৈরি বা প্রবেশ করতে পারবে।
+      </p>
+
+      <div class="callout callout-rule">
+        <div class="callout-icon">🔐</div>
+        <div>
+          <div class="callout-title">মোবাইল নেটওয়ার্কে TURN সার্ভার কেন অপরিহার্য?</div>
+          <div>
+            মোবাইল ডেটা (4G/5G) ব্যবহারকারীদের জন্য Symmetric NAT বা Carrier-Grade NAT (CGNAT) কাজ করে, যার ফলে সরাসরি P2P কানেকশন তৈরি হতে পারে না। সার্ভার স্বয়ংক্রিয়ভাবে Coturn (HMAC-SHA1) টাইম-লিমিটেড ক্রেডেনশিয়াল জেনারেট করে দেয়, যাতে কোনো ডেটা ড্রপ ছাড়াই স্ট্রিম রিল্যায় হয়।
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint-box">
+        <span class="method-badge method-post">POST</span>
+        <span>/api/auth/token</span>
+      </div>
+
+      <div class="code-box">
+        <div class="code-top"><span>Request Payload (JSON)</span><span>POST /api/auth/token</span></div>
+        <pre><code>{
+  <span class="k">"api_key"</span>: <span class="s">"dev_api_key_123"</span>,
+  <span class="k">"api_secret"</span>: <span class="s">"dev_api_secret_456"</span>,
+  <span class="k">"user_id"</span>: <span class="s">"usr_alex_88"</span>,
+  <span class="k">"user_name"</span>: <span class="s">"Alex Streamer"</span>,
+  <span class="k">"avatar_url"</span>: <span class="s">"https://cdn.liveapp.com/avatars/alex.jpg"</span>
+}</code></pre>
+      </div>
+
+      <div class="code-box">
+        <div class="code-top"><span>Success Response (200 OK)</span><span>JWT Token &amp; Dynamic ICE Config</span></div>
+        <pre><code>{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"token"</span>: <span class="s">"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoidXNyX2FsZXhfODgiLCJ1c2VyX25hbWUiOiJBbGV4IFN0cmVhbWVyIiwicm9sZSI6InVzZXIiLCJleHAiOjE3ODc4OTUwMDB9.sig..."</span>,
+  <span class="k">"user_id"</span>: <span class="s">"usr_alex_88"</span>,
+  <span class="k">"user_name"</span>: <span class="s">"Alex Streamer"</span>,
+  <span class="k">"avatar_url"</span>: <span class="s">"https://cdn.liveapp.com/avatars/alex.jpg"</span>,
+  <span class="k">"expires_in"</span>: <span class="n">86400</span>,
+  <span class="k">"ice_servers"</span>: [
+    {
+      <span class="k">"urls"</span>: [<span class="s">"stun:stun.l.google.com:19302"</span>, <span class="s">"stun:192.168.0.116:3478"</span>]
+    },
+    {
+      <span class="k">"urls"</span>: [
+        <span class="s">"turn:192.168.0.116:3478?transport=udp"</span>,
+        <span class="s">"turn:192.168.0.116:3478?transport=tcp"</span>
+      ],
+      <span class="k">"username"</span>: <span class="s">"1787895000:usr_alex_88"</span>,
+      <span class="k">"credential"</span>: <span class="s">"apeIoP+Zzx84gMCkWWTxBx0BUok="</span>
+    }
+  ]
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 3: WEBSOCKET CONNECTION                                           -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-ws">
+      <div class="section-header">
+        <div class="section-number">৩</div>
+        <h2 class="section-title">ওয়েবসকেট কানেকশন (WebSocket Envelope Architecture)</h2>
+      </div>
+      <p class="section-desc">
+        ক্লায়েন্ট এবং সার্ভারের মধ্যে সিগন্যালিং, চ্যাট এবং গিফটিং আদান-প্রদানের জন্য একটি একক দীর্ঘস্থায়ী WebSocket কানেকশন ব্যবহার করা হয়। হ্যান্ডশেকের সময় টোকেনটি URL কুয়েরি প্যারামিটারে পাস করতে হবে।
+      </p>
+
+      <div class="endpoint-box">
+        <span class="method-badge method-ws">WS</span>
+        <span>wss://{HOST}/ws?token={JWT_TOKEN}</span>
+      </div>
+
+      <div class="code-box">
+        <div class="code-top"><span>Standard WS Envelope (WSMessage)</span><span>ক্লায়েন্ট আউটগোয়িং ফরম্যাট</span></div>
+        <pre><code>{
+  <span class="k">"action"</span>: <span class="s">"&lt;ACTION_NAME&gt;"</span>,
+  <span class="k">"room_id"</span>: <span class="s">"room-101"</span>,
+  <span class="k">"user_id"</span>: <span class="s">"usr_alex_88"</span>,
+  <span class="k">"payload"</span>: {
+    <span class="c">// অ্যাকশন সংশ্লিষ্ট সুনির্দিষ্ট ডেটা</span>
+  }
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 4: LATE JOINER SYNC                                               -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-late-joiner">
+      <div class="section-header">
+        <div class="section-number">৪</div>
+        <h2 class="section-title">লেট জয়েনার সিঙ্ক ও ক্যাশিং (Late Joiner Sync - CRITICAL)</h2>
+      </div>
+      <p class="section-desc">
+        লাইভ স্ট্রিমিং অ্যাপ্লিকেশনের সবচেয়ে জটিল ও গুরুত্বপূর্ণ অংশ হলো <strong>লেট জয়েনিং সিনক্রোনাইজেশন</strong>।
+      </p>
+
+      <div class="grid-2">
+        <div class="info-card">
+          <h4>সমস্যাটি কী?</h4>
+          <p>
+            লাইভ শুরু হওয়ার ৩০ মিনিট পর যখন কোনো দর্শক রুমে প্রবেশ করে, তখন সে অতীতের লাইভ চ্যাট বা ইভেন্টগুলো মিস করে। কার কত স্কোর, ৮টি সিটের মধ্যে কোনটায় কে বসে আছে এবং কার ক্যামেরা মিউট—তা দর্শক জানতে পারে না।
+          </p>
+        </div>
+        <div class="info-card">
+          <h4>সমাধান: Redis স্টেট স্ন্যাপশট</h4>
+          <p>
+            Go সার্ভার প্রতিটি রুমের বর্তমান লাইভ অবস্থা রিয়েল-টাইমে Redis-এ সংরক্ষণ করে (<code>room:{id}:state</code>)। দর্শক যুক্ত হওয়ার সাথে সাথে সার্ভার তাকে <code>room_info_sync</code> মেসেজ পাঠায়।
+          </p>
+        </div>
+      </div>
+
+      <div class="code-box">
+        <div class="code-top"><span>সার্ভার থেকে প্রাপ্ত স্ন্যাপশট</span><span>event: room_info_sync</span></div>
+        <pre><code>{
+  <span class="k">"event"</span>: <span class="s">"room_info_sync"</span>,
+  <span class="k">"room_id"</span>: <span class="s">"room-101"</span>,
+  <span class="k">"user_id"</span>: <span class="s">"usr_bob_99"</span>,
+  <span class="k">"data"</span>: {
+    <span class="k">"room_id"</span>: <span class="s">"room-101"</span>,
+    <span class="k">"host_id"</span>: <span class="s">"usr_alex_88"</span>,
+    <span class="k">"total_viewers"</span>: <span class="n">1420</span>,
+    <span class="k">"host_score"</span>: <span class="n">58200</span>,
+    <span class="k">"active_seats"</span>: {
+      <span class="k">"0"</span>: <span class="s">"usr_alex_88"</span>,
+      <span class="k">"1"</span>: <span class="s">"usr_sarah_cohost"</span>,
+      <span class="k">"2"</span>: <span class="s">"usr_mike_cohost"</span>
+    },
+    <span class="k">"media_states"</span>: {
+      <span class="k">"usr_alex_88"</span>: {
+        <span class="k">"muted_audio"</span>: <span class="b">false</span>,
+        <span class="k">"muted_video"</span>: <span class="b">false</span>
+      },
+      <span class="k">"usr_sarah_cohost"</span>: {
+        <span class="k">"muted_audio"</span>: <span class="b">true</span>,
+        <span class="k">"muted_video"</span>: <span class="b">false</span>
+      },
+      <span class="k">"usr_mike_cohost"</span>: {
+        <span class="k">"muted_audio"</span>: <span class="b">false</span>,
+        <span class="k">"muted_video"</span>: <span class="b">true</span>
+      }
+    },
+    <span class="k">"created_at"</span>: <span class="n">1724742000</span>
+  }
+}</code></pre>
+      </div>
+
+      <div class="callout callout-warning">
+        <div class="callout-icon">⚠️</div>
+        <div>
+          <div class="callout-title">SDK ডেভেলপারদের জন্য আবশ্যিক নিয়ম</div>
+          <div>
+            ক্লায়েন্ট SDK-কে অবশ্যই কোনো রিয়েল-টাইম ডেল্টা ইভেন্ট প্রসেস করার আগেই এই <code>room_info_sync</code> পে-লোডটি পড়ে UI ইনিশিয়ালাইজ করতে হবে (সিটে ইউজারদের বসানো, প্রাথমিক স্কোর সেট করা এবং মিউট আইকন দেখানো)।
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 5: ROOM LIFECYCLE                                                 -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-lifecycle">
+      <div class="section-header">
+        <div class="section-number">৫</div>
+        <h2 class="section-title">রুম লাইফসাইকেল (Room Lifecycle Management)</h2>
+      </div>
+      <p class="section-desc">
+        লাইভ ব্রডকাস্ট শুরু করা, দর্শক হিসেবে যুক্ত হওয়া, রুম বন্ধ করা এবং গ্রেসফুলি রুম ত্যাগ করার সম্পূর্ণ ফ্লো:
+      </p>
+
+      <!-- 1. Publish / Create Room -->
+      <div class="code-box">
+        <div class="code-top"><span>১. হোস্ট লাইভ শুরু করা (publish)</span><span>action: publish</span></div>
+        <pre><code>{
+  <span class="k">"action"</span>: <span class="s">"publish"</span>,
+  <span class="k">"room_id"</span>: <span class="s">"room-101"</span>,
+  <span class="k">"room_name"</span>: <span class="s">"Gaming Live Show"</span>,
+  <span class="k">"user_id"</span>: <span class="s">"usr_alex_88"</span>,
+  <span class="k">"payload"</span>: {
+    <span class="k">"sdp"</span>: <span class="s">"v=0\r\no=- 12345 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE 0 1..."</span>,
+    <span class="k">"type"</span>: <span class="s">"offer"</span>
+  }
+}</code></pre>
+      </div>
+
+      <!-- 2. Viewer Join -->
+      <div class="code-box">
+        <div class="code-top"><span>২. দর্শক রুমে যুক্ত হওয়া (join_room)</span><span>action: join_room</span></div>
+        <pre><code>{
+  <span class="k">"action"</span>: <span class="s">"join_room"</span>,
+  <span class="k">"room_id"</span>: <span class="s">"room-101"</span>,
+  <span class="k">"user_id"</span>: <span class="s">"usr_bob_99"</span>,
+  <span class="k">"payload"</span>: {
+    <span class="k">"role"</span>: <span class="s">"viewer"</span>,
+    <span class="k">"user_name"</span>: <span class="s">"Bob Viewer"</span>
+  }
+}</code></pre>
+      </div>
+
+      <!-- 3. End Room -->
+      <div class="code-box">
+        <div class="code-top"><span>৩. হোস্ট লাইভ শেষ করা ও রুম বন্ধ (room_closed)</span><span>event: room_closed</span></div>
+        <pre><code>{
+  <span class="k">"event"</span>: <span class="s">"room_closed"</span>,
+  <span class="k">"room_id"</span>: <span class="s">"room-101"</span>,
+  <span class="k">"user_id"</span>: <span class="s">"usr_alex_88"</span>,
+  <span class="k">"payload"</span>: {
+    <span class="k">"message"</span>: <span class="s">"হোস্ট লাইভ স্ট্রিম শেষ করেছেন।"</span>
+  }
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 6: CHAT & GIFTS                                                   -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-economy">
+      <div class="section-header">
+        <div class="section-number">৬</div>
+        <h2 class="section-title">রিয়েল-টাইম ইকোনমি ও চ্যাট (Chat, Gifts &amp; Economy)</h2>
+      </div>
+      <p class="section-desc">
+        চ্যাট মেসেজ আদান-প্রদান এবং গিফট পাঠানোর সাথে সাথে ডায়মন্ড/কয়েন স্কোর স্বয়ংক্রিয়ভাবে রিয়েল-টাইমে ব্যালেন্স আপডেট হয়:
+      </p>
+
+      <div class="code-box">
+        <div class="code-top"><span>১. চ্যাট মেসেজ পাঠানো</span><span>action: chat</span></div>
+        <pre><code>{
+  <span class="k">"action"</span>: <span class="s">"chat"</span>,
+  <span class="k">"room_id"</span>: <span class="s">"room-101"</span>,
+  <span class="k">"user_id"</span>: <span class="s">"usr_bob_99"</span>,
+  <span class="k">"payload"</span>: {
+    <span class="k">"user_name"</span>: <span class="s">"Bob Viewer"</span>,
+    <span class="k">"message"</span>: <span class="s">"অসাধারণ লাইভ স্ট্রিম! রকেট গিফট পাঠালাম!"</span>,
+    <span class="k">"avatar_url"</span>: <span class="s">"https://cdn.liveapp.com/avatars/bob.jpg"</span>
+  }
+}</code></pre>
+      </div>
+
+      <div class="code-box">
+        <div class="code-top"><span>২. গিফট পাঠানো</span><span>action: gift</span></div>
+        <pre><code>{
+  <span class="k">"action"</span>: <span class="s">"gift"</span>,
+  <span class="k">"room_id"</span>: <span class="s">"room-101"</span>,
+  <span class="k">"user_id"</span>: <span class="s">"usr_bob_99"</span>,
+  <span class="k">"payload"</span>: {
+    <span class="k">"gift_name"</span>: <span class="s">"Super Rocket"</span>,
+    <span class="k">"coins"</span>: <span class="n">500</span>,
+    <span class="k">"user_name"</span>: <span class="s">"Bob Viewer"</span>
+  }
+}</code></pre>
+      </div>
+
+      <div class="code-box">
+        <div class="code-top"><span>৩. স্কোর ব্রডকাস্ট ইভেন্ট</span><span>event: gift_processed</span></div>
+        <pre><code>{
+  <span class="k">"event"</span>: <span class="s">"gift_processed"</span>,
+  <span class="k">"room_id"</span>: <span class="s">"room-101"</span>,
+  <span class="k">"payload"</span>: {
+    <span class="k">"sender"</span>: <span class="s">"usr_bob_99"</span>,
+    <span class="k">"sender_name"</span>: <span class="s">"Bob Viewer"</span>,
+    <span class="k">"gift_name"</span>: <span class="s">"Super Rocket"</span>,
+    <span class="k">"coins"</span>: <span class="n">500</span>,
+    <span class="k">"new_score"</span>: <span class="n">58700</span>
+  }
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 7: CO-HOSTING & SEATS                                             -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-cohost">
+      <div class="section-header">
+        <div class="section-number">৭</div>
+        <h2 class="section-title">কো-হোস্ট ও সিট ম্যানেজমেন্ট (WebRTC Renegotiation)</h2>
+      </div>
+      <p class="section-desc">
+        কো-হোস্টিং হলো ৮-সিট সিস্টেম যেখানে দর্শকরা হোস্টের সাথে একই লাইভে ভিডিও শেয়ার করতে পারে।
+      </p>
+
+      <div class="step-flow">
+        <div class="flow-item">
+          <span class="flow-badge">ধাপ ১</span>
+          <div>দর্শক <code>{ "action": "seat_request", "payload": { "seat_id": "1" } }</code> পাঠায়।</div>
+        </div>
+        <div class="flow-item">
+          <span class="flow-badge">ধাপ ২</span>
+          <div>হোস্ট রিকোয়েস্ট অনুমোদন করে <code>{ "action": "seat_accept", "payload": { "target_user": "usr_sarah", "seat_id": "1" } }</code> পাঠায়।</div>
+        </div>
+        <div class="flow-item">
+          <span class="flow-badge">ধাপ ৩</span>
+          <div>
+            <strong>WebRTC Renegotiation:</strong> সার্ভার সাথে সাথে রুমের সমস্ত দর্শকের কাছে একটি নতুন <strong>SDP Offer</strong> পাঠায়। ক্লায়েন্ট SDK <code>createAnswer()</code> তৈরি করে উত্তর পাঠাবে এবং কো-হোস্টের নতুন ভিডিও ফ্রেমটি স্ক্রিনে রেন্ডার করবে।
+          </div>
+        </div>
+      </div>
+
+      <div class="code-box">
+        <div class="code-top"><span>সিট আপডেট ইভেন্ট</span><span>event: seat_updated</span></div>
+        <pre><code>{
+  <span class="k">"event"</span>: <span class="s">"seat_updated"</span>,
+  <span class="k">"room_id"</span>: <span class="s">"room-101"</span>,
+  <span class="k">"payload"</span>: {
+    <span class="k">"action"</span>: <span class="s">"seat_assigned"</span>,
+    <span class="k">"seat_id"</span>: <span class="s">"1"</span>,
+    <span class="k">"user_id"</span>: <span class="s">"usr_sarah_cohost"</span>
+  }
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 8: PK BATTLES                                                     -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-pk">
+      <div class="section-header">
+        <div class="section-number">৮</div>
+        <h2 class="section-title">পিকে ব্যাটল (PK Battle - Cross-Room SFU Cascading)</h2>
+      </div>
+      <p class="section-desc">
+        দুটি ভিন্ন রুমের দুইজন হোস্টের মধ্যে স্প্লিট-স্ক্রিন ব্যাটল শুরু করতে SFU Cascading এবং Redis Pub/Sub সমন্বয়ে কাজ করে:
+      </p>
+
+      <div class="grid-2">
+        <div class="code-box" style="margin: 0;">
+          <div class="code-top"><span>হোস্ট ১ আমন্ত্রণ পাঠানো</span><span>action: pk_request</span></div>
+          <pre><code>{
+  <span class="k">"action"</span>: <span class="s">"pk_request"</span>,
+  <span class="k">"room_id"</span>: <span class="s">"room-A"</span>,
+  <span class="k">"payload"</span>: {
+    <span class="k">"target_room_id"</span>: <span class="s">"room-B"</span>
+  }
+}</code></pre>
+        </div>
+
+        <div class="code-box" style="margin: 0;">
+          <div class="code-top"><span>হোস্ট ২ গ্রহণ করা</span><span>action: pk_accept</span></div>
+          <pre><code>{
+  <span class="k">"action"</span>: <span class="s">"pk_accept"</span>,
+  <span class="k">"room_id"</span>: <span class="s">"room-B"</span>,
+  <span class="k">"payload"</span>: {
+    <span class="k">"target_room_id"</span>: <span class="s">"room-A"</span>
+  }
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="code-box" style="margin-top: 24px;">
+        <div class="code-top"><span>রিয়েল-টাইম পিকে স্কোর ও প্রগ্রেস বার সিঙ্ক</span><span>event: pk_score_update</span></div>
+        <pre><code>{
+  <span class="k">"event"</span>: <span class="s">"pk_score_update"</span>,
+  <span class="k">"room_id"</span>: <span class="s">"room-A"</span>,
+  <span class="k">"payload"</span>: {
+    <span class="k">"session_id"</span>: <span class="s">"room-A_room-B"</span>,
+    <span class="k">"room_1"</span>: <span class="s">"room-A"</span>,
+    <span class="k">"room_2"</span>: <span class="s">"room-B"</span>,
+    <span class="k">"room_a_score"</span>: <span class="n">3500</span>,
+    <span class="k">"room_b_score"</span>: <span class="n">1200</span>
+  }
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 9: WEBRTC RULES                                                   -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-webrtc-rules">
+      <div class="section-header">
+        <div class="section-number">৯</div>
+        <h2 class="section-title">WebRTC পাবলিশিং রুলস (Strict Rules for Simulcast)</h2>
+      </div>
+
+      <div class="callout callout-warning">
+        <div class="callout-icon">🚨</div>
+        <div>
+          <div class="callout-title">মাস্টার রুল: Offer তৈরির আগেই Transceiver যুক্ত করতে হবে!</div>
+          <div>
+            WebRTC স্পেসিফিকেশন অনুযায়ী, <code>createOffer()</code> কল করার আগেই <code>addTransceiver</code> দিয়ে ভিডিও এবং অডিও ট্র্যাক যুক্ত করতে হবে। অন্যথায় SDP Offer-এ মিডিয়া সেকশন (m=video) তৈরি হবে না এবং সিমুলকাস্ট এনকোডিং লেয়ার (f, h, q) নিষ্ক্রিয় হয়ে যাবে।
+          </div>
+        </div>
+      </div>
+
+      <div class="code-box">
+        <div class="code-top"><span>৩-লেয়ার সিমুলকাস্ট পাবলিশিং কোড</span><span>JavaScript / WebRTC</span></div>
+        <pre><code><span class="c">// ১. ভিডিও ট্র্যাকের জন্য ৩টি সিমুলকাস্ট এনকোডিং লেয়ার সেট করো:</span>
+<span class="k">const</span> videoTransceiver = peerConnection.addTransceiver(videoTrack, {
+  <span class="k">direction</span>: <span class="s">'sendonly'</span>,
+  <span class="k">streams</span>: [localStream],
+  <span class="k">sendEncodings</span>: [
+    { <span class="k">rid</span>: <span class="s">'f'</span>, <span class="k">active</span>: <span class="b">true</span>, <span class="k">maxBitrate</span>: <span class="n">1200000</span> },                         <span class="c">// High (1080p/720p)</span>
+    { <span class="k">rid</span>: <span class="s">'h'</span>, <span class="k">active</span>: <span class="b">true</span>, <span class="k">maxBitrate</span>: <span class="n">500000</span>, <span class="k">scaleResolutionDownBy</span>: <span class="n">2</span> },<span class="c">// Medium (480p)</span>
+    { <span class="k">rid</span>: <span class="s">'q'</span>, <span class="k">active</span>: <span class="b">true</span>, <span class="k">maxBitrate</span>: <span class="n">150000</span>, <span class="k">scaleResolutionDownBy</span>: <span class="n">4</span> } <span class="c">// Low (240p)</span>
+  ]
+});
+
+<span class="c">// ২. এরপর Offer তৈরি করো:</span>
+<span class="k">const</span> offer = <span class="k">await</span> peerConnection.createOffer();
+
+<span class="c">// ৩. Local Description সেট করে সার্ভারে পাঠাও:</span>
+<span class="k">await</span> peerConnection.setLocalDescription(offer);</code></pre>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 10: GRACE PERIOD & AUTO RECONNECT                                 -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-reconnect">
+      <div class="section-header">
+        <div class="section-number">১০</div>
+        <h2 class="section-title">গ্রেস পিরিয়ড ও অটো-রিকানেক্ট (Resilience &amp; 25s Grace Period)</h2>
+      </div>
+      <p class="section-desc">
+        হোস্টের সাময়িক ইন্টারনেট ড্রপ হলে সাথে সাথে রুম ডিলিট হয় না। সার্ভার ২৫ সেকেন্ডের জন্য <strong>Grace Period Timer</strong> শুরু করে।
+      </p>
+
+      <div class="code-box">
+        <div class="code-top"><span>হোস্ট ডিসকানেক্ট হলে দর্শকদের কাছে বার্তা</span><span>event: host_reconnecting</span></div>
+        <pre><code>{
+  <span class="k">"event"</span>: <span class="s">"host_reconnecting"</span>,
+  <span class="k">"room_id"</span>: <span class="s">"room-101"</span>,
+  <span class="k">"user_id"</span>: <span class="s">"usr_alex_88"</span>,
+  <span class="k">"payload"</span>: {
+    <span class="k">"message"</span>: <span class="s">"হোস্ট পুনরায় সংযোগের চেষ্টা করছেন... ২৫ সেকেন্ড অপেক্ষা করুন।"</span>
+  }
+}</code></pre>
+      </div>
+
+      <div class="code-box">
+        <div class="code-top"><span>হোস্ট সফলভাবে ফিরে আসলে</span><span>event: host_reconnected</span></div>
+        <pre><code>{
+  <span class="k">"event"</span>: <span class="s">"host_reconnected"</span>,
+  <span class="k">"room_id"</span>: <span class="s">"room-101"</span>,
+  <span class="k">"user_id"</span>: <span class="s">"usr_alex_88"</span>
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 11: CLIENT SDK STRUCTURE                                          -->
+    <!-- ========================================================================= -->
+    <section class="section-card" id="sec-sdk-arch">
+      <div class="section-header">
+        <div class="section-number">১১</div>
+        <h2 class="section-title">ক্লায়েন্ট SDK স্ট্রাকচার (Flutter / React Native Guide)</h2>
+      </div>
+      <p class="section-desc">
+        যেকোনো মোবাইল বা ওয়েব ক্লায়েন্টে সহজে ইন্টিগ্রেশনের জন্য আপনার অ্যাপকে ৪টি প্রধান মডিউলে বিভক্ত করুন:
+      </p>
+
+      <div class="grid-2">
+        <div class="info-card">
+          <h4>1. LiveAuthClient</h4>
+          <p>REST API হ্যান্ডেল করে এবং JWT টোকেন ও ডাইনামিক Coturn ICE সার্ভার ক্যাশ করে রাখে।</p>
+        </div>
+        <div class="info-card">
+          <h4>2. LiveSignalingClient</h4>
+          <p>WebSocket কানেকশন, হার্টবিট পিং/পং এবং অটো-রিকানেক্ট হ্যান্ডেল করে।</p>
+        </div>
+        <div class="info-card">
+          <h4>3. LiveMediaEngine</h4>
+          <p>flutter_webrtc রেন্ডারার, ৩-লেয়ার সিমুলকাস্ট এবং ডাইনামিক SDP রিনেগোশিয়েশন নিয়ন্ত্রণ করে।</p>
+        </div>
+        <div class="info-card">
+          <h4>4. LiveRoomState</h4>
+          <p>ChangeNotifier/ValueNotifier ভিত্তিক রিঅ্যাক্টিভ স্টোর যা ডায়মন্ড স্কোর ও সিট লাইভ আপডেট করে।</p>
+        </div>
+      </div>
+
+      <h3 style="font-size: 16px; font-weight: 700; color: #fff; margin: 24px 0 12px 0;">
+        Flutter UI-তে মাত্র ৫ লাইনে SDK ব্যবহারের উদাহরণ:
+      </h3>
+
+      <div class="code-box">
+        <div class="code-top"><span>Flutter Widget Integration</span><span>Dart</span></div>
+        <pre><code><span class="c">// ১. ইনিশিয়ালাইজ ও লাইভ রুমে কানেক্ট:</span>
+<span class="k">final</span> sdk = LiveMediaSDK(hostUrl: <span class="s">'http://192.168.0.116:8080'</span>, apiKey: <span class="s">'dev_api_key_123'</span>, apiSecret: <span class="s">'dev_api_secret_456'</span>);
+<span class="k">await</span> sdk.joinLiveRoom(roomId: <span class="s">'room-101'</span>, userId: <span class="s">'usr_alex'</span>, isHost: <span class="b">true</span>);
+
+<span class="c">// ২. UI-তে ভিডিও ভিউ দেখানো:</span>
+RTCVideoView(sdk.media.localRenderer, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover);
+
+<span class="c">// ৩. রিয়েল-টাইমে স্কোর দেখানো:</span>
+ListenableBuilder(
+  listenable: sdk.state,
+  builder: (_, __) => Text(<span class="s">'Diamonds: ${sdk.state.hostScore}'</span>),
+);</code></pre>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>

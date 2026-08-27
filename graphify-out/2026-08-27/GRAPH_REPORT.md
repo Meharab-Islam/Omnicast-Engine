@@ -1,11 +1,11 @@
 # Graph Report - go_media_server  (2026-08-27)
 
 ## Corpus Check
-- 41 files · ~38,746 words
+- 43 files · ~41,540 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 407 nodes · 849 edges · 17 communities (12 shown, 5 thin omitted)
+- 498 nodes · 971 edges · 19 communities (13 shown, 6 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 45 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
@@ -21,7 +21,7 @@
 - RedisBroker
 - LiveMediaCore
 - WebhookDispatcher
-- turn_auth.go
+- .emit
 - sync.RWMutex
 - signaling.go
 - webrtc.go
@@ -31,6 +31,8 @@
 - 🚀 Go Live Media Server (SFU & Interactive Streaming)
 - CascadeManager
 - HandleCoHostConnection
+- LiveRoomClient
+- LiveRoomClient
 - live-media-server
 
 ## God Nodes (most connected - your core abstractions)
@@ -40,10 +42,10 @@
 4. `Client` - 34 edges
 5. `SignalingMessage` - 26 edges
 6. `LiveMediaCore` - 25 edges
-7. `WebhookDispatcher` - 14 edges
-8. `CascadeManager` - 14 edges
-9. `main()` - 13 edges
-10. `NewRoomManager()` - 13 edges
+7. `LiveRoomClient` - 17 edges
+8. `WebhookDispatcher` - 14 edges
+9. `CascadeManager` - 14 edges
+10. `main()` - 13 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `main()` --calls--> `NewWebhookDispatcher()`  [EXTRACTED]
@@ -60,19 +62,19 @@
 ## Import Cycles
 - None detected.
 
-## Communities (17 total, 5 thin omitted)
+## Communities (19 total, 6 thin omitted)
 
 ### Community 0 - "Room"
 Cohesion: 0.10
 Nodes (6): time.Timer, Room, webrtc.PeerConnection, webrtc.TrackLocalStaticRTP, NewRoomWithName(), CoHostMedia
 
 ### Community 1 - "Client"
-Cohesion: 0.10
-Nodes (17): encoding/json.RawMessage, github.com/gofiber/contrib/websocket.Conn, SignalingMessage, ParseSignalingMessage(), RoomManager, webrtc.API, webrtc.PeerConnection, NewClient() (+9 more)
+Cohesion: 0.09
+Nodes (19): encoding/json.RawMessage, github.com/gofiber/contrib/websocket.Conn, SignalingMessage, ParseSignalingMessage(), TestParseSignalingMessage(), TestSignalingMessageEncode(), RoomManager, webrtc.API (+11 more)
 
 ### Community 2 - "testing.T"
-Cohesion: 0.11
-Nodes (22): testing.T, TestNewRedisBroker_EmptyAddr(), TestRedisBroker_NilOperations(), TestParseSignalingMessage(), TestSignalingMessageEncode(), NewRoom(), TestRoomCoHostTracks(), TestRoomSimulcastTracks() (+14 more)
+Cohesion: 0.09
+Nodes (27): testing.T, TestNewRedisBroker_EmptyAddr(), TestRedisBroker_NilOperations(), NewRoom(), TestRoomCoHostTracks(), TestRoomSimulcastTracks(), TestRoomState(), TestPKManager() (+19 more)
 
 ### Community 3 - "RedisBroker"
 Cohesion: 0.13
@@ -82,9 +84,9 @@ Nodes (10): MessageHandler, context.Context, time.Time, RedisBroker, NewRedisBro
 Cohesion: 0.12
 Nodes (12): WebhookEvent, WebhookEventType, net/http.Client, sync.Once, sync.WaitGroup, GenerateSignature(), WebhookDispatcher, NewWebhookDispatcher() (+4 more)
 
-### Community 6 - "turn_auth.go"
-Cohesion: 0.33
-Nodes (7): GenerateTURNCredentials(), GetDefaultICEServers(), GetDefaultICEServersJSON(), TestGenerateTURNCredentials(), TestGetDefaultICEServers(), webrtc.ICEServer, ICEServerJSON
+### Community 6 - ".emit"
+Cohesion: 0.08
+Nodes (4): EventEmitter, LiveMediaManager, LiveMediaSDK, LiveStateManager
 
 ### Community 7 - "sync.RWMutex"
 Cohesion: 0.09
@@ -110,25 +112,29 @@ Nodes (8): context.CancelFunc, github.com/fasthttp/websocket.Conn, sync.Mutex, w
 Cohesion: 0.19
 Nodes (16): webrtc.API, webrtc.Configuration, webrtc.PeerConnection, webrtc.TrackLocalStaticRTP, HandleCoHostConnection(), HandleHostConnection(), GetRTPBuffer(), PutRTPBuffer() (+8 more)
 
+### Community 16 - "LiveRoomClient"
+Cohesion: 0.06
+Nodes (8): LiveMediaManager, LiveMediaSDK, LiveRoomClient, LiveStateManager, PKSession, PublishOptions, RoomStateSnapshot, SDKConfig
+
 ## Knowledge Gaps
-- **21 isolated node(s):** `live-media-server`, `TokenRequest`, `Participant`, `📑 সূচিপত্র (Table of Contents)`, `🔥 মূল ফিচারসমূহ:` (+16 more)
+- **25 isolated node(s):** `live-media-server`, `TokenRequest`, `Participant`, `SDKConfig`, `PublishOptions` (+20 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **6 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `Room` connect `Room` to `testing.T`, `RedisBroker`, `sync.RWMutex`, `RoomManager`, `CascadeManager`, `HandleCoHostConnection`?**
-  _High betweenness centrality (0.280) - this node is a cross-community bridge._
+  _High betweenness centrality (0.187) - this node is a cross-community bridge._
 - **Why does `RoomManager` connect `RoomManager` to `Room`, `testing.T`, `RedisBroker`, `WebhookDispatcher`, `sync.RWMutex`, `CascadeManager`?**
-  _High betweenness centrality (0.193) - this node is a cross-community bridge._
+  _High betweenness centrality (0.129) - this node is a cross-community bridge._
 - **Why does `RedisBroker` connect `RedisBroker` to `RoomManager`, `CascadeManager`, `sync.RWMutex`?**
-  _High betweenness centrality (0.105) - this node is a cross-community bridge._
+  _High betweenness centrality (0.070) - this node is a cross-community bridge._
 - **What connects `live-media-server`, `TokenRequest`, `Participant` to the rest of the system?**
-  _21 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _25 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Room` be split into smaller, more focused modules?**
   _Cohesion score 0.09523809523809523 - nodes in this community are weakly interconnected._
 - **Should `Client` be split into smaller, more focused modules?**
-  _Cohesion score 0.0966183574879227 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08843537414965986 - nodes in this community are weakly interconnected._
 - **Should `testing.T` be split into smaller, more focused modules?**
-  _Cohesion score 0.11264367816091954 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09365079365079365 - nodes in this community are weakly interconnected._

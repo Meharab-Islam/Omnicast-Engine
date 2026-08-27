@@ -262,5 +262,17 @@
     "seen": 1787808595.4062479,
     "ast_hash": "62e8d839be56c9ae258ad2cbfe8caac3",
     "semantic_hash": ""
+  },
+  "public/sdk/live_media_sdk.d.ts": {
+    "mtime": 1787808745.1424115,
+    "seen": 1787808756.666528,
+    "ast_hash": "e5b4592202b53363a3e7619400389c87",
+    "semantic_hash": ""
+  },
+  "public/sdk/live_media_sdk.js": {
+    "mtime": 1787808738.1443772,
+    "seen": 1787808756.666529,
+    "ast_hash": "28133b874fec37779b16625cb17f23b1",
+    "semantic_hash": ""
   }
 }
