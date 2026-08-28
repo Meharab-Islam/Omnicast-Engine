@@ -276,7 +276,13 @@
       if (stream) {
         this.localStream = stream;
       } else {
-        this.localStream = await navigator.mediaDevices.getUserMedia({ video, audio });
+        const videoConstraints = typeof video === 'object' ? video : (video ? {
+          width: { ideal: 640, max: 640 },
+          height: { ideal: 480, max: 480 },
+          frameRate: { ideal: 24, max: 30 }
+        } : false);
+
+        this.localStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio });
       }
 
       this._createPeerConnection();
@@ -295,6 +301,7 @@
           streams: [this.localStream],
           sendEncodings: encodings
         });
+        this._forceVP8(this.videoTransceiver);
       }
 
       // Add Audio Transceiver
@@ -319,6 +326,21 @@
       this.isPublishing = true;
       this.emit('onLocalStream', this.localStream);
       return this.localStream;
+    }
+
+    _forceVP8(transceiver) {
+      if (transceiver && 'setCodecPreferences' in transceiver && typeof RTCRtpReceiver !== 'undefined' && RTCRtpReceiver.getCapabilities) {
+        try {
+          const capabilities = RTCRtpReceiver.getCapabilities('video');
+          if (capabilities && capabilities.codecs) {
+            const vp8Codecs = capabilities.codecs.filter(c => c.mimeType.toLowerCase() === 'video/vp8');
+            const otherCodecs = capabilities.codecs.filter(c => c.mimeType.toLowerCase() !== 'video/vp8' && c.mimeType.toLowerCase() !== 'video/h264');
+            if (vp8Codecs.length > 0) {
+              transceiver.setCodecPreferences([...vp8Codecs, ...otherCodecs]);
+            }
+          }
+        } catch (_) {}
+      }
     }
 
     /**

@@ -208,6 +208,11 @@ func (rm *RoomManager) CreateRoom(roomID, hostID string) (*models.Room, error) {
 	room := models.NewRoom(roomID, hostID)
 	rm.activeRooms[roomID] = room
 
+	// Start 1-second presence batcher to throttle joins/leaves without CPU spikes
+	room.StartPresenceBatcher(1*time.Second, func(joins []*models.Participant, leaves []string, count int, list []*models.Participant) {
+		rm.broadcastPresenceBatch(room.RoomID, joins, leaves, count, list)
+	})
+
 	// Subscribe to Redis room channel if broker is active
 	if rm.broker != nil && rm.broker.IsActive() {
 		_ = rm.broker.SubscribeRoom(roomID)
@@ -270,7 +275,11 @@ func (rm *RoomManager) JoinViewer(roomID string, viewerClient *Client) error {
 		})
 	}
 
+	// Save participant metadata & enqueue into presence batch queue
+	p := viewerClient.ToParticipant()
+	room.AddParticipant(p)
 	room.AddViewer(viewerClient.ID, viewerClient)
+	room.EnqueuePresenceJoin(p)
 
 	// Subscribe to Redis room channel if broker is active on this node
 	if rm.broker != nil && rm.broker.IsActive() {
@@ -290,29 +299,11 @@ func (rm *RoomManager) JoinViewer(roomID string, viewerClient *Client) error {
 		})
 	}
 
-	// Broadcast updated viewer state (total_viewers & viewers_list) to everyone in the room & cluster
-	viewerCount := room.ViewersCount()
-	viewersList := room.GetViewersList()
-	payload, _ := json.Marshal(map[string]any{
-		"event":         "viewer_update",
-		"room_id":       roomID,
-		"total_viewers": viewerCount,
-		"count":         viewerCount,
-		"viewers_list":  viewersList,
-	})
-	updateMsg := &models.SignalingMessage{
-		Event:        "viewer_update",
-		RoomID:       roomID,
-		TotalViewers: viewerCount,
-		ViewersList:  viewersList,
-		Payload:      payload,
-	}
-	_ = rm.BroadcastToRoom(roomID, updateMsg)
-
-	// Sync updated viewer count and seats to Redis RoomState
+	// Synchronize updated state to Redis immediately for late joiners
 	rm.SyncRoomState(roomID)
 
 	// Empty Room Auto-Destroy Check (The '0' Rule)
+	viewerCount := room.ViewersCount()
 	if viewerCount == 0 && room.GetHostClient() == nil {
 		appCfg := config.GetAppConfig()
 		emptyTimeout := appCfg.YAML.RoomManagement.EmptyRoomTimeoutSec
@@ -330,7 +321,7 @@ func (rm *RoomManager) JoinViewer(roomID string, viewerClient *Client) error {
 	return nil
 }
 
-// RemoveViewer removes a viewer client from a room and broadcasts updated viewer state
+// RemoveViewer removes a viewer client from a room and enqueues departure in the presence batcher
 func (rm *RoomManager) RemoveViewer(roomID, viewerID string) {
 	rm.mu.RLock()
 	room, exists := rm.activeRooms[roomID]
@@ -342,7 +333,9 @@ func (rm *RoomManager) RemoveViewer(roomID, viewerID string) {
 	}
 
 	room.RemoveViewer(viewerID)
+	room.RemoveParticipant(viewerID)
 	room.RemoveCoHostTrack(viewerID)
+	room.EnqueuePresenceLeave(viewerID)
 
 	if dispatcher != nil {
 		dispatcher.Dispatch(api.WebhookEvent{
@@ -356,24 +349,58 @@ func (rm *RoomManager) RemoveViewer(roomID, viewerID string) {
 	}
 
 	viewerCount := room.ViewersCount()
-	viewersList := room.GetViewersList()
-	payload, _ := json.Marshal(map[string]any{
-		"event":         "viewer_update",
+
+	// Handle empty room auto-destroy check
+	if viewerCount == 0 && room.GetHostClient() == nil {
+		appCfg := config.GetAppConfig()
+		emptyTimeout := appCfg.YAML.RoomManagement.EmptyRoomTimeoutSec
+		if emptyTimeout > 0 {
+			log.Printf("Room %s is now empty after viewer removal. Starting %d-second destruction timer...\n", roomID, emptyTimeout)
+			room.StartEmptyRoomTimer(time.Duration(emptyTimeout)*time.Second, func() {
+				log.Printf("Empty room %s timeout reached. Executing instant cleanup...\n", roomID)
+				rm.destroyRoomInstant(roomID)
+			})
+		}
+	}
+}
+
+// broadcastPresenceBatch broadcasts a consolidated presence update (batched joins/leaves) to all room participants
+func (rm *RoomManager) broadcastPresenceBatch(roomID string, joins []*models.Participant, leaves []string, totalViewers int, participants []*models.Participant) {
+	viewersList := make([]string, 0, len(participants))
+	for _, p := range participants {
+		if p != nil {
+			viewersList = append(viewersList, p.UserID)
+		}
+	}
+
+	payloadBytes, err := json.Marshal(map[string]any{
+		"event":         "presence_update",
 		"room_id":       roomID,
-		"total_viewers": viewerCount,
-		"count":         viewerCount,
+		"total_viewers": totalViewers,
+		"count":         totalViewers,
+		"joined":        joins,
+		"left":          leaves,
+		"viewers":       participants,
 		"viewers_list":  viewersList,
 	})
-	updateMsg := &models.SignalingMessage{
-		Event:        "viewer_update",
-		RoomID:       roomID,
-		TotalViewers: viewerCount,
-		ViewersList:  viewersList,
-		Payload:      payload,
+	if err != nil {
+		return
 	}
-	_ = rm.BroadcastToRoom(roomID, updateMsg)
 
-	// Sync updated viewer state to Redis RoomState
+	sigMsg := &models.SignalingMessage{
+		Event:        "presence_update",
+		RoomID:       roomID,
+		TotalViewers: totalViewers,
+		ViewersList:  viewersList,
+		Payload:      payloadBytes,
+	}
+
+	encoded, err := sigMsg.Encode()
+	if err == nil {
+		_ = rm.BroadcastRawBytesToRoom(roomID, encoded)
+	}
+
+	// Also sync state to Redis
 	rm.SyncRoomState(roomID)
 }
 
@@ -403,8 +430,8 @@ func (rm *RoomManager) RemoveRoom(roomID string) {
 	}
 }
 
-// BroadcastToRoom sends a signaling message to the host and all viewers of the specified room in a thread-safe manner
-// If a RedisBroker is active, it publishes to Redis Pub/Sub so all server instances broadcast to their local clients.
+// BroadcastToRoom broadcasts a signaling message to all participants in a room.
+// JSON Caching: Marshals payload once into []byte and dispatches non-blockingly to all connections.
 func (rm *RoomManager) BroadcastToRoom(roomID string, msg *models.SignalingMessage) error {
 	rm.mu.RLock()
 	room, exists := rm.activeRooms[roomID]
@@ -420,26 +447,43 @@ func (rm *RoomManager) BroadcastToRoom(roomID string, msg *models.SignalingMessa
 		return activeBroker.PublishRoomEvent(roomID, msg)
 	}
 
-	// Fallback to local in-memory broadcast
+	// Local broadcast with cached JSON byte array
 	return broadcastToRoomInternal(room, msg)
 }
 
-// broadcastToRoomInternal sends a message to participants without acquiring rm.mu
-func broadcastToRoomInternal(room *models.Room, msg *models.SignalingMessage) error {
-	if room == nil || msg == nil {
-		return nil
+// BroadcastRawBytesToRoom dispatches pre-marshaled JSON byte array to all room participants without re-marshaling
+func (rm *RoomManager) BroadcastRawBytesToRoom(roomID string, rawJSON []byte) error {
+	rm.mu.RLock()
+	room, exists := rm.activeRooms[roomID]
+	activeBroker := rm.broker
+	rm.mu.RUnlock()
+
+	if !exists || room == nil {
+		return errors.New("room not found: " + roomID)
 	}
 
-	encoded, err := msg.Encode()
-	if err != nil {
-		return err
+	// If distributed Redis broker is active, publish to Redis channel
+	if activeBroker != nil && activeBroker.IsActive() {
+		sigMsg, err := models.ParseSignalingMessage(rawJSON)
+		if err == nil {
+			return activeBroker.PublishRoomEvent(roomID, sigMsg)
+		}
+	}
+
+	return broadcastRawToRoomInternal(room, rawJSON)
+}
+
+// broadcastRawToRoomInternal sends pre-encoded byte array to participants without acquiring rm.mu
+func broadcastRawToRoomInternal(room *models.Room, rawBytes []byte) error {
+	if room == nil || len(rawBytes) == 0 {
+		return nil
 	}
 
 	room.RLock()
 	// Forward message to Host if connected
 	if room.HostClient != nil {
 		if hostClient, ok := room.HostClient.(*Client); ok && hostClient != nil {
-			hostClient.SafeSend(encoded)
+			hostClient.SafeSend(rawBytes)
 		}
 	}
 
@@ -452,14 +496,28 @@ func broadcastToRoomInternal(room *models.Room, msg *models.SignalingMessage) er
 	}
 	room.RUnlock()
 
-	// Forward message to all Viewers
+	// Non-blocking concurrent dispatch to all Viewers
 	for _, client := range targets {
 		if client != nil {
-			client.SafeSend(encoded)
+			client.SafeSend(rawBytes)
 		}
 	}
 
 	return nil
+}
+
+// broadcastToRoomInternal encodes the message exactly once and dispatches raw bytes
+func broadcastToRoomInternal(room *models.Room, msg *models.SignalingMessage) error {
+	if room == nil || msg == nil {
+		return nil
+	}
+
+	encoded, err := msg.Encode()
+	if err != nil {
+		return err
+	}
+
+	return broadcastRawToRoomInternal(room, encoded)
 }
 
 // AddTrackAndRenegotiate adds a new media track (e.g. Co-host video/audio) to all connected viewers and the main host in the room,
@@ -709,6 +767,7 @@ func (rm *RoomManager) CloseRoomAndNotifyWithReason(roomID, hostID, reason strin
 	// Cancel any active timers on the room
 	room.CancelReconnectTimer()
 	room.CancelEmptyRoomTimer()
+	room.StopPresenceBatcher()
 
 	// Instant Redis Wipe: Unlink state, score, chats, participants, banned, and PK sessions
 	if rm.broker != nil && rm.broker.IsActive() {

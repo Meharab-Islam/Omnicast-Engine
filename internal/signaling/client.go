@@ -50,6 +50,7 @@ type Client struct {
 	UserName       string                 `json:"user_name,omitempty"`
 	AvatarURL      string                 `json:"avatar_url,omitempty"`
 	Role           string                 `json:"role,omitempty"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 	RoomID         string                 `json:"room_id,omitempty"`
 	Claims         *UserClaims            `json:"-"`
 	Hub            *Hub                   `json:"-"`
@@ -82,12 +83,15 @@ func NewClientWithClaims(hub *Hub, roomManager *RoomManager, api *webrtc.API, co
 	avatarURL := ""
 	role := "viewer"
 	roomID := ""
+	var metadata map[string]interface{}
 
 	if claims != nil {
 		if claims.UserID != "" {
 			clientID = claims.UserID
 		}
-		if claims.UserName != "" {
+		if claims.DisplayName != "" {
+			userName = claims.DisplayName
+		} else if claims.UserName != "" {
 			userName = claims.UserName
 		}
 		if claims.AvatarURL != "" {
@@ -99,6 +103,9 @@ func NewClientWithClaims(hub *Hub, roomManager *RoomManager, api *webrtc.API, co
 		if claims.RoomID != "" {
 			roomID = claims.RoomID
 		}
+		if claims.Metadata != nil {
+			metadata = claims.Metadata
+		}
 	}
 
 	return &Client{
@@ -106,6 +113,7 @@ func NewClientWithClaims(hub *Hub, roomManager *RoomManager, api *webrtc.API, co
 		UserName:    userName,
 		AvatarURL:   avatarURL,
 		Role:        role,
+		Metadata:    metadata,
 		RoomID:      roomID,
 		Claims:      claims,
 		Hub:         hub,
@@ -113,6 +121,31 @@ func NewClientWithClaims(hub *Hub, roomManager *RoomManager, api *webrtc.API, co
 		WebRTCAPI:   api,
 		Conn:        conn,
 		Send:        make(chan []byte, 256),
+	}
+}
+
+// ToParticipant converts client profile metadata to a models.Participant struct
+func (c *Client) ToParticipant() *models.Participant {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	displayName := c.UserName
+	if displayName == "" {
+		displayName = c.ID
+	}
+	var metaCopy map[string]interface{}
+	if c.Metadata != nil {
+		metaCopy = make(map[string]interface{}, len(c.Metadata))
+		for k, v := range c.Metadata {
+			metaCopy[k] = v
+		}
+	}
+	return &models.Participant{
+		UserID:      c.ID,
+		DisplayName: displayName,
+		AvatarURL:   c.AvatarURL,
+		Role:        c.Role,
+		Metadata:    metaCopy,
+		JoinedAt:    time.Now().UTC(),
 	}
 }
 
@@ -159,7 +192,7 @@ func (c *Client) ReadPump() {
 // handleSignalingMessage routes WebRTC signaling events (publish/offer, play/join_room, chat, ice candidate, etc.)
 func (c *Client) handleSignalingMessage(msg *models.SignalingMessage) {
 	switch msg.Event {
-	case "publish", "offer":
+	case "create_room", "publish", "offer":
 		c.handlePublishOffer(msg)
 
 	case "play", "join_room", "join", "subscribe":
@@ -168,7 +201,7 @@ func (c *Client) handleSignalingMessage(msg *models.SignalingMessage) {
 	case "chat", "chat_message":
 		c.handleChatMessage(msg)
 
-	case "gift":
+	case "gift", "send_gift", "gift_sent":
 		c.handleGiftMessage(msg)
 
 	case "seat_request", "request_seat":
@@ -195,7 +228,7 @@ func (c *Client) handleSignalingMessage(msg *models.SignalingMessage) {
 	case "pk_accept", "accept_pk", "pk_start", "start_pk":
 		c.handlePKAccept(msg)
 
-	case "pk_stop", "stop_pk", "end_pk":
+	case "pk_stop", "stop_pk", "end_pk", "pk_end":
 		c.handlePKStop(msg)
 
 	case "subscribe_cohost":
@@ -212,6 +245,9 @@ func (c *Client) handleSignalingMessage(msg *models.SignalingMessage) {
 
 	case "answer", "sdp_answer":
 		c.handleSDPAnswer(msg)
+
+	case "request_layer", "select_layer", "set_layer", "switch_layer":
+		c.handleRequestLayer(msg)
 
 	default:
 		log.Printf("Unhandled signaling event '%s' from client %s\n", msg.Event, c.ID)
@@ -230,6 +266,64 @@ func (c *Client) handlePublishOffer(msg *models.SignalingMessage) {
 		roomID = "default-room"
 	}
 
+	// Extract display name, avatar URL, and dynamic metadata if provided
+	if msg.DisplayName != "" {
+		c.mu.Lock()
+		c.UserName = msg.DisplayName
+		c.mu.Unlock()
+	}
+	if msg.AvatarURL != "" {
+		c.mu.Lock()
+		c.AvatarURL = msg.AvatarURL
+		c.mu.Unlock()
+	}
+	if msg.Metadata != nil {
+		c.mu.Lock()
+		c.Metadata = msg.Metadata
+		c.mu.Unlock()
+	}
+	if len(msg.Payload) > 0 {
+		var profile struct {
+			DisplayName string                 `json:"display_name"`
+			UserName    string                 `json:"user_name"`
+			AvatarURL   string                 `json:"avatar_url"`
+			Role        string                 `json:"role"`
+			Metadata    map[string]interface{} `json:"metadata"`
+		}
+		if err := json.Unmarshal(msg.Payload, &profile); err == nil {
+			c.mu.Lock()
+			if profile.DisplayName != "" {
+				c.UserName = profile.DisplayName
+			} else if profile.UserName != "" {
+				c.UserName = profile.UserName
+			}
+			if profile.AvatarURL != "" {
+				c.AvatarURL = profile.AvatarURL
+			}
+			if profile.Role != "" {
+				c.Role = profile.Role
+			}
+			if profile.Metadata != nil {
+				c.Metadata = profile.Metadata
+			}
+			c.mu.Unlock()
+		}
+	}
+
+	// Extract room_type from message or payload (defaults to "video")
+	roomType := msg.RoomType
+	if roomType == "" && len(msg.Payload) > 0 {
+		var payloadData struct {
+			RoomType string `json:"room_type"`
+		}
+		if err := json.Unmarshal(msg.Payload, &payloadData); err == nil && payloadData.RoomType != "" {
+			roomType = payloadData.RoomType
+		}
+	}
+	if roomType != "audio" && roomType != "video" {
+		roomType = "video"
+	}
+
 	// Retrieve or create room
 	room, exists := c.RoomManager.GetRoom(roomID)
 	if !exists {
@@ -242,9 +336,15 @@ func (c *Client) handlePublishOffer(msg *models.SignalingMessage) {
 		if msg.RoomName != "" {
 			room.SetRoomName(msg.RoomName)
 		}
-		log.Printf("Created new room '%s' (%s) for host client %s\n", roomID, room.GetRoomName(), c.ID)
-	} else if msg.RoomName != "" {
-		room.SetRoomName(msg.RoomName)
+		room.SetRoomType(roomType)
+		log.Printf("Created new room '%s' (Type: %s, Name: %s) for host client %s\n", roomID, roomType, room.GetRoomName(), c.ID)
+	} else {
+		if msg.RoomName != "" {
+			room.SetRoomName(msg.RoomName)
+		}
+		if msg.RoomType != "" {
+			room.SetRoomType(msg.RoomType)
+		}
 	}
 
 	// Determine if this is Main Host or a Co-Host
@@ -295,6 +395,12 @@ func (c *Client) handlePublishOffer(msg *models.SignalingMessage) {
 			}
 
 			if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
+				// Strict Security Check: Drop and ignore video tracks in audio-only rooms
+				if room.GetRoomType() == "audio" {
+					log.Printf("[Security] Dropped unauthorized co-host %s video track in audio-only Room %s (SSRC: %d)\n",
+						c.ID, roomID, remoteTrack.SSRC())
+					return
+				}
 				room.SetCoHostTrack(c.ID, localTrack)
 				room.SetCoHostVideoSSRC(c.ID, uint32(remoteTrack.SSRC()))
 			} else if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio {
@@ -511,6 +617,50 @@ func (c *Client) handleViewerJoinPlay(msg *models.SignalingMessage) {
 	roomID := msg.RoomID
 	if roomID == "" {
 		roomID = "default-room"
+	}
+
+	// Extract display name, avatar URL, and dynamic metadata if provided
+	if msg.DisplayName != "" {
+		c.mu.Lock()
+		c.UserName = msg.DisplayName
+		c.mu.Unlock()
+	}
+	if msg.AvatarURL != "" {
+		c.mu.Lock()
+		c.AvatarURL = msg.AvatarURL
+		c.mu.Unlock()
+	}
+	if msg.Metadata != nil {
+		c.mu.Lock()
+		c.Metadata = msg.Metadata
+		c.mu.Unlock()
+	}
+	if len(msg.Payload) > 0 {
+		var profile struct {
+			DisplayName string                 `json:"display_name"`
+			UserName    string                 `json:"user_name"`
+			AvatarURL   string                 `json:"avatar_url"`
+			Role        string                 `json:"role"`
+			Metadata    map[string]interface{} `json:"metadata"`
+		}
+		if err := json.Unmarshal(msg.Payload, &profile); err == nil {
+			c.mu.Lock()
+			if profile.DisplayName != "" {
+				c.UserName = profile.DisplayName
+			} else if profile.UserName != "" {
+				c.UserName = profile.UserName
+			}
+			if profile.AvatarURL != "" {
+				c.AvatarURL = profile.AvatarURL
+			}
+			if profile.Role != "" {
+				c.Role = profile.Role
+			}
+			if profile.Metadata != nil {
+				c.Metadata = profile.Metadata
+			}
+			c.mu.Unlock()
+		}
 	}
 
 	// On Edge servers or distributed setups, ensure room is present and cascaded from Origin if needed
@@ -1980,4 +2130,63 @@ func (c *Client) handleEndRoom(msg *models.SignalingMessage) {
 
 	log.Printf("[Kill Switch] Authorized end_room request for room '%s' by user '%s' (%s)\n", roomID, c.ID, reason)
 	c.RoomManager.ForceEndRoom(roomID, c.ID, reason)
+}
+
+// handleRequestLayer switches the spatial simulcast layer for a viewer to optimize download bandwidth
+func (c *Client) handleRequestLayer(msg *models.SignalingMessage) {
+	roomID := msg.RoomID
+	if roomID == "" {
+		c.mu.Lock()
+		roomID = c.RoomID
+		c.mu.Unlock()
+	}
+
+	room, exists := c.RoomManager.GetRoom(roomID)
+	if !exists || room == nil {
+		log.Printf("Request layer failed: room %s not found\n", roomID)
+		return
+	}
+
+	var req struct {
+		TargetUser string `json:"target_user"`
+		Layer      string `json:"layer"`
+		RID        string `json:"rid"`
+	}
+
+	if len(msg.Payload) > 0 {
+		_ = json.Unmarshal(msg.Payload, &req)
+	}
+
+	targetLayer := req.Layer
+	if targetLayer == "" {
+		targetLayer = req.RID
+	}
+	if targetLayer != internalWebRTC.LayerHigh && targetLayer != internalWebRTC.LayerMedium && targetLayer != internalWebRTC.LayerLow {
+		targetLayer = internalWebRTC.LayerHigh
+	}
+
+	// Retrieve TrackSwitcher for this viewer
+	if switcherObj, ok := room.GetTrackSwitcher(c.ID); ok && switcherObj != nil {
+		if switcher, ok := switcherObj.(*internalWebRTC.TrackSwitcher); ok && switcher != nil {
+			switcher.SwitchLayer(targetLayer)
+			room.SendPLIImmediate()
+			log.Printf("[Dynamic Layer] Switched layer to '%s' for viewer %s in Room %s\n", targetLayer, c.ID, roomID)
+
+			respPayload, _ := json.Marshal(map[string]any{
+				"event":       "layer_switched",
+				"target_user": req.TargetUser,
+				"layer":       targetLayer,
+				"status":      "ok",
+			})
+			respMsg := models.SignalingMessage{
+				Event:   "layer_switched",
+				RoomID:  roomID,
+				UserID:  c.ID,
+				Payload: respPayload,
+			}
+			if enc, err := respMsg.Encode(); err == nil {
+				c.SafeSend(enc)
+			}
+		}
+	}
 }

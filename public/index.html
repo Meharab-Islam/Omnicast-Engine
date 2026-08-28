@@ -956,7 +956,8 @@
     let currentRoomName = '';
     let pendingRequesterId = null;
 
-    const myUserID = 'user-' + Math.random().toString(36).substring(2, 8);
+    // Truly unique user ID per session to prevent peer collision & auto-kicks
+    const myUserID = 'user_' + Math.random().toString(36).substring(2, 9) + '_' + Math.floor(Math.random() * 10000);
 
     let rtcConfig = {
       iceServers: [
@@ -1056,6 +1057,36 @@
       fetchActiveRooms();
     }
 
+    // =========================================================================
+    // OPTIMIZED CAMERA CONSTRAINTS & VP8 CODEC ENFORCEMENT
+    // =========================================================================
+    const CAMERA_CONSTRAINTS = {
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        frameRate: { ideal: 24 }
+      },
+      audio: true
+    };
+
+    function forceVP8Codec(transceiver) {
+      if (transceiver && 'setCodecPreferences' in transceiver && typeof RTCRtpReceiver !== 'undefined' && RTCRtpReceiver.getCapabilities) {
+        try {
+          const capabilities = RTCRtpReceiver.getCapabilities('video');
+          if (capabilities && capabilities.codecs) {
+            const vp8Codecs = capabilities.codecs.filter(c => c.mimeType.toLowerCase() === 'video/vp8');
+            const otherCodecs = capabilities.codecs.filter(c => c.mimeType.toLowerCase() !== 'video/vp8' && c.mimeType.toLowerCase() !== 'video/h264');
+            if (vp8Codecs.length > 0) {
+              transceiver.setCodecPreferences([...vp8Codecs, ...otherCodecs]);
+              console.log('[WebRTC Codec] Forced VP8 codec preference on transceiver');
+            }
+          }
+        } catch (e) {
+          console.warn('[WebRTC Codec] setCodecPreferences warning:', e);
+        }
+      }
+    }
+
     // Host: Start Live from Lobby
     async function startHostFromLobby() {
       const roomNameInput = document.getElementById('room-name-input');
@@ -1063,10 +1094,10 @@
       const roomID = 'room-' + Math.random().toString(36).substring(2, 8);
 
       try {
-        addLog('Requesting camera & microphone access...', 'info');
+        addLog('Requesting camera & microphone access (480p stable)...', 'info');
 
-        // 1. Get user media first and ensure video stream is active
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        // 1. Get user media with optimized 480p constraints
+        localStream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
 
         // 2. Switch UI view
         isHost = true;
@@ -1092,19 +1123,20 @@
 
         setupHostPeerConnection(peerConnection, roomID, roomName);
 
-        // 5. Configure Simulcast Video Transceiver with 3 quality layers (High 'f', Med 'h', Low 'q')
+        // 5. Configure Simulcast Video Transceiver with capped bitrates to prevent network choking
         const videoTrack = localStream.getVideoTracks()[0];
         if (videoTrack) {
-          peerConnection.addTransceiver(videoTrack, {
+          const videoTransceiver = peerConnection.addTransceiver(videoTrack, {
             direction: 'sendonly',
             streams: [localStream],
             sendEncodings: [
-              { rid: 'f', active: true, maxBitrate: 1200000 },
-              { rid: 'h', active: true, maxBitrate: 500000, scaleResolutionDownBy: 2 },
-              { rid: 'q', active: true, maxBitrate: 150000, scaleResolutionDownBy: 4 }
+              { rid: 'f', active: true, maxBitrate: 800000 },
+              { rid: 'h', active: true, maxBitrate: 350000, scaleResolutionDownBy: 2 },
+              { rid: 'q', active: true, maxBitrate: 120000, scaleResolutionDownBy: 4 }
             ]
           });
-          console.log('[Host Simulcast] Added Video Transceiver with 3 encodings (f, h, q)');
+          forceVP8Codec(videoTransceiver);
+          console.log('[Host Simulcast] Added Video Transceiver with capped encodings (f:800k, h:350k, q:120k) & forced VP8');
         }
 
         const audioTrack = localStream.getAudioTracks()[0];
@@ -1116,10 +1148,10 @@
           console.log('[Host] Added Audio Transceiver');
         }
 
-        // 6. এরপর Offer তৈরি করো:
+        // 6. Create Offer:
         const offer = await peerConnection.createOffer();
 
-        // 7. সবশেষে Local Description সেট করে সার্ভারে পাঠাও:
+        // 7. Local Description সেট করে সার্ভারে পাঠাও:
         await peerConnection.setLocalDescription(offer);
 
         ws.send(JSON.stringify({
@@ -1629,11 +1661,12 @@
           }
         };
 
-        // 2. addTransceiver ensure recvonly
+        // 2. addTransceiver ensure recvonly & force VP8
         console.log('[Viewer Step 2] Calling addTransceiver for video and audio (direction: recvonly)...');
-        peerConnection.addTransceiver('video', { direction: 'recvonly' });
-        peerConnection.addTransceiver('audio', { direction: 'recvonly' });
-        console.log('[Viewer Step 2] Transceivers added successfully.');
+        const videoTransceiver = peerConnection.addTransceiver('video', { direction: 'recvonly' });
+        const audioTransceiver = peerConnection.addTransceiver('audio', { direction: 'recvonly' });
+        forceVP8Codec(videoTransceiver);
+        console.log('[Viewer Step 2] Transceivers added successfully with VP8 preferred.');
 
         // onicecandidate handler
         peerConnection.onicecandidate = (event) => {
@@ -1651,6 +1684,7 @@
         // 3. Create Offer, setLocalDescription and send join_room message
         console.log('[Viewer Step 4] Creating SDP Offer...');
         const offer = await peerConnection.createOffer();
+
         console.log('[Viewer Step 4] Setting LocalDescription (Offer)...');
         await peerConnection.setLocalDescription(offer);
 
@@ -1731,10 +1765,23 @@
       addLog(`Audio output is now ${video.muted ? 'Muted' : 'Unmuted'}.`, 'info');
     }
 
+    let isPublishingCoHost = false;
+
     async function becomeCoHostPublisher() {
+      if (isPublishingCoHost) {
+        console.warn('[Co-Host Publish] Publish operation already in progress, skipping.');
+        return;
+      }
+      isPublishingCoHost = true;
+
       try {
-        addLog('Acquiring camera and microphone for Co-Host...', 'info');
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        addLog('Acquiring camera and microphone for Co-Host (480p stable)...', 'info');
+        
+        // Verify or re-acquire media stream safely
+        if (!localStream || !localStream.active || localStream.getTracks().length === 0) {
+          localStream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
+        }
+        
         const localCard = document.getElementById('card-local-preview');
         if (localCard) {
           localCard.style.display = 'flex';
@@ -1744,7 +1791,7 @@
         const localVideo = document.getElementById('localVideo');
         if (localVideo) {
           localVideo.srcObject = localStream;
-          await localVideo.play().catch(e => console.warn(e));
+          await localVideo.play().catch(e => console.warn('Local preview play error:', e));
         }
 
         // Seamless Transition: Do NOT close or replace existing PeerConnection!
@@ -1764,14 +1811,44 @@
           };
         }
 
-        // Add local camera & mic tracks to the existing PeerConnection
-        localStream.getTracks().forEach(track => {
-          peerConnection.addTrack(track, localStream);
-          console.log('[Co-Host Seamless] Added local track to existing PeerConnection:', track.kind, track.id);
-        });
+        // Check existing senders before adding tracks to prevent "A sender already exists" error
+        const senders = peerConnection.getSenders();
+        for (const track of localStream.getTracks()) {
+          const existingSender = senders.find(s => s.track && s.track.kind === track.kind);
+          if (existingSender) {
+            console.log('[Co-Host Seamless] Replacing existing sender track for kind:', track.kind);
+            await existingSender.replaceTrack(track).catch(err => console.warn('replaceTrack warning:', err));
+            if (track.kind === 'video') {
+              try {
+                const params = existingSender.getParameters();
+                if (!params.encodings || params.encodings.length === 0) {
+                  params.encodings = [{ maxBitrate: 400000 }];
+                } else {
+                  params.encodings[0].maxBitrate = 400000;
+                }
+                await existingSender.setParameters(params);
+              } catch (_) {}
+            }
+          } else {
+            console.log('[Co-Host Seamless] Adding new track to PeerConnection:', track.kind, track.id);
+            if (track.kind === 'video') {
+              const videoTransceiver = peerConnection.addTransceiver(track, {
+                direction: 'sendonly',
+                streams: [localStream],
+                sendEncodings: [
+                  { maxBitrate: 400000 } // Explicitly cap co-host video bitrate to 400kbps to prevent stuttering/network choking
+                ]
+              });
+              forceVP8Codec(videoTransceiver);
+            } else {
+              peerConnection.addTrack(track, localStream);
+            }
+          }
+        }
 
-        // Ensure remote transceivers retain receiving capability without interruption
+        // Ensure remote transceivers retain receiving capability without interruption & set VP8 preference
         peerConnection.getTransceivers().forEach(transceiver => {
+          forceVP8Codec(transceiver);
           if (transceiver.receiver && transceiver.receiver.track) {
             if (transceiver.direction === 'recvonly' && transceiver.sender && transceiver.sender.track) {
               transceiver.direction = 'sendrecv';
@@ -1779,7 +1856,7 @@
           }
         });
 
-        // Create and send updated SDP offer
+        // Create standard SDP offer without manual SDP munging
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
@@ -1793,11 +1870,13 @@
           }
         }));
 
-        addLog('Co-host stream seamlessly published with active host video.', 'success');
+        addLog('Co-host stream seamlessly published.', 'success');
 
       } catch (e) {
         addLog('Co-host publish failed: ' + e.message, 'error');
         console.error('[Co-Host Publish Error]', e);
+      } finally {
+        isPublishingCoHost = false;
       }
     }
 
@@ -2115,7 +2194,7 @@
 
         // Verify or re-acquire media stream
         if (!localStream || localStream.getTracks().length === 0 || !localStream.active) {
-          localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          localStream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
           const mainVideo = document.getElementById('mainVideo');
           if (mainVideo) {
             mainVideo.srcObject = localStream;
@@ -2137,6 +2216,8 @@
           peerConnection.addTrack(track, localStream);
           console.log('[Host Reconnect] Attached track:', track.kind, track.id);
         });
+
+        peerConnection.getTransceivers().forEach(t => forceVP8Codec(t));
 
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);

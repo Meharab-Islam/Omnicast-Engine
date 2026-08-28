@@ -3,6 +3,7 @@ package signaling
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"omnicast/internal/models"
 )
@@ -236,21 +237,21 @@ func TestViewerUpdateEvent(t *testing.T) {
 		t.Fatalf("Failed to create room: %v", err)
 	}
 
-	hostClient := &Client{ID: "host-main", Send: make(chan []byte, 10)}
+	hostClient := &Client{ID: "host-main", UserName: "Host Admin", Send: make(chan []byte, 10)}
 	room.SetHostClient(hostClient)
 
-	viewer1 := &Client{ID: "viewer-u1", Send: make(chan []byte, 10)}
+	viewer1 := &Client{ID: "viewer-u1", UserName: "Alice", AvatarURL: "https://avatar.com/alice.png", Send: make(chan []byte, 10)}
 	_ = rm.JoinViewer("room-v-sync", viewer1)
 
-	// Check host received viewer_update
+	// Check host received presence_update (batched)
 	select {
 	case msgBytes := <-hostClient.Send:
 		var msg models.SignalingMessage
 		if err := json.Unmarshal(msgBytes, &msg); err != nil {
-			t.Fatalf("Failed to parse viewer_update message: %v", err)
+			t.Fatalf("Failed to parse presence_update message: %v", err)
 		}
-		if msg.Event != "viewer_update" {
-			t.Errorf("Expected event 'viewer_update', got '%s'", msg.Event)
+		if msg.Event != "presence_update" && msg.Event != "viewer_update" {
+			t.Errorf("Expected event 'presence_update', got '%s'", msg.Event)
 		}
 		if msg.TotalViewers != 1 {
 			t.Errorf("Expected TotalViewers 1, got %d", msg.TotalViewers)
@@ -258,8 +259,8 @@ func TestViewerUpdateEvent(t *testing.T) {
 		if len(msg.ViewersList) != 1 || msg.ViewersList[0] != "viewer-u1" {
 			t.Errorf("Expected ViewersList ['viewer-u1'], got %v", msg.ViewersList)
 		}
-	default:
-		t.Error("Expected host to receive viewer_update message")
+	case <-time.After(1500 * time.Millisecond):
+		t.Error("Timed out waiting for presence_update message")
 	}
 
 	// Remove viewer and check broadcast
@@ -272,14 +273,14 @@ func TestViewerUpdateEvent(t *testing.T) {
 	case msgBytes := <-hostClient.Send:
 		var msg models.SignalingMessage
 		_ = json.Unmarshal(msgBytes, &msg)
-		if msg.Event != "viewer_update" {
-			t.Errorf("Expected event 'viewer_update', got '%s'", msg.Event)
+		if msg.Event != "presence_update" && msg.Event != "viewer_update" {
+			t.Errorf("Expected event 'presence_update', got '%s'", msg.Event)
 		}
 		if msg.TotalViewers != 0 {
 			t.Errorf("Expected TotalViewers 0 after removal, got %d", msg.TotalViewers)
 		}
-	default:
-		t.Error("Expected host to receive viewer_update on removal")
+	case <-time.After(1500 * time.Millisecond):
+		t.Error("Timed out waiting for presence_update on removal")
 	}
 }
 

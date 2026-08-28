@@ -95,6 +95,26 @@ func (pkm *PKManager) StartPK(roomID1, roomID2 string) error {
 	pkm.activePKs[roomID1] = session
 	pkm.activePKs[roomID2] = session
 
+	// Update Room.PKState on both rooms for instantaneous room_state sync
+	room1.SetPKState(&models.PKState{
+		IsActive:       true,
+		SessionID:      sessionID,
+		OpponentID:     room2.HostID,
+		OpponentRoomID: roomID2,
+		HostScore:      session.Score1,
+		OpponentScore:  session.Score2,
+	})
+	room2.SetPKState(&models.PKState{
+		IsActive:       true,
+		SessionID:      sessionID,
+		OpponentID:     room1.HostID,
+		OpponentRoomID: roomID1,
+		HostScore:      session.Score2,
+		OpponentScore:  session.Score1,
+	})
+	pkm.roomManager.SyncRoomState(roomID1)
+	pkm.roomManager.SyncRoomState(roomID2)
+
 	// Persist PKSession in Redis
 	if broker := pkm.roomManager.GetBroker(); broker != nil && broker.IsActive() {
 		_ = broker.SavePKSession(nil, session)
@@ -154,11 +174,27 @@ func (pkm *PKManager) SyncPKScore(roomID string, updatedScore int64) {
 		if score1 == 0 {
 			score1 = int64(r1.GetHostScore())
 		}
+		r1.SetPKState(&models.PKState{
+			IsActive:       true,
+			SessionID:      session.SessionID,
+			OpponentID:     session.HostID2,
+			OpponentRoomID: session.RoomID2,
+			HostScore:      score1,
+			OpponentScore:  score2,
+		})
 	}
 	if r2, ok := pkm.roomManager.GetRoom(session.RoomID2); ok && r2 != nil {
 		if score2 == 0 {
 			score2 = int64(r2.GetHostScore())
 		}
+		r2.SetPKState(&models.PKState{
+			IsActive:       true,
+			SessionID:      session.SessionID,
+			OpponentID:     session.HostID1,
+			OpponentRoomID: session.RoomID1,
+			HostScore:      score2,
+			OpponentScore:  score1,
+		})
 	}
 
 	scorePayload, _ := json.Marshal(map[string]any{
@@ -216,11 +252,15 @@ func (pkm *PKManager) StopPK(roomID string) error {
 		_ = broker.DeletePKSession(nil, session.RoomID1, session.RoomID2)
 	}
 
-	// Remove cross-routed tracks
+	// Remove cross-routed tracks & clear PKState on both rooms
 	if r1, ok := pkm.roomManager.GetRoom(session.RoomID1); ok && r1 != nil {
+		r1.SetPKState(nil)
+		pkm.roomManager.SyncRoomState(session.RoomID1)
 		pkm.roomManager.RemoveTrackAndRenegotiate(session.RoomID2, "pk-"+r1.HostID)
 	}
 	if r2, ok := pkm.roomManager.GetRoom(session.RoomID2); ok && r2 != nil {
+		r2.SetPKState(nil)
+		pkm.roomManager.SyncRoomState(session.RoomID2)
 		pkm.roomManager.RemoveTrackAndRenegotiate(session.RoomID1, "pk-"+r2.HostID)
 	}
 

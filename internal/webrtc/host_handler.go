@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"time"
+	"sync"
 
-	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3"
 	"omnicast/internal/models"
@@ -31,10 +30,35 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 	}
 	room.SetHostPeerConnection(peerConnection)
 
+	// Maintain a separate ring buffer for every incoming video track from the Host
+	packetBuffers := make(map[string]*PacketBuffer)
+	var pbMu sync.RWMutex
+
 	// Listen for incoming media tracks from the host
 	peerConnection.OnTrack(func(remoteTrack *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		rid := remoteTrack.RID()
 		log.Printf("Host track received: Kind=%s, RID=%s\n", remoteTrack.Kind().String(), rid)
+
+		// Get or create dedicated PacketBuffer for this video track layer
+		var pktBuffer *PacketBuffer
+		if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
+			layerKey := rid
+			if layerKey == "" {
+				layerKey = "default"
+			}
+
+			pbMu.Lock()
+			if pb, exists := packetBuffers[layerKey]; exists && pb != nil {
+				pktBuffer = pb
+			} else {
+				pktBuffer = NewPacketBuffer(DefaultPacketBufferSize)
+				packetBuffers[layerKey] = pktBuffer
+			}
+			pbMu.Unlock()
+			if room != nil {
+				room.SetPacketBuffer(layerKey, pktBuffer)
+			}
+		}
 
 		trackID := remoteTrack.ID()
 		if rid != "" {
@@ -47,6 +71,13 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 		// Register track into the room
 		switch remoteTrack.Kind() {
 		case webrtc.RTPCodecTypeVideo:
+			// Strict Security Check: Drop and ignore video tracks in audio-only rooms
+			if room.GetRoomType() == "audio" {
+				log.Printf("[Security] Dropped unauthorized incoming video track %s in audio-only Room %s (SSRC: %d)\n",
+					remoteTrack.ID(), room.RoomID, remoteTrack.SSRC())
+				return
+			}
+
 			if rid == "" {
 				// Non-simulcast standard video track
 				if existing := room.GetVideoTrack(); existing != nil {
@@ -91,20 +122,6 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 				}
 			}
 
-			// Send periodic PLI (Picture Loss Indication) keyframe requests to host
-			go func() {
-				ticker := time.NewTicker(3 * time.Second)
-				defer ticker.Stop()
-				for range ticker.C {
-					if peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
-						return
-					}
-					_ = peerConnection.WriteRTCP([]rtcp.Packet{
-						&rtcp.PictureLossIndication{MediaSSRC: uint32(remoteTrack.SSRC())},
-					})
-				}
-			}()
-
 		case webrtc.RTPCodecTypeAudio:
 			if existing := room.GetAudioTrack(); existing != nil {
 				localTrack = existing
@@ -141,7 +158,19 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 					return
 				}
 
-				// Forward RTP packet to the room's localTrack
+				// 1. Store a copy of the packet in the track's PacketBuffer BEFORE forwarding
+				var parsedPkt *rtp.Packet
+				if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
+					var pkt rtp.Packet
+					if err := pkt.Unmarshal(buf[:n]); err == nil {
+						parsedPkt = &pkt
+						if pktBuffer != nil {
+							pktBuffer.Push(&pkt)
+						}
+					}
+				}
+
+				// 2. Forward RTP packet to the room's localTrack
 				if _, writeErr := localTrack.Write(buf[:n]); writeErr != nil {
 					if !errors.Is(writeErr, io.ErrClosedPipe) {
 						log.Printf("Error writing RTP packet to room local track: %v\n", writeErr)
@@ -149,20 +178,17 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 					return
 				}
 
-				// If this is a video track, fan out to active viewer TrackSwitchers for dynamic ABR switching
-				if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
+				// 3. Fan out to active viewer TrackSwitchers for dynamic ABR switching
+				if parsedPkt != nil {
 					switchers := room.GetAllTrackSwitchers()
 					if len(switchers) > 0 {
-						var pkt rtp.Packet
-						if err := pkt.Unmarshal(buf[:n]); err == nil {
-							effectiveRID := rid
-							if effectiveRID == "" {
-								effectiveRID = "h"
-							}
-							for _, s := range switchers {
-								if ts, ok := s.(*TrackSwitcher); ok && ts != nil {
-									_ = ts.WriteRTP(effectiveRID, &pkt)
-								}
+						effectiveRID := rid
+						if effectiveRID == "" {
+							effectiveRID = "h"
+						}
+						for _, s := range switchers {
+							if ts, ok := s.(*TrackSwitcher); ok && ts != nil {
+								_ = ts.WriteRTP(effectiveRID, parsedPkt)
 							}
 						}
 					}
@@ -244,6 +270,13 @@ func HandleCoHostConnection(api *webrtc.API, room *models.Room, coHostID string,
 
 		// Save in CoHostTracks map according to track Kind (never overwrite video with audio)
 		if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
+			// Strict Security Check: Drop and ignore video tracks in audio-only rooms
+			if room.GetRoomType() == "audio" {
+				log.Printf("[Security] Dropped unauthorized co-host %s video track in audio-only Room %s (SSRC: %d)\n",
+					coHostID, room.RoomID, remoteTrack.SSRC())
+				return
+			}
+
 			room.SetCoHostTrack(coHostID, localTrack)
 			room.SetCoHostVideoSSRC(coHostID, uint32(remoteTrack.SSRC()))
 			log.Printf("CoHost %s video track registered in Room %s (SSRC: %d)\n", coHostID, room.RoomID, remoteTrack.SSRC())
@@ -252,24 +285,10 @@ func HandleCoHostConnection(api *webrtc.API, room *models.Room, coHostID string,
 			log.Printf("CoHost %s audio track registered in Room %s\n", coHostID, room.RoomID)
 		}
 
-		if onTrackSaved != nil {
-			onTrackSaved(coHostID, localTrack)
-		}
-
-		// Send periodic PLI if video
+		// Get or create dedicated PacketBuffer for co-host video track
+		var coHostPktBuffer *PacketBuffer
 		if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
-			go func() {
-				ticker := time.NewTicker(3 * time.Second)
-				defer ticker.Stop()
-				for range ticker.C {
-					if peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
-						return
-					}
-					_ = peerConnection.WriteRTCP([]rtcp.Packet{
-						&rtcp.PictureLossIndication{MediaSSRC: uint32(remoteTrack.SSRC())},
-					})
-				}
-			}()
+			coHostPktBuffer = NewPacketBuffer(DefaultPacketBufferSize)
 		}
 
 		// Forward RTP packets to localTrack continuously
@@ -283,6 +302,15 @@ func HandleCoHostConnection(api *webrtc.API, room *models.Room, coHostID string,
 				if readErr != nil {
 					return
 				}
+
+				// Store a copy in PacketBuffer before forwarding
+				if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo && coHostPktBuffer != nil {
+					var pkt rtp.Packet
+					if err := pkt.Unmarshal(buf[:n]); err == nil {
+						coHostPktBuffer.Push(&pkt)
+					}
+				}
+
 				if _, writeErr := localTrack.Write(buf[:n]); writeErr != nil {
 					return
 				}

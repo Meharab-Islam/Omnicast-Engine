@@ -77,6 +77,40 @@ func InitWebRTC() (*webrtc.API, error) {
 		return nil, err
 	}
 
+	// Register VP8 RTX Retransmission Codec (LiveKit / Mediasoup standard)
+	if err := mediaEngine.RegisterCodec(
+		webrtc.RTPCodecParameters{
+			RTPCodecCapability: webrtc.RTPCodecCapability{
+				MimeType:     "video/rtx",
+				ClockRate:    90000,
+				Channels:     0,
+				SDPFmtpLine:  "apt=96",
+				RTCPFeedback: nil,
+			},
+			PayloadType: 98,
+		},
+		webrtc.RTPCodecTypeVideo,
+	); err != nil {
+		return nil, err
+	}
+
+	// Register H264 RTX Retransmission Codec
+	if err := mediaEngine.RegisterCodec(
+		webrtc.RTPCodecParameters{
+			RTPCodecCapability: webrtc.RTPCodecCapability{
+				MimeType:     "video/rtx",
+				ClockRate:    90000,
+				Channels:     0,
+				SDPFmtpLine:  "apt=97",
+				RTCPFeedback: nil,
+			},
+			PayloadType: 99,
+		},
+		webrtc.RTPCodecTypeVideo,
+	); err != nil {
+		return nil, err
+	}
+
 	// 1. Register RTP Header Extensions for Simulcast (MID & RID) and Bandwidth Estimation
 	// MID (Media Stream ID) & RID (RTP Stream ID: 'q', 'h', 'f') allow the SFU server
 	// to identify which incoming RTP packets belong to which Simulcast layer (Low, Medium, High).
@@ -122,9 +156,9 @@ func InitWebRTC() (*webrtc.API, error) {
 		return nil, err
 	}
 
-	// 3. Configure SettingEngine to restrict WebRTC UDP port range (50000 - 50050) and advertise NAT 1:1 Public IP
+	// 3. Configure SettingEngine to restrict WebRTC UDP port range (50000 - 52000) and advertise NAT 1:1 Public IP
 	settingEngine := webrtc.SettingEngine{}
-	if err := settingEngine.SetEphemeralUDPPortRange(50000, 50050); err != nil {
+	if err := settingEngine.SetEphemeralUDPPortRange(50000, 52000); err != nil {
 		return nil, err
 	}
 

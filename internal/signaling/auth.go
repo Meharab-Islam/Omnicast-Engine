@@ -11,13 +11,15 @@ import (
 // DefaultJWTSecret fallback secret key if JWT_SECRET env is not provided
 const DefaultJWTSecret = "live_media_server_jwt_secret_key_2026"
 
-// UserClaims defines the JWT payload structure for authenticated streaming
+// UserClaims defines the JWT payload structure for authenticated streaming (Agora / LiveKit style)
 type UserClaims struct {
-	UserID    string `json:"user_id"`
-	UserName  string `json:"user_name,omitempty"`
-	AvatarURL string `json:"avatar_url,omitempty"`
-	Role      string `json:"role,omitempty"` // "host", "viewer", "cohost", "edge_server"
-	RoomID    string `json:"room_id,omitempty"`
+	UserID      string                 `json:"user_id"`
+	UserName    string                 `json:"user_name,omitempty"`
+	DisplayName string                 `json:"display_name,omitempty"`
+	AvatarURL   string                 `json:"avatar_url,omitempty"`
+	Role        string                 `json:"role,omitempty"` // "host", "viewer", "cohost", "edge_server"
+	RoomID      string                 `json:"room_id,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 	jwt.RegisteredClaims
 }
 

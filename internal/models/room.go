@@ -21,6 +21,7 @@ type CoHostMedia struct {
 type Room struct {
 	RoomID       string                  `json:"room_id"`
 	RoomName     string                  `json:"room_name"`
+	RoomType     string                  `json:"room_type"` // "video" or "audio"
 	HostID       string                  `json:"host_id"`
 	MainSeatID   string                  `json:"main_seat_id"`
 	HostScore    int                     `json:"host_score"`
@@ -30,20 +31,31 @@ type Room struct {
 	HostVideoSSRC uint32                 `json:"-"`
 	VideoSSRCs   map[string]uint32       `json:"-"`
 	Viewers      map[string]any          `json:"-"`
+	Participants map[string]*Participant `json:"-"`
 	ActiveSeats  map[string]string       `json:"active_seats"`
 	MediaStates  map[string]MediaState   `json:"media_states"`
+	PKState      *PKState                `json:"pk_state,omitempty"`
 	VideoTrack   *webrtc.TrackLocalStaticRTP            `json:"-"`
 	VideoTracks  map[string]*webrtc.TrackLocalStaticRTP `json:"-"`
 	AudioTrack   *webrtc.TrackLocalStaticRTP            `json:"-"`
 	CoHostTracks   map[string]*CoHostMedia                `json:"-"`
 	TrackSwitchers map[string]any                         `json:"-"`
+	PacketBuffers  map[string]any                         `json:"-"`
 	bannedUsers    map[string]bool                        `json:"-"`
 	participantReconnectTimers map[string]*time.Timer     `json:"-"`
 	emptyRoomTimer *time.Timer                            `json:"-"`
 	reconnectTimer *time.Timer                          `json:"-"`
 	isReconnecting bool                                 `json:"-"`
 	lastPLITime    time.Time                            `json:"-"`
-	mu           sync.RWMutex
+
+	// Presence Batching & Throttling
+	pendingJoins    []*Participant
+	pendingLeaves   []string
+	stopPresence    chan struct{}
+	presenceStarted bool
+	presenceMu      sync.Mutex
+
+	mu sync.RWMutex
 }
 
 // NewRoom creates and initializes a new Room with default room name, current timestamp, and default main seat
@@ -51,19 +63,25 @@ func NewRoom(roomID, hostID string) *Room {
 	return &Room{
 		RoomID:       roomID,
 		RoomName:     roomID,
+		RoomType:     "video",
 		HostID:       hostID,
 		MainSeatID:   hostID,
 		HostScore:    0,
 		CreatedAt:    time.Now().UTC(),
 		Viewers:      make(map[string]any),
+		Participants: make(map[string]*Participant),
 		ActiveSeats:  map[string]string{"0": hostID},
 		MediaStates:    make(map[string]MediaState),
 		VideoTracks:    make(map[string]*webrtc.TrackLocalStaticRTP),
 		VideoSSRCs:     make(map[string]uint32),
 		CoHostTracks:   make(map[string]*CoHostMedia),
 		TrackSwitchers: make(map[string]any),
+		PacketBuffers:  make(map[string]any),
 		bannedUsers:    make(map[string]bool),
 		participantReconnectTimers: make(map[string]*time.Timer),
+		pendingJoins:   make([]*Participant, 0),
+		pendingLeaves:  make([]string, 0),
+		stopPresence:   make(chan struct{}),
 	}
 }
 
@@ -75,18 +93,24 @@ func NewRoomWithName(roomID, roomName, hostID string) *Room {
 	return &Room{
 		RoomID:       roomID,
 		RoomName:     roomName,
+		RoomType:     "video",
 		HostID:       hostID,
 		MainSeatID:   hostID,
 		HostScore:    0,
 		CreatedAt:    time.Now().UTC(),
 		Viewers:      make(map[string]any),
+		Participants: make(map[string]*Participant),
 		ActiveSeats:    map[string]string{"0": hostID},
 		MediaStates:    make(map[string]MediaState),
 		VideoTracks:    make(map[string]*webrtc.TrackLocalStaticRTP),
 		CoHostTracks:   make(map[string]*CoHostMedia),
 		TrackSwitchers: make(map[string]any),
+		PacketBuffers:  make(map[string]any),
 		bannedUsers:    make(map[string]bool),
 		participantReconnectTimers: make(map[string]*time.Timer),
+		pendingJoins:   make([]*Participant, 0),
+		pendingLeaves:  make([]string, 0),
+		stopPresence:   make(chan struct{}),
 	}
 }
 
@@ -245,16 +269,78 @@ func (r *Room) GetRoomState() *RoomState {
 		mediaCopy[k] = v
 	}
 
+	var participantsCopy []*Participant
+	if r.Participants != nil {
+		participantsCopy = make([]*Participant, 0, len(r.Participants))
+		for _, p := range r.Participants {
+			if p != nil {
+				participantsCopy = append(participantsCopy, p)
+			}
+		}
+	}
+
+	roomType := r.RoomType
+	if roomType == "" {
+		roomType = "video"
+	}
+
+	var pkCopy *PKState
+	if r.PKState != nil {
+		copied := *r.PKState
+		pkCopy = &copied
+	}
+
 	return &RoomState{
 		RoomID:       r.RoomID,
 		RoomName:     r.RoomName,
+		RoomType:     roomType,
 		HostID:       r.HostID,
 		TotalViewers: len(r.Viewers),
 		HostScore:    int64(r.HostScore),
 		ActiveSeats:  seatsCopy,
 		MediaStates:  mediaCopy,
+		Participants: participantsCopy,
+		PKState:      pkCopy,
 		CreatedAt:    r.CreatedAt,
 	}
+}
+
+// SetPKState assigns the active PK battle state
+func (r *Room) SetPKState(state *PKState) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.PKState = state
+}
+
+// GetPKState returns a snapshot of the active PK battle state
+func (r *Room) GetPKState() *PKState {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.PKState == nil {
+		return nil
+	}
+	copied := *r.PKState
+	return &copied
+}
+
+// SetRoomType sets the room media type ('video' or 'audio')
+func (r *Room) SetRoomType(roomType string) {
+	if roomType != "audio" && roomType != "video" {
+		roomType = "video"
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.RoomType = roomType
+}
+
+// GetRoomType returns the room media type ('video' or 'audio')
+func (r *Room) GetRoomType() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.RoomType == "" {
+		return "video"
+	}
+	return r.RoomType
 }
 
 // SetHostClient stores the host client reference in a thread-safe manner
@@ -718,6 +804,51 @@ func (r *Room) GetAllTrackSwitchers() map[string]any {
 	return copyMap
 }
 
+// GetTrackSwitcher retrieves a specific viewer's TrackSwitcher
+func (r *Room) GetTrackSwitcher(viewerID string) (any, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.TrackSwitchers == nil {
+		return nil, false
+	}
+	switcher, exists := r.TrackSwitchers[viewerID]
+	return switcher, exists
+}
+
+// SetPacketBuffer stores a track's PacketBuffer in a thread-safe manner
+func (r *Room) SetPacketBuffer(layerKey string, pb any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.PacketBuffers == nil {
+		r.PacketBuffers = make(map[string]any)
+	}
+	r.PacketBuffers[layerKey] = pb
+}
+
+// GetPacketBuffer retrieves a specific layer's PacketBuffer
+func (r *Room) GetPacketBuffer(layerKey string) any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.PacketBuffers == nil {
+		return nil
+	}
+	return r.PacketBuffers[layerKey]
+}
+
+// GetAllPacketBuffers returns a copy of all PacketBuffers
+func (r *Room) GetAllPacketBuffers() map[string]any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.PacketBuffers == nil {
+		return make(map[string]any)
+	}
+	copyMap := make(map[string]any, len(r.PacketBuffers))
+	for k, v := range r.PacketBuffers {
+		copyMap[k] = v
+	}
+	return copyMap
+}
+
 // GetAllCoHostTracks returns a shallow copy of all registered co-host media
 func (r *Room) GetAllCoHostTracks() map[string]*CoHostMedia {
 	r.mu.RLock()
@@ -864,4 +995,133 @@ func (r *Room) CancelEmptyRoomTimer() bool {
 		return stopped
 	}
 	return false
+}
+
+// AddParticipant stores a participant's profile metadata in the room
+func (r *Room) AddParticipant(p *Participant) {
+	if p == nil || p.UserID == "" {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.Participants == nil {
+		r.Participants = make(map[string]*Participant)
+	}
+	r.Participants[p.UserID] = p
+}
+
+// RemoveParticipant removes a participant's profile metadata from the room
+func (r *Room) RemoveParticipant(userID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.Participants != nil {
+		delete(r.Participants, userID)
+	}
+}
+
+// GetParticipant retrieves a specific participant's profile metadata
+func (r *Room) GetParticipant(userID string) (*Participant, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.Participants == nil {
+		return nil, false
+	}
+	p, exists := r.Participants[userID]
+	return p, exists
+}
+
+// GetParticipantsList returns a snapshot slice of all active participants in the room
+func (r *Room) GetParticipantsList() []*Participant {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.Participants == nil {
+		return nil
+	}
+	list := make([]*Participant, 0, len(r.Participants))
+	for _, p := range r.Participants {
+		if p != nil {
+			list = append(list, p)
+		}
+	}
+	return list
+}
+
+// EnqueuePresenceJoin enqueues a joined participant into the presence batch queue
+func (r *Room) EnqueuePresenceJoin(p *Participant) {
+	if p == nil {
+		return
+	}
+	r.presenceMu.Lock()
+	defer r.presenceMu.Unlock()
+	r.pendingJoins = append(r.pendingJoins, p)
+}
+
+// EnqueuePresenceLeave enqueues a departed user into the presence batch queue
+func (r *Room) EnqueuePresenceLeave(userID string) {
+	if userID == "" {
+		return
+	}
+	r.presenceMu.Lock()
+	defer r.presenceMu.Unlock()
+	r.pendingLeaves = append(r.pendingLeaves, userID)
+}
+
+// FlushPresence drains and returns the accumulated joins and leaves
+func (r *Room) FlushPresence() (joins []*Participant, leaves []string, totalCount int, participants []*Participant) {
+	r.presenceMu.Lock()
+	if len(r.pendingJoins) == 0 && len(r.pendingLeaves) == 0 {
+		r.presenceMu.Unlock()
+		return nil, nil, r.ViewersCount(), nil
+	}
+	joins = r.pendingJoins
+	leaves = r.pendingLeaves
+	r.pendingJoins = make([]*Participant, 0)
+	r.pendingLeaves = make([]string, 0)
+	r.presenceMu.Unlock()
+
+	totalCount = r.ViewersCount()
+	participants = r.GetParticipantsList()
+	return joins, leaves, totalCount, participants
+}
+
+// StartPresenceBatcher runs a background ticker (e.g. 1s) to batch broadcast presence events
+func (r *Room) StartPresenceBatcher(interval time.Duration, onFlush func(joins []*Participant, leaves []string, count int, list []*Participant)) {
+	r.presenceMu.Lock()
+	if r.presenceStarted {
+		r.presenceMu.Unlock()
+		return
+	}
+	r.presenceStarted = true
+	stopCh := r.stopPresence
+	r.presenceMu.Unlock()
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopCh:
+				return
+			case <-ticker.C:
+				joins, leaves, count, list := r.FlushPresence()
+				if (len(joins) > 0 || len(leaves) > 0) && onFlush != nil {
+					onFlush(joins, leaves, count, list)
+				}
+			}
+		}
+	}()
+}
+
+// StopPresenceBatcher stops the presence batching background routine
+func (r *Room) StopPresenceBatcher() {
+	r.presenceMu.Lock()
+	defer r.presenceMu.Unlock()
+	if r.presenceStarted {
+		r.presenceStarted = false
+		select {
+		case <-r.stopPresence:
+		default:
+			close(r.stopPresence)
+		}
+	}
 }
