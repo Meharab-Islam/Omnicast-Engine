@@ -1,6 +1,7 @@
 package signaling
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -977,7 +978,7 @@ func (c *Client) handleChatMessage(msg *models.SignalingMessage) {
 
 	// Store bounded chat in Redis (strictly kept at max 50 items with LTRIM and 24h TTL)
 	if broker := c.RoomManager.GetBroker(); broker != nil && broker.IsActive() {
-		_ = broker.PushChatMessage(nil, roomID, msg)
+		_ = broker.PushChatMessage(context.TODO(), roomID, msg)
 	}
 
 	log.Printf("Broadcasted chat message from user %s in Room %s\n", c.ID, roomID)

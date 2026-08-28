@@ -1,6 +1,7 @@
 package signaling
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -82,7 +83,7 @@ func (rm *RoomManager) refreshActiveRoomsTTL() {
 	activeBroker := rm.broker
 	rm.mu.RUnlock()
 
-	if err := activeBroker.BatchRefreshRoomTTLs(nil, roomIDs); err != nil {
+	if err := activeBroker.BatchRefreshRoomTTLs(context.TODO(), roomIDs); err != nil {
 		log.Printf("[Redis Warning] Failed to refresh TTL for active rooms: %v\n", err)
 	} else {
 		log.Printf("[Redis TTL Refresher] Refreshed 24h TTL for %d active rooms.\n", len(roomIDs))
@@ -108,7 +109,7 @@ func (rm *RoomManager) flushPendingScores() {
 	rm.mu.RUnlock()
 
 	if activeBroker != nil && activeBroker.IsActive() {
-		_ = activeBroker.BatchIncrementScores(nil, deltas)
+		_ = activeBroker.BatchIncrementScores(context.TODO(), deltas)
 	}
 }
 
@@ -421,7 +422,7 @@ func (rm *RoomManager) RemoveRoom(roomID string) {
 	if rm.broker != nil && rm.broker.IsActive() {
 		rm.broker.UnsubscribeRoom(roomID)
 		_ = rm.broker.RemoveRoomOrigin(roomID)
-		_ = rm.broker.DeleteRoomState(nil, roomID)
+		_ = rm.broker.DeleteRoomState(context.TODO(), roomID)
 	}
 
 	if room, exists := rm.activeRooms[roomID]; exists {
@@ -773,7 +774,7 @@ func (rm *RoomManager) CloseRoomAndNotifyWithReason(roomID, hostID, reason strin
 	if rm.broker != nil && rm.broker.IsActive() {
 		rm.broker.UnsubscribeRoom(roomID)
 		_ = rm.broker.RemoveRoomOrigin(roomID)
-		_ = rm.broker.UnlinkAllRoomKeys(nil, roomID)
+		_ = rm.broker.UnlinkAllRoomKeys(context.TODO(), roomID)
 	}
 
 	// Trigger room_ended webhook event
@@ -934,7 +935,7 @@ func syncRoomStateInternal(room *models.Room, activeBroker *broker.RedisBroker) 
 	}
 	state := room.GetRoomState()
 	if activeBroker != nil && activeBroker.IsActive() {
-		_ = activeBroker.SaveRoomState(nil, state)
+		_ = activeBroker.SaveRoomState(context.TODO(), state)
 	}
 }
 
@@ -959,7 +960,7 @@ func (rm *RoomManager) GetRoomState(roomID string) *models.RoomState {
 
 	// 1. Try fetching from Redis first
 	if activeBroker != nil && activeBroker.IsActive() {
-		if state, err := activeBroker.GetRoomState(nil, roomID); err == nil && state != nil {
+		if state, err := activeBroker.GetRoomState(context.TODO(), roomID); err == nil && state != nil {
 			return state
 		}
 	}

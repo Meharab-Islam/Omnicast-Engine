@@ -1,6 +1,7 @@
 package signaling
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -117,7 +118,7 @@ func (pkm *PKManager) StartPK(roomID1, roomID2 string) error {
 
 	// Persist PKSession in Redis
 	if broker := pkm.roomManager.GetBroker(); broker != nil && broker.IsActive() {
-		_ = broker.SavePKSession(nil, session)
+		_ = broker.SavePKSession(context.TODO(), session)
 	}
 
 	// Broadcast 'pk_started' signaling event to participants in both rooms
@@ -163,11 +164,9 @@ func (pkm *PKManager) SyncPKScore(roomID string, updatedScore int64) {
 
 	// Fetch current scores
 	var score1, score2 int64
-	broker := pkm.roomManager.GetBroker()
-
-	if broker != nil && broker.IsActive() {
-		score1, _ = broker.GetHostScore(nil, session.RoomID1)
-		score2, _ = broker.GetHostScore(nil, session.RoomID2)
+	if broker := pkm.roomManager.GetBroker(); broker != nil && broker.IsActive() {
+		score1, _ = broker.GetHostScore(context.TODO(), session.RoomID1)
+		score2, _ = broker.GetHostScore(context.TODO(), session.RoomID2)
 	}
 
 	if r1, ok := pkm.roomManager.GetRoom(session.RoomID1); ok && r1 != nil {
@@ -227,7 +226,7 @@ func (pkm *PKManager) SyncPKScore(roomID string, updatedScore int64) {
 	}
 	_ = pkm.roomManager.BroadcastToRoom(session.RoomID2, scoreMsg2)
 
-	if broker != nil && broker.IsActive() {
+	if broker := pkm.roomManager.GetBroker(); broker != nil && broker.IsActive() {
 		_ = broker.PublishPKEvent(session.SessionID, scoreMsg)
 	}
 
@@ -249,7 +248,7 @@ func (pkm *PKManager) StopPK(roomID string) error {
 
 	// Clean up from Redis
 	if broker := pkm.roomManager.GetBroker(); broker != nil && broker.IsActive() {
-		_ = broker.DeletePKSession(nil, session.RoomID1, session.RoomID2)
+		_ = broker.DeletePKSession(context.TODO(), session.RoomID1, session.RoomID2)
 	}
 
 	// Remove cross-routed tracks & clear PKState on both rooms
@@ -300,7 +299,7 @@ func (pkm *PKManager) GetPKSession(roomID string) (*models.PKSession, bool) {
 
 	// Fallback to Redis
 	if broker := pkm.roomManager.GetBroker(); broker != nil && broker.IsActive() {
-		if redisSession, err := broker.GetPKSession(nil, roomID); err == nil && redisSession != nil {
+		if redisSession, err := broker.GetPKSession(context.TODO(), roomID); err == nil && redisSession != nil {
 			pkm.mu.Lock()
 			pkm.activePKs[roomID] = redisSession
 			pkm.mu.Unlock()

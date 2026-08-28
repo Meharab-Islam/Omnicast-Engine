@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"context"
 	"testing"
 )
 
@@ -50,37 +51,37 @@ func TestRedisBroker_NilOperations(t *testing.T) {
 		t.Fatal("expected error on RemoveRoomOrigin of nil broker")
 	}
 
-	err = b.SaveRoomState(nil, nil)
+	err = b.SaveRoomState(context.TODO(), nil)
 	if err == nil {
 		t.Fatal("expected error on SaveRoomState of nil broker")
 	}
 
-	_, err = b.GetRoomState(nil, "room-101")
+	_, err = b.GetRoomState(context.TODO(), "room-101")
 	if err == nil {
 		t.Fatal("expected error on GetRoomState of nil broker")
 	}
 
-	_, err = b.IncrementHostScore(nil, "room-101", 10)
+	_, err = b.IncrementHostScore(context.TODO(), "room-101", 10)
 	if err == nil {
 		t.Fatal("expected error on IncrementHostScore of nil broker")
 	}
 
-	err = b.DeleteRoomState(nil, "room-101")
+	err = b.DeleteRoomState(context.TODO(), "room-101")
 	if err == nil {
 		t.Fatal("expected error on DeleteRoomState of nil broker")
 	}
 
-	err = b.PushChatMessage(nil, "room-101", nil)
+	err = b.PushChatMessage(context.TODO(), "room-101", nil)
 	if err != nil {
 		t.Fatal("expected nil error on PushChatMessage of nil broker")
 	}
 
-	err = b.RefreshRoomTTL(nil, "room-101")
+	err = b.RefreshRoomTTL(context.TODO(), "room-101")
 	if err != nil {
 		t.Fatal("expected nil error on RefreshRoomTTL of nil broker")
 	}
 
-	err = b.BatchRefreshRoomTTLs(nil, []string{"room-101"})
+	err = b.BatchRefreshRoomTTLs(context.TODO(), []string{"room-101"})
 	if err != nil {
 		t.Fatal("expected nil error on BatchRefreshRoomTTLs of nil broker")
 	}
