@@ -66,9 +66,11 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 	viewerID := fmt.Sprintf("viewer_%d", time.Now().UnixNano())
 
 	var switcher *TrackSwitcher
+	var viewerVideoTrack *webrtc.TrackLocalStaticRTP
 	if videoTrack != nil {
 		// Create dedicated egress TrackLocalStaticRTP for this viewer
-		viewerVideoTrack, trackErr := webrtc.NewTrackLocalStaticRTP(
+		var trackErr error
+		viewerVideoTrack, trackErr = webrtc.NewTrackLocalStaticRTP(
 			videoTrack.Codec(),
 			videoTrack.ID(),
 			videoTrack.StreamID(),
@@ -110,7 +112,12 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 			return nil, addErr
 		}
 
-		// 1. Send immediate Keyframe PLI request on track attachment
+		// 1. Forcefully trigger the PLI throttler to request an immediate keyframe for the new viewer subscription
+		trackID := fmt.Sprintf("%s:%d", room.RoomID, room.GetHostVideoSSRC())
+		if viewerVideoTrack != nil {
+			trackID = viewerVideoTrack.ID()
+		}
+		ForceSendPLI(trackID)
 		if room != nil {
 			room.SendPLIImmediate()
 		}
@@ -160,7 +167,12 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 		log.Printf("Viewer ICE Connection State (Room %s): %s\n", room.RoomID, connectionState.String())
 		if connectionState == webrtc.ICEConnectionStateConnected {
 			if room != nil {
-				// Immediate initial PLI packet
+				// Forcefully trigger PLI throttler to ensure immediate keyframe burst for new viewer
+				trackID := fmt.Sprintf("%s:%d", room.RoomID, room.GetHostVideoSSRC())
+				if viewerVideoTrack != nil {
+					trackID = viewerVideoTrack.ID()
+				}
+				ForceSendPLI(trackID)
 				room.SendPLIImmediate()
 				// Send high-frequency rapid bursts (100ms, 150ms, 250ms, 400ms, 600ms) to ensure
 				// the publisher's camera encoder emits an IDR I-Frame at the exact instant the viewer's decoder initializes
@@ -243,6 +255,35 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 					var pkt rtp.Packet
 					if err := pkt.Unmarshal(buf[:n]); err == nil {
 						coHostPktBuffer.Push(&pkt)
+					}
+				}
+
+				// Phase 5: Audio level extraction & Selective Audio Forwarding for Co-Hosts
+				if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio && room != nil {
+					// 1. Update ActiveSpeakerDetector with co-host audio level
+					if detectorAny := room.GetActiveSpeakerDetector(); detectorAny != nil {
+						if detector, ok := detectorAny.(*ActiveSpeakerDetector); ok && detector != nil {
+							var pkt rtp.Packet
+							if err := pkt.Unmarshal(buf[:n]); err == nil {
+								for extID := uint8(1); extID <= 14; extID++ {
+									if extPayload := pkt.Header.GetExtension(extID); len(extPayload) > 0 {
+										level, _ := ParseAudioLevel(extPayload)
+										detector.UpdateLevel(viewerID, level)
+										break
+									}
+								}
+							}
+						}
+					}
+
+					// 2. Selective Audio Forwarding: only forward if in top active speakers
+					if forwarderAny := room.GetAudioForwarder(); forwarderAny != nil {
+						if forwarder, ok := forwarderAny.(*AudioForwarder); ok && forwarder != nil {
+							if !forwarder.ShouldForward(viewerID) {
+								// Silent co-host is muted at server level
+								continue
+							}
+						}
 					}
 				}
 
@@ -364,11 +405,87 @@ func ReadRTCP(sender *webrtc.RTPSender, room *models.Room, viewerID string, swit
 								room.SendPLIThrottled(1 * time.Second)
 							}
 						}
-					case *rtcp.PictureLossIndication, *rtcp.FullIntraRequest:
-						// Smart PLI throttling: max 1 PLI per second to protect publisher encoder
-						if room != nil {
-							room.SendPLIThrottled(1 * time.Second)
+					case *rtcp.PictureLossIndication:
+						// Intercept PLI from Viewer and do NOT forward immediately.
+						// Instead, call CanSendPLI(trackID) to enforce rate-limiting.
+						trackID := fmt.Sprintf("%s:%d", room.RoomID, p.MediaSSRC)
+						if switcher != nil && switcher.outTrack != nil {
+							trackID = switcher.outTrack.ID()
 						}
+
+						if CanSendPLI(trackID) {
+							log.Printf("[PLI Forwarded] Room %s: Allowed PLI for track %s (MediaSSRC %d) from Viewer %s\n",
+								room.RoomID, trackID, p.MediaSSRC, viewerID)
+
+							// Construct a new rtcp.PictureLossIndication packet
+							mediaSSRC := p.MediaSSRC
+							if mediaSSRC == 0 && room != nil {
+								mediaSSRC = room.GetHostVideoSSRC()
+							}
+							pliPacket := &rtcp.PictureLossIndication{
+								SenderSSRC: p.SenderSSRC,
+								MediaSSRC:  mediaSSRC,
+							}
+
+							// Write this new PLI packet directly to the Publisher's RTCPeerConnection using WriteRTCP()
+							if room != nil {
+								var targetPublisherPC *webrtc.PeerConnection
+
+								// Check if MediaSSRC belongs to a specific Co-Host publisher
+								for coHostID, coHostMedia := range room.GetAllCoHostTracks() {
+									if coHostMedia != nil && coHostMedia.VideoSSRC != 0 && coHostMedia.VideoSSRC == mediaSSRC {
+										if coHostPC := room.GetCoHostPeerConnection(coHostID); coHostPC != nil {
+											targetPublisherPC = coHostPC
+											break
+										}
+									}
+								}
+
+								// Fallback to Main Host publisher PeerConnection
+								if targetPublisherPC == nil && room.HostPC != nil {
+									targetPublisherPC = room.HostPC
+								}
+
+								if targetPublisherPC != nil && targetPublisherPC.ConnectionState() != webrtc.PeerConnectionStateClosed {
+									if err := targetPublisherPC.WriteRTCP([]rtcp.Packet{pliPacket}); err != nil {
+										log.Printf("[PLI Write Error] Room %s: Failed to write PLI to Publisher RTCPeerConnection: %v\n", room.RoomID, err)
+									} else {
+										log.Printf("[PLI Written] Room %s: Wrote PLI packet directly to Publisher RTCPeerConnection (MediaSSRC %d)\n", room.RoomID, mediaSSRC)
+									}
+								} else {
+									room.SendPLIImmediate()
+								}
+							}
+						} else {
+							log.Printf("[PLI Throttled] Room %s: Suppressed redundant PLI from Viewer %s for track %s (MediaSSRC %d)\n",
+								room.RoomID, viewerID, trackID, p.MediaSSRC)
+						}
+					case *rtcp.FullIntraRequest:
+						// Intercept FIR from Viewer and enforce rate-limiting via CanSendPLI
+						trackID := fmt.Sprintf("%s:%d", room.RoomID, p.MediaSSRC)
+						if switcher != nil && switcher.outTrack != nil {
+							trackID = switcher.outTrack.ID()
+						}
+
+						if CanSendPLI(trackID) {
+							log.Printf("[FIR Forwarded] Room %s: Allowed FIR for track %s (MediaSSRC %d) from Viewer %s\n",
+								room.RoomID, trackID, p.MediaSSRC, viewerID)
+							if room != nil {
+								room.SendPLIImmediate()
+							}
+						} else {
+							log.Printf("[FIR Throttled] Room %s: Suppressed redundant FIR from Viewer %s for track %s\n",
+								room.RoomID, viewerID, trackID)
+						}
+					case *rtcp.TransportLayerCC:
+						// Intercept and process TWCC (Transport-Wide Congestion Control) feedback report
+						log.Printf("[TWCC Feedback] Room %s: Viewer %s TWCC feedback received (BaseSeq: %d, StatusCount: %d, Deltas: %d)\n",
+							room.RoomID, viewerID, p.BaseSequenceNumber, p.PacketStatusCount, len(p.RecvDeltas))
+					case *rtcp.ReceiverReport:
+						// Parse RTCP Receiver Reports (RR) to extract Round-Trip Time (RTT) and reception quality
+						rtt := ExtractRTTFromReceiverReport(p, time.Now())
+						log.Printf("[Receiver Report] Room %s: Viewer %s RR received (Reports: %d, Measured RTT: %v)\n",
+							room.RoomID, viewerID, len(p.Reports), rtt)
 					}
 				}
 			} else if room != nil {
@@ -431,4 +548,35 @@ func BuildNackPairs(seqs []uint16) []rtcp.NackPair {
 		i = j
 	}
 	return pairs
+}
+
+// ListenTWCCFeedback runs a dedicated background goroutine for a Viewer that continuously listens
+// for TWCC feedback / rtcp.TransportLayerCC packets generated by the interceptor.
+func ListenTWCCFeedback(sender *webrtc.RTPSender, room *models.Room, viewerID string, estimator *BandwidthEstimator, onFeedback func(cc *rtcp.TransportLayerCC)) {
+	if sender == nil {
+		return
+	}
+
+	go func() {
+		rtcpBuf := make([]byte, 1500)
+		for {
+			n, _, rtcpErr := sender.Read(rtcpBuf)
+			if rtcpErr != nil {
+				return
+			}
+			pkts, unmarshalErr := rtcp.Unmarshal(rtcpBuf[:n])
+			if unmarshalErr != nil {
+				continue
+			}
+			for _, pkt := range pkts {
+				if twccPacket, ok := pkt.(*rtcp.TransportLayerCC); ok && twccPacket != nil {
+					log.Printf("[TWCC Interceptor Listener] Room %s: Viewer %s received TWCC packet (BaseSeq: %d, Packets: %d)\n",
+						room.RoomID, viewerID, twccPacket.BaseSequenceNumber, twccPacket.PacketStatusCount)
+					if onFeedback != nil {
+						onFeedback(twccPacket)
+					}
+				}
+			}
+		}
+	}()
 }

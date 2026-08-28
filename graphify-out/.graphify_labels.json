@@ -13,8 +13,19 @@
   "11": "RoomManager",
   "12": "api/auth.go",
   "13": "🚀 OmniCast Engine — Enterprise Go WebRTC SFU Media Server",
+  "14": "time.Duration",
+  "15": "PacketBuffer",
   "16": "LiveRoomClient",
   "17": "main",
   "18": "omnicast",
-  "21": "entrypoint.sh"
+  "19": "FanOutDispatcher",
+  "20": "sync.RWMutex",
+  "21": "entrypoint.sh",
+  "22": "TimestampAdjuster",
+  "23": "NewRoomManager",
+  "24": "ActiveSpeakerDetector",
+  "25": "NewActiveSpeakerDetector",
+  "26": "AudioForwarder",
+  "27": "NewBandwidthEstimator",
+  "28": "InitWebRTC"
 }

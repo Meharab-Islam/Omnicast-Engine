@@ -148,7 +148,7 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 			buf := *bufPtr
 
 			for {
-				n, _, readErr := remoteTrack.Read(buf)
+				n, attrs, readErr := remoteTrack.Read(buf)
 				if readErr != nil {
 					if errors.Is(readErr, io.EOF) {
 						log.Printf("Host track %s closed (EOF)\n", remoteTrack.ID())
@@ -168,6 +168,27 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 							pktBuffer.Push(&pkt)
 						}
 					}
+				}
+
+				// 1.5 Active Speaker Detection: Extract ssrc-audio-level RTP header extension
+				// from incoming audio packets and feed to the room's ActiveSpeakerDetector.
+				if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio {
+					if detectorAny := room.GetActiveSpeakerDetector(); detectorAny != nil {
+						if detector, ok := detectorAny.(*ActiveSpeakerDetector); ok && detector != nil {
+							var pkt rtp.Packet
+							if err := pkt.Unmarshal(buf[:n]); err == nil {
+								// Check one-byte extension IDs 1..14
+								for extID := uint8(1); extID <= 14; extID++ {
+									if extPayload := pkt.Header.GetExtension(extID); len(extPayload) > 0 {
+										level, _ := ParseAudioLevel(extPayload)
+										detector.UpdateLevel("host", level)
+										break
+									}
+								}
+							}
+						}
+					}
+					_ = attrs // Suppress unused variable warning
 				}
 
 				// 2. Forward RTP packet to the room's localTrack

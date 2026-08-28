@@ -249,6 +249,9 @@ func (c *Client) handleSignalingMessage(msg *models.SignalingMessage) {
 	case "request_layer", "select_layer", "set_layer", "switch_layer":
 		c.handleRequestLayer(msg)
 
+	case "set_viewport", "update_viewport", "viewport":
+		c.handleSetViewport(msg)
+
 	default:
 		log.Printf("Unhandled signaling event '%s' from client %s\n", msg.Event, c.ID)
 	}
@@ -2188,5 +2191,68 @@ func (c *Client) handleRequestLayer(msg *models.SignalingMessage) {
 				c.SafeSend(enc)
 			}
 		}
+	}
+}
+
+// handleSetViewport updates the dynamic viewport and server-side track pausing for a viewer
+func (c *Client) handleSetViewport(msg *models.SignalingMessage) {
+	roomID := msg.RoomID
+	if roomID == "" {
+		roomID = c.RoomID
+	}
+	if roomID == "" || c.RoomManager == nil {
+		return
+	}
+
+	room, exists := c.RoomManager.GetRoom(roomID)
+	if !exists || room == nil {
+		return
+	}
+
+	var req struct {
+		VisibleSpeakers []string `json:"visible_speakers"`
+		VisibleCohosts  []string `json:"visible_cohosts"`
+		Tracks          []string `json:"tracks"`
+	}
+
+	if len(msg.Payload) > 0 {
+		_ = json.Unmarshal(msg.Payload, &req)
+	}
+
+	visible := req.VisibleSpeakers
+	if len(visible) == 0 {
+		visible = req.VisibleCohosts
+	}
+	if len(visible) == 0 {
+		visible = req.Tracks
+	}
+
+	// Update room's ViewportManager
+	if vmAny := room.GetViewportManager(); vmAny != nil {
+		if vm, ok := vmAny.(*internalWebRTC.ViewportManager); ok && vm != nil {
+			vm.SetVisibleTracks(c.ID, visible)
+		}
+	} else {
+		// Initialize if not already present
+		vm := internalWebRTC.NewViewportManager(roomID)
+		vm.SetVisibleTracks(c.ID, visible)
+		room.SetViewportManager(vm)
+	}
+
+	log.Printf("[Signaling Viewport] Viewer %s updated viewport in Room %s: %v\n", c.ID, roomID, visible)
+
+	respPayload, _ := json.Marshal(map[string]any{
+		"event":            "viewport_updated",
+		"visible_speakers": visible,
+		"status":           "ok",
+	})
+	respMsg := models.SignalingMessage{
+		Event:   "viewport_updated",
+		RoomID:  roomID,
+		UserID:  c.ID,
+		Payload: respPayload,
+	}
+	if enc, err := respMsg.Encode(); err == nil {
+		c.SafeSend(enc)
 	}
 }

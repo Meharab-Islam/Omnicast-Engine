@@ -48,9 +48,9 @@
     "semantic_hash": ""
   },
   "internal/models/room.go": {
-    "mtime": 1787917797.754266,
-    "seen": 1787917837.470131,
-    "ast_hash": "103751f12c6fea481db30f09cefe543b",
+    "mtime": 1787936537.642876,
+    "seen": 1787936593.0072699,
+    "ast_hash": "636cca61f1f66fe3a3211609e5452a36",
     "semantic_hash": ""
   },
   "internal/signaling/room_manager.go": {
@@ -60,9 +60,9 @@
     "semantic_hash": ""
   },
   "internal/webrtc/engine.go": {
-    "mtime": 1787917058.9633403,
-    "seen": 1787917085.419928,
-    "ast_hash": "19821fbda4f1a622e364718d21dd61c5",
+    "mtime": 1787936678.8662007,
+    "seen": 1787936698.628959,
+    "ast_hash": "a45d04e7cab9c876af727b43efbe90b6",
     "semantic_hash": ""
   },
   "internal/webrtc/host_handler.go": {
@@ -90,9 +90,9 @@
     "semantic_hash": "54c82bc5187d4f0a1e0408f2edc4bef6"
   },
   "internal/webrtc/viewer_handler.go": {
-    "mtime": 1787917820.4951026,
-    "seen": 1787917837.470146,
-    "ast_hash": "6c546077b65506d0e19d77cdbd69a75a",
+    "mtime": 1787936919.927034,
+    "seen": 1787936967.47407,
+    "ast_hash": "20bcf3047a9bd91619839128525e76db",
     "semantic_hash": ""
   },
   "internal/signaling/pk_manager.go": {
@@ -252,15 +252,15 @@
     "semantic_hash": ""
   },
   "internal/webrtc/track_switcher.go": {
-    "mtime": 1787851742.0037572,
-    "seen": 1787851798.789899,
-    "ast_hash": "dfabef9168ffc8fb46ccc6faad2014f2",
+    "mtime": 1787937949.5508494,
+    "seen": 1787937978.800062,
+    "ast_hash": "a3ad91bccd022023bcfecc166fb14d8a",
     "semantic_hash": ""
   },
   "internal/webrtc/track_switcher_test.go": {
-    "mtime": 1787808472.5325644,
-    "seen": 1787808595.4062479,
-    "ast_hash": "62e8d839be56c9ae258ad2cbfe8caac3",
+    "mtime": 1787937577.2133486,
+    "seen": 1787937599.234485,
+    "ast_hash": "d430179da55f5f86c54d72f144abf6ae",
     "semantic_hash": ""
   },
   "public/sdk/live_media_sdk.d.ts": {
@@ -345,6 +345,54 @@
     "mtime": 1787917256.922595,
     "seen": 1787917275.771998,
     "ast_hash": "86829a7fe85adf176e4dea2b33719ff3",
+    "semantic_hash": ""
+  },
+  "internal/webrtc/pli_throttler.go": {
+    "mtime": 1787936556.2838106,
+    "seen": 1787936593.007283,
+    "ast_hash": "76dee0a287734e92dbf0162b0251c28f",
+    "semantic_hash": ""
+  },
+  "internal/webrtc/pli_throttler_test.go": {
+    "mtime": 1787926143.619664,
+    "seen": 1787926162.294139,
+    "ast_hash": "728293b0bbc8a1fbb8be0db94c53502e",
+    "semantic_hash": ""
+  },
+  "internal/webrtc/bandwidth_estimator.go": {
+    "mtime": 1787937318.7564898,
+    "seen": 1787937343.079873,
+    "ast_hash": "ef43d87d6d107e44c962caba91ccac08",
+    "semantic_hash": ""
+  },
+  "internal/webrtc/bandwidth_estimator_test.go": {
+    "mtime": 1787937327.8006659,
+    "seen": 1787937343.079874,
+    "ast_hash": "f6f4a380b730d4a9ac34cabca36abc67",
+    "semantic_hash": ""
+  },
+  "internal/webrtc/seq_adjuster.go": {
+    "mtime": 1787937199.888248,
+    "seen": 1787937219.5281532,
+    "ast_hash": "8904e6ce82e116e2ad0ca64db38c775b",
+    "semantic_hash": ""
+  },
+  "internal/webrtc/seq_adjuster_test.go": {
+    "mtime": 1787937205.9151065,
+    "seen": 1787937219.5281541,
+    "ast_hash": "2a642d9201ef776239594900f2dd7868",
+    "semantic_hash": ""
+  },
+  "internal/webrtc/ts_adjuster.go": {
+    "mtime": 1787937230.2524493,
+    "seen": 1787937251.271127,
+    "ast_hash": "1d26922c0ca3fad1d90aa823d9b8328d",
+    "semantic_hash": ""
+  },
+  "internal/webrtc/ts_adjuster_test.go": {
+    "mtime": 1787937236.576877,
+    "seen": 1787937251.2711282,
+    "ast_hash": "c5d03631cf7ea20b675966b645d9f27f",
     "semantic_hash": ""
   }
 }

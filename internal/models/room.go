@@ -48,6 +48,14 @@ type Room struct {
 	isReconnecting bool                                 `json:"-"`
 	lastPLITime    time.Time                            `json:"-"`
 
+	// Phase 5: Enterprise Audio Resilience
+	activeSpeakerDetector any `json:"-"` // *webrtc.ActiveSpeakerDetector (stored as any to avoid circular import)
+	audioForwarder        any `json:"-"` // *webrtc.AudioForwarder
+
+	// Phase 6: Massive Fan-Out & Dynamic Viewport Management
+	viewportManager  any `json:"-"` // *webrtc.ViewportManager
+	fanOutDispatcher any `json:"-"` // *webrtc.FanOutDispatcher
+
 	// Presence Batching & Throttling
 	pendingJoins    []*Participant
 	pendingLeaves   []string
@@ -717,6 +725,19 @@ func (r *Room) SetCoHostPeerConnection(coHostID string, pc *webrtc.PeerConnectio
 	media.PeerConnection = pc
 }
 
+// GetCoHostPeerConnection retrieves the PeerConnection for a specific co-host in a thread-safe manner
+func (r *Room) GetCoHostPeerConnection(coHostID string) *webrtc.PeerConnection {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.CoHostTracks == nil {
+		return nil
+	}
+	if media, exists := r.CoHostTracks[coHostID]; exists && media != nil {
+		return media.PeerConnection
+	}
+	return nil
+}
+
 // SetCoHostVideoSSRC assigns the incoming video SSRC for a co-host
 func (r *Room) SetCoHostVideoSSRC(coHostID string, ssrc uint32) {
 	r.mu.Lock()
@@ -1125,3 +1146,61 @@ func (r *Room) StopPresenceBatcher() {
 		}
 	}
 }
+
+// GetActiveSpeakerDetector returns the active speaker detector instance (as any)
+func (r *Room) GetActiveSpeakerDetector() any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.activeSpeakerDetector
+}
+
+// SetActiveSpeakerDetector sets the active speaker detector instance
+func (r *Room) SetActiveSpeakerDetector(detector any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.activeSpeakerDetector = detector
+}
+
+// GetAudioForwarder returns the audio forwarder instance (as any)
+func (r *Room) GetAudioForwarder() any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.audioForwarder
+}
+
+// SetAudioForwarder sets the audio forwarder instance
+func (r *Room) SetAudioForwarder(forwarder any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.audioForwarder = forwarder
+}
+
+// GetViewportManager returns the viewport manager instance (as any)
+func (r *Room) GetViewportManager() any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.viewportManager
+}
+
+// SetViewportManager sets the viewport manager instance
+func (r *Room) SetViewportManager(vm any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.viewportManager = vm
+}
+
+// GetFanOutDispatcher returns the fan-out dispatcher instance (as any)
+func (r *Room) GetFanOutDispatcher() any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.fanOutDispatcher
+}
+
+// SetFanOutDispatcher sets the fan-out dispatcher instance
+func (r *Room) SetFanOutDispatcher(d any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.fanOutDispatcher = d
+}
+
+
