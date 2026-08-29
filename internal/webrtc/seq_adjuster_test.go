@@ -99,3 +99,30 @@ func TestSequenceNumberAdjuster_Concurrent(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestSequenceNumberAdjuster_NextContiguous(t *testing.T) {
+	adj := NewSequenceNumberAdjuster()
+
+	// Packets arrive with gaps due to dropped intermediate SVC layers:
+	// Incoming: 100, 105 (gaps: 101..104 dropped), 110 (106..109 dropped), 111
+	out1 := adj.NextContiguous(100)
+	if out1 != 100 {
+		t.Fatalf("expected out1 100, got %d", out1)
+	}
+
+	out2 := adj.NextContiguous(105)
+	if out2 != 101 {
+		t.Fatalf("expected out2 101 (strictly contiguous +1), got %d", out2)
+	}
+
+	out3 := adj.NextContiguous(110)
+	if out3 != 102 {
+		t.Fatalf("expected out3 102, got %d", out3)
+	}
+
+	out4 := adj.NextContiguous(111)
+	if out4 != 103 {
+		t.Fatalf("expected out4 103, got %d", out4)
+	}
+}
+

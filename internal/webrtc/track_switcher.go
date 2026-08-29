@@ -1,28 +1,33 @@
 package webrtc
 
 import (
+	"log"
 	"sync"
 
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3"
+	"omnicast/internal/metrics"
 )
 
-// TrackSwitcher intercepts incoming simulcast RTP packets and smoothly relays them to a viewer
-// by rewriting RTP Sequence Numbers and Timestamps to ensure uninterrupted video decoding during layer switches.
-// Holds references to the 3 incoming Host tracks (RID 'q', 'h', 'f') and one outgoing webrtc.TrackLocalStaticRTP for the Viewer.
+// TrackSwitcher intercepts incoming video RTP packets and smoothly relays them to a viewer.
+// It operates on a single VP9 video track with Scalable Video Coding (SVC L3T3)
+// or seamlessly relays multi-layer streams by rewriting RTP Sequence Numbers and Timestamps.
 type TrackSwitcher struct {
-	// 3 incoming Host tracks for Simulcast layers
+	// Single incoming VP9 video track for SVC operation
+	inputTrack *webrtc.TrackRemote
+
+	// Backward-compatible references for simulcast layers
 	trackQ *webrtc.TrackRemote // Low Resolution (RID 'q')
 	trackH *webrtc.TrackRemote // Medium Resolution (RID 'h')
 	trackF *webrtc.TrackRemote // High / Full Resolution (RID 'f')
 
-	// Active Host track pointer currently being forwarded to the viewer
+	// Active track pointer currently being forwarded
 	activeTrack *webrtc.TrackRemote
 
-	// Target Host track pointer to switch to
+	// Target track pointer to switch to
 	targetTrack *webrtc.TrackRemote
 
-	// Flag indicating whether a track switch is pending
+	// Flag indicating whether a layer/track switch is pending
 	pendingSwitch bool
 
 	// One outgoing track for the Viewer
@@ -31,6 +36,13 @@ type TrackSwitcher struct {
 	currentLayer    string
 	targetLayer     string
 	waitingKeyframe bool
+
+	// SVC (Scalable Video Coding) Spatial and Temporal Layer Controls
+	currentSpatialLayer  uint8 // S: 0=Low ('q'), 1=Medium ('h'), 2=High ('f')
+	targetSpatialLayer   uint8
+	currentTemporalLayer uint8 // T: 0=7.5fps, 1=15fps, 2=30fps
+	targetTemporalLayer  uint8
+	vp9Parser            *VP9PayloadParser
 
 	lastInSeq  uint16
 	lastInTS   uint32
@@ -58,14 +70,29 @@ func NewTrackSwitcher(outTrack *webrtc.TrackLocalStaticRTP, initialLayer string)
 	if initialLayer == "" {
 		initialLayer = "h"
 	}
+	var initialSpatial uint8 = 1 // default 'h' (Medium)
+	switch initialLayer {
+	case LayerLow:
+		initialSpatial = 0
+	case LayerMedium:
+		initialSpatial = 1
+	case LayerHigh:
+		initialSpatial = 2
+	}
+
 	ts := &TrackSwitcher{
-		outTrack:     outTrack,
-		currentLayer: initialLayer,
-		targetLayer:  initialLayer,
-		seqAdjuster:  NewSequenceNumberAdjuster(),
-		tsAdjuster:   NewTimestampAdjuster(),
-		queue:        make(chan *rtp.Packet, 256),
-		closed:       make(chan struct{}),
+		outTrack:             outTrack,
+		currentLayer:         initialLayer,
+		targetLayer:          initialLayer,
+		currentSpatialLayer:  initialSpatial,
+		targetSpatialLayer:   initialSpatial,
+		currentTemporalLayer: 2, // Full 30fps
+		targetTemporalLayer:  2,
+		vp9Parser:            NewVP9PayloadParser(),
+		seqAdjuster:          NewSequenceNumberAdjuster(),
+		tsAdjuster:           NewTimestampAdjuster(),
+		queue:                make(chan *rtp.Packet, 256),
+		closed:               make(chan struct{}),
 	}
 
 	// Dedicated background worker to write RTP packets asynchronously to the viewer's track
@@ -81,12 +108,181 @@ func NewTrackSwitcher(outTrack *webrtc.TrackLocalStaticRTP, initialLayer string)
 				}
 				if ts.outTrack != nil {
 					_ = ts.outTrack.WriteRTP(pkt)
+					metrics.AddBytesSent(pkt.MarshalSize())
 				}
 			}
 		}
 	}()
 
 	return ts
+}
+
+// NewVP9TrackSwitcher creates a TrackSwitcher operating on a single incoming VP9 video track with SVC L3T3
+func NewVP9TrackSwitcher(inputTrack *webrtc.TrackRemote, outTrack *webrtc.TrackLocalStaticRTP, initialLayer string) *TrackSwitcher {
+	ts := NewTrackSwitcher(outTrack, initialLayer)
+	ts.inputTrack = inputTrack
+	ts.activeTrack = inputTrack
+	return ts
+}
+
+// SetInputTrack sets the single incoming VP9 video track for SVC operation
+func (ts *TrackSwitcher) SetInputTrack(track *webrtc.TrackRemote) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	ts.inputTrack = track
+	ts.activeTrack = track
+}
+
+// GetInputTrack returns the single incoming VP9 video track
+func (ts *TrackSwitcher) GetInputTrack() *webrtc.TrackRemote {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+	return ts.inputTrack
+}
+
+// SwitchSVCLayers changes the target Spatial (S) and Temporal (T) layers for the single VP9 track
+func (ts *TrackSwitcher) SwitchSVCLayers(targetSpatial, targetTemporal uint8) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	if targetSpatial > 2 {
+		targetSpatial = 2
+	}
+	if targetTemporal > 2 {
+		targetTemporal = 2
+	}
+
+	ts.targetSpatialLayer = targetSpatial
+	ts.targetTemporalLayer = targetTemporal
+
+	switch targetSpatial {
+	case 0:
+		ts.targetLayer = LayerLow
+	case 1:
+		ts.targetLayer = LayerMedium
+	case 2:
+		ts.targetLayer = LayerHigh
+	}
+
+	if targetSpatial != ts.currentSpatialLayer || targetTemporal != ts.currentTemporalLayer {
+		ts.pendingSwitch = true
+		ts.waitingKeyframe = true
+	} else {
+		ts.pendingSwitch = false
+		ts.waitingKeyframe = false
+	}
+}
+
+// DropHighestSpatialLayer instructs the TrackSwitcher to drop the highest active Spatial Layer
+// (e.g. drop S=2 down to S=1, only forwarding S=0 and S=1; or drop S=1 down to S=0) to alleviate network congestion.
+// Returns the new target spatial layer.
+func (ts *TrackSwitcher) DropHighestSpatialLayer() uint8 {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	if ts.currentSpatialLayer > 0 {
+		newSpatial := ts.currentSpatialLayer - 1
+		ts.targetSpatialLayer = newSpatial
+		switch newSpatial {
+		case 0:
+			ts.targetLayer = LayerLow
+		case 1:
+			ts.targetLayer = LayerMedium
+		}
+		ts.pendingSwitch = true
+		ts.waitingKeyframe = false // Down-switching can happen immediately
+		ts.currentSpatialLayer = newSpatial
+		ts.currentLayer = ts.targetLayer
+
+		// Calculate offsets to maintain continuous sequence numbers & timestamps
+		if ts.started {
+			ts.seqOffset = ts.seqAdjuster.GetOffset()
+		}
+
+		log.Printf("[Congestion Control] Dropped highest spatial layer to S=%d (now forwarding layers S=0..S=%d, target layer: '%s')\n",
+			newSpatial, newSpatial, ts.targetLayer)
+		return newSpatial
+	}
+	return 0
+}
+
+// HandleCongestion checks packet loss and estimated bitrate from the TWCC Bandwidth Estimator:
+// If congestion is detected (e.g., loss > 5% or bitrate < 1 Mbps), it instructs the TrackSwitcher
+// to drop the highest spatial layer (e.g., drop S=2 and only forward S=0 and S=1).
+func (ts *TrackSwitcher) HandleCongestion(packetLoss float64, bitrateBps int) bool {
+	if packetLoss > LossThresholdHigh || (bitrateBps > 0 && bitrateBps < 1_000_000) {
+		ts.mu.RLock()
+		currentS := ts.currentSpatialLayer
+		ts.mu.RUnlock()
+
+		if currentS > 0 {
+			ts.DropHighestSpatialLayer()
+			return true
+		}
+	}
+	return false
+}
+
+// DropHighestTemporalLayer instructs the TrackSwitcher to drop the highest active Temporal Layer
+// (e.g. drop frames with T=2 while keeping and forwarding T=0 and T=1) when CPU or bandwidth is slightly constrained.
+// Returns the new target temporal layer.
+func (ts *TrackSwitcher) DropHighestTemporalLayer() uint8 {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	if ts.currentTemporalLayer > 0 {
+		newTemporal := ts.currentTemporalLayer - 1
+		ts.targetTemporalLayer = newTemporal
+		ts.currentTemporalLayer = newTemporal
+
+		log.Printf("[Temporal Layer Dropping] Dropped highest temporal layer to T=%d (dropping T=2, forwarding T=0 and T=1)\n",
+			newTemporal)
+		return newTemporal
+	}
+	return 0
+}
+
+// SetTemporalLayer sets the maximum allowed temporal layer (T=0, T=1, or T=2)
+func (ts *TrackSwitcher) SetTemporalLayer(targetT uint8) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	if targetT > 2 {
+		targetT = 2
+	}
+	ts.targetTemporalLayer = targetT
+	ts.currentTemporalLayer = targetT
+	log.Printf("[Temporal Layer] Set maximum temporal layer to T=%d\n", targetT)
+}
+
+// HandleTemporalConstraint checks if CPU load or network bandwidth is slightly constrained:
+// If so, it drops the highest temporal layer (dropping T=2 down to T=1, or T=1 down to T=0).
+func (ts *TrackSwitcher) HandleTemporalConstraint(isConstrained bool) bool {
+	if isConstrained {
+		ts.mu.RLock()
+		currentT := ts.currentTemporalLayer
+		ts.mu.RUnlock()
+
+		if currentT > 0 {
+			ts.DropHighestTemporalLayer()
+			return true
+		}
+	}
+	return false
+}
+
+// GetSpatialLayer returns the currently active spatial layer (0, 1, or 2)
+func (ts *TrackSwitcher) GetSpatialLayer() uint8 {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+	return ts.currentSpatialLayer
+}
+
+// GetTemporalLayer returns the currently active temporal layer (0, 1, or 2)
+func (ts *TrackSwitcher) GetTemporalLayer() uint8 {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+	return ts.currentTemporalLayer
 }
 
 // NewSimulcastTrackSwitcher creates a TrackSwitcher with references to all 3 incoming Host tracks (RID 'q', 'h', 'f')
@@ -166,7 +362,7 @@ func (ts *TrackSwitcher) Close() {
 	})
 }
 
-// GetCurrentLayer returns the currently active simulcast layer RID ('q', 'h', 'f')
+// GetCurrentLayer returns the currently active layer RID ('q', 'h', 'f')
 func (ts *TrackSwitcher) GetCurrentLayer() string {
 	ts.mu.RLock()
 	defer ts.mu.RUnlock()
@@ -220,12 +416,24 @@ func (ts *TrackSwitcher) SetTargetTrack(targetTrack *webrtc.TrackRemote) {
 	ts.SwitchTrack(targetTrack)
 }
 
-// SwitchLayer requests a switch to a target simulcast layer RID.
-// It compares the resolved target track with the activeTrack:
-// If they are different, sets pendingSwitch = true and stores targetTrack.
+// SwitchLayer initiates switching to a target spatial layer ('q', 'h', 'f')
+// In SVC mode, maps to spatial layers S0 (Low), S1 (Medium), S2 (High) on the single VP9 track.
 func (ts *TrackSwitcher) SwitchLayer(targetRID string) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
+
+	var targetSpatial uint8 = 1
+	switch targetRID {
+	case LayerLow:
+		targetSpatial = 0
+	case LayerMedium:
+		targetSpatial = 1
+	case LayerHigh:
+		targetSpatial = 2
+	}
+
+	ts.targetLayer = targetRID
+	ts.targetSpatialLayer = targetSpatial
 
 	var targetTrack *webrtc.TrackRemote
 	switch targetRID {
@@ -237,10 +445,7 @@ func (ts *TrackSwitcher) SwitchLayer(targetRID string) {
 		targetTrack = ts.trackF
 	}
 
-	ts.targetLayer = targetRID
-
-	// Compare target track with activeTrack
-	if targetTrack != ts.activeTrack || ts.currentLayer != targetRID {
+	if targetSpatial != ts.currentSpatialLayer || targetRID != ts.currentLayer || (targetTrack != nil && targetTrack != ts.activeTrack) {
 		ts.pendingSwitch = true
 		ts.targetTrack = targetTrack
 		ts.waitingKeyframe = true
@@ -251,26 +456,38 @@ func (ts *TrackSwitcher) SwitchLayer(targetRID string) {
 	}
 }
 
+// SwitchLayerByRID initiates switching to a target layer RID
+func (ts *TrackSwitcher) SwitchLayerByRID(targetRID string) {
+	ts.SwitchLayer(targetRID)
+}
+
 // ForceSwitchLayer switches the layer immediately
 func (ts *TrackSwitcher) ForceSwitchLayer(targetRID string) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 	ts.currentLayer = targetRID
 	ts.targetLayer = targetRID
-	ts.pendingSwitch = false
-	ts.waitingKeyframe = false
 	switch targetRID {
 	case LayerLow:
+		ts.currentSpatialLayer = 0
+		ts.targetSpatialLayer = 0
 		ts.activeTrack = ts.trackQ
 	case LayerMedium:
+		ts.currentSpatialLayer = 1
+		ts.targetSpatialLayer = 1
 		ts.activeTrack = ts.trackH
 	case LayerHigh:
+		ts.currentSpatialLayer = 2
+		ts.targetSpatialLayer = 2
 		ts.activeTrack = ts.trackF
 	}
+	ts.pendingSwitch = false
+	ts.waitingKeyframe = false
 }
 
-// WriteRTP processes an incoming RTP packet from a specific RID, rewrites its SequenceNumber & Timestamp,
-// and pushes it to the non-blocking worker queue for asynchronous transmission.
+// WriteRTP processes an incoming RTP packet (from single VP9 track or simulcast layer),
+// performs SVC spatial/temporal layer filtering, rewrites SequenceNumber & Timestamp,
+// and pushes it to the non-blocking worker queue for asynchronous transmission to the viewer.
 func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 	if packet == nil || ts.outTrack == nil {
 		return nil
@@ -286,59 +503,89 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 	default:
 	}
 
-	// In the RTP forwarding loop, before writing the packet, check if pendingSwitch == true
-	if ts.pendingSwitch || ts.waitingKeyframe {
-		// If this packet is from the target layer/track, parse the incoming RTP payload to check if it's a Keyframe (I-frame)
-		if rid == ts.targetLayer || (ts.targetTrack != nil && rid == ts.targetTrack.RID()) {
-			codecMime := ""
-			if ts.outTrack != nil {
-				codecMime = ts.outTrack.Codec().MimeType
-			}
-			isKey := IsKeyframe(codecMime, packet.Payload)
+	codecMime := ""
+	if ts.outTrack != nil {
+		codecMime = ts.outTrack.Codec().MimeType
+	}
 
-			// Once a keyframe is detected on the targetTrack, change the activeTrack pointer to the targetTrack
-			if isKey || !ts.started {
+	// Check if payload is VP9
+	isVP9 := codecMime == webrtc.MimeTypeVP9 || codecMime == "video/VP9"
+	var vp9Desc *VP9PayloadDescriptor
+	if isVP9 && len(packet.Payload) > 0 {
+		vp9Desc, _ = ParseVP9Descriptor(packet.Payload)
+	}
+
+	if vp9Desc != nil {
+		// Single VP9 Track with SVC (Scalable Video Coding) L3T3
+		if ts.pendingSwitch || ts.waitingKeyframe {
+			// Check if packet allows switching (Keyframe / Intra-frame or Up-switch point U=1)
+			if vp9Desc.IsKeyframe() || vp9Desc.SwitchingUp || !ts.started {
+				ts.currentSpatialLayer = ts.targetSpatialLayer
+				ts.currentTemporalLayer = ts.targetTemporalLayer
 				ts.currentLayer = ts.targetLayer
-				// Ensure targetTrack is resolved if switching by RID
-				if ts.targetTrack == nil {
-					switch ts.targetLayer {
-					case LayerLow:
-						ts.targetTrack = ts.trackQ
-					case LayerMedium:
-						ts.targetTrack = ts.trackH
-					case LayerHigh:
-						ts.targetTrack = ts.trackF
-					}
-				}
-				if ts.targetTrack != nil {
-					ts.activeTrack = ts.targetTrack
-					ts.targetTrack = nil
-				}
 				ts.pendingSwitch = false
 				ts.waitingKeyframe = false
 
-				// Immediately upon switching, calculate the difference between the old track's
-				// sequence number and the new track's sequence number to update the SequenceNumberAdjuster offset.
-				// Calculate the timestamp offset similarly and update the TimestampAdjuster.
+				// Calculate offsets to maintain continuous sequence numbers & timestamps
 				if ts.started {
-					// Use the dedicated SequenceNumberAdjuster to compute: offset = (lastOutSeq + 1) - newInSeq
 					ts.seqAdjuster.Switch(packet.SequenceNumber)
 					ts.seqOffset = ts.seqAdjuster.GetOffset()
 
-					// Use the dedicated TimestampAdjuster to compute: offset = (lastOutTS + frameDuration) - newInTS
 					ts.tsAdjuster.Switch(packet.Timestamp, DefaultFrameDuration90kHz)
 					ts.tsOffset = ts.tsAdjuster.GetOffset()
 				}
-			} else {
-				// If the packet is NOT a keyframe, drop packets from the targetTrack
+			} else if vp9Desc.S > ts.currentSpatialLayer {
+				// While waiting for Keyframe/Up-switch point, drop higher spatial layer packets
 				return nil
 			}
 		}
-	}
 
-	// Continue forwarding packets from the old activeTrack and drop packets that do not belong to the currently active layer
-	if rid != ts.currentLayer {
-		return nil
+		// Filter out packets belonging to spatial (S) or temporal (T) layers above target
+		if vp9Desc.HasLayerIndices {
+			if vp9Desc.S > ts.currentSpatialLayer || vp9Desc.T > ts.currentTemporalLayer {
+				return nil // Drop higher layer packet
+			}
+		}
+	} else {
+		// Fallback for multi-track simulcast (e.g. VP8 / H.264 legacy streams)
+		if ts.pendingSwitch || ts.waitingKeyframe {
+			if rid == ts.targetLayer || (ts.targetTrack != nil && rid == ts.targetTrack.RID()) {
+				isKey := IsKeyframe(codecMime, packet.Payload)
+				if isKey || !ts.started {
+					ts.currentLayer = ts.targetLayer
+					if ts.targetTrack == nil {
+						switch ts.targetLayer {
+						case LayerLow:
+							ts.targetTrack = ts.trackQ
+						case LayerMedium:
+							ts.targetTrack = ts.trackH
+						case LayerHigh:
+							ts.targetTrack = ts.trackF
+						}
+					}
+					if ts.targetTrack != nil {
+						ts.activeTrack = ts.targetTrack
+						ts.targetTrack = nil
+					}
+					ts.pendingSwitch = false
+					ts.waitingKeyframe = false
+
+					if ts.started {
+						ts.seqAdjuster.Switch(packet.SequenceNumber)
+						ts.seqOffset = ts.seqAdjuster.GetOffset()
+
+						ts.tsAdjuster.Switch(packet.Timestamp, DefaultFrameDuration90kHz)
+						ts.tsOffset = ts.tsAdjuster.GetOffset()
+					}
+				} else {
+					return nil
+				}
+			}
+		}
+
+		if rid != ts.currentLayer && rid != "" && rid != "default" {
+			return nil
+		}
 	}
 
 	// Clone packet for zero-mutation safety
@@ -353,20 +600,21 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 		ts.lastOutTS = packet.Timestamp
 		ts.seqOffset = 0
 		ts.tsOffset = 0
-		// Initialize the SequenceNumberAdjuster and TimestampAdjuster with the first packet
-		ts.seqAdjuster.Adjust(packet.SequenceNumber)
-		ts.tsAdjuster.Adjust(packet.Timestamp)
+		ts.seqAdjuster.NextContiguous(packet.SequenceNumber)
+		ts.tsAdjuster.AdjustContinuous(packet.Timestamp, DefaultFrameDuration90kHz)
+		outPkt.Header.SequenceNumber = ts.lastOutSeq
+		outPkt.Header.Timestamp = ts.lastOutTS
 	} else {
-		// Apply the adjusted sequence numbers and timestamps to the RTP packet headers
-		// before calling WriteRTP() to ensure a completely seamless transition for the Viewer.
-		//
-		// SequenceNumberAdjuster: outSeq = inSeq + offset  (offset recalculated on each layer switch)
-		// TimestampAdjuster:      outTS  = inTS  + offset  (offset recalculated on each layer switch)
-		//
-		// This guarantees the Viewer's decoder sees a strictly monotonic sequence space
-		// and a continuous timestamp clock, regardless of which simulcast layer is active.
-		outPkt.Header.SequenceNumber = ts.seqAdjuster.Adjust(packet.SequenceNumber)
-		outPkt.Header.Timestamp = ts.tsAdjuster.Adjust(packet.Timestamp)
+		// Ensure that when SVC layers are dropped, the RTP Sequence Numbers and Timestamps
+		// are rewritten contiguously (+1 for every forwarded packet, unbroken timestamp clock)
+		// so the Viewer's decoder does not freeze, stall, or trigger false packet loss NACKs.
+		if isVP9 {
+			outPkt.Header.SequenceNumber = ts.seqAdjuster.NextContiguous(packet.SequenceNumber)
+			outPkt.Header.Timestamp = ts.tsAdjuster.AdjustContinuous(packet.Timestamp, DefaultFrameDuration90kHz)
+		} else {
+			outPkt.Header.SequenceNumber = ts.seqAdjuster.Adjust(packet.SequenceNumber)
+			outPkt.Header.Timestamp = ts.tsAdjuster.Adjust(packet.Timestamp)
+		}
 
 		ts.lastInSeq = packet.SequenceNumber
 		ts.lastInTS = packet.Timestamp
@@ -375,7 +623,6 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 	}
 
 	// Enqueue the rewritten packet for the background worker to call outTrack.WriteRTP()
-	// Non-blocking write: if the viewer's buffer is full, drop packet for this slow viewer without blocking others
 	select {
 	case ts.queue <- &outPkt:
 	default:
@@ -470,6 +717,13 @@ func IsKeyframe(mimeType string, payload []byte) bool {
 					return true
 				}
 			}
+		}
+	}
+
+	// 3. VP9 Keyframe Detection (IETF draft-ietf-payload-vp9)
+	if mimeType == webrtc.MimeTypeVP9 || mimeType == "video/VP9" {
+		if IsVP9Keyframe(payload) {
+			return true
 		}
 	}
 

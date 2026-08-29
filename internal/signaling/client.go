@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"omnicast/internal/api"
@@ -23,11 +24,11 @@ const (
 	// Time allowed to write a message to the peer.
 	writeWait = 10 * time.Second
 
-	// Time allowed to read the next pong message from the peer.
-	pongWait = 60 * time.Second
+	// Time allowed to read the next pong message from the peer (15 seconds before zombie cleanup).
+	pongWait = 15 * time.Second
 
-	// Send pings to peer with this period. Must be less than pongWait.
-	pingPeriod = (pongWait * 9) / 10
+	// Send pings to peer every 5 seconds.
+	pingPeriod = 5 * time.Second
 
 	// Maximum message size allowed from peer (512 KB).
 	maxMessageSize = 512 * 1024
@@ -47,27 +48,38 @@ var DefaultRTCConfiguration = webrtc.Configuration{
 
 // Client represents a connected WebSocket client
 type Client struct {
-	ID             string                 `json:"id"`
-	UserName       string                 `json:"user_name,omitempty"`
-	AvatarURL      string                 `json:"avatar_url,omitempty"`
-	Role           string                 `json:"role,omitempty"`
-	Metadata       map[string]interface{} `json:"metadata,omitempty"`
-	RoomID         string                 `json:"room_id,omitempty"`
-	Claims         *UserClaims            `json:"-"`
-	Hub            *Hub                   `json:"-"`
-	RoomManager    *RoomManager           `json:"-"`
-	WebRTCAPI      *webrtc.API            `json:"-"`
-	PeerConnection *webrtc.PeerConnection `json:"-"`
-	Conn           *websocket.Conn        `json:"-"`
-	Send           chan []byte            `json:"-"`
-	closed         bool
-	writeMu        sync.Mutex
-	mu             sync.Mutex
+	ID               string                 `json:"id"`
+	UserName         string                 `json:"user_name,omitempty"`
+	AvatarURL        string                 `json:"avatar_url,omitempty"`
+	Role             string                 `json:"role,omitempty"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
+	RoomID           string                 `json:"room_id,omitempty"`
+	Claims           *UserClaims            `json:"-"`
+	Hub              *Hub                   `json:"-"`
+	RoomManager      *RoomManager           `json:"-"`
+	WebRTCAPI        *webrtc.API            `json:"-"`
+	PeerConnection   *webrtc.PeerConnection `json:"-"`
+	Conn             *websocket.Conn        `json:"-"`
+	Send             chan []byte            `json:"-"`
+	lastPongReceived atomic.Int64           `json:"-"`
+	closed           bool
+	writeMu          sync.Mutex
+	mu               sync.Mutex
+}
+
+// UpdateLastPong updates the lastPongReceived timestamp to current unix time
+func (c *Client) UpdateLastPong() {
+	c.lastPongReceived.Store(time.Now().Unix())
+}
+
+// GetLastPong returns the last pong timestamp in unix seconds
+func (c *Client) GetLastPong() int64 {
+	return c.lastPongReceived.Load()
 }
 
 // NewClient creates and initializes a new Client with a generated UUID
 func NewClient(hub *Hub, roomManager *RoomManager, api *webrtc.API, conn *websocket.Conn) *Client {
-	return &Client{
+	c := &Client{
 		ID:          uuid.New().String(),
 		Hub:         hub,
 		RoomManager: roomManager,
@@ -75,6 +87,8 @@ func NewClient(hub *Hub, roomManager *RoomManager, api *webrtc.API, conn *websoc
 		Conn:        conn,
 		Send:        make(chan []byte, 256),
 	}
+	c.lastPongReceived.Store(time.Now().Unix())
+	return c
 }
 
 // NewClientWithClaims creates a Client initialized with authenticated JWT claims
@@ -109,7 +123,7 @@ func NewClientWithClaims(hub *Hub, roomManager *RoomManager, api *webrtc.API, co
 		}
 	}
 
-	return &Client{
+	c := &Client{
 		ID:          clientID,
 		UserName:    userName,
 		AvatarURL:   avatarURL,
@@ -123,6 +137,8 @@ func NewClientWithClaims(hub *Hub, roomManager *RoomManager, api *webrtc.API, co
 		Conn:        conn,
 		Send:        make(chan []byte, 256),
 	}
+	c.lastPongReceived.Store(time.Now().Unix())
+	return c
 }
 
 // ToParticipant converts client profile metadata to a models.Participant struct
@@ -165,7 +181,9 @@ func (c *Client) ReadPump() {
 
 	c.Conn.SetReadLimit(maxMessageSize)
 	_ = c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.UpdateLastPong()
 	c.Conn.SetPongHandler(func(string) error {
+		c.UpdateLastPong()
 		_ = c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
@@ -178,6 +196,8 @@ func (c *Client) ReadPump() {
 			}
 			break
 		}
+
+		c.UpdateLastPong()
 
 		// Parse signaling message JSON
 		sigMsg, parseErr := models.ParseSignalingMessage(rawMsg)
@@ -193,6 +213,20 @@ func (c *Client) ReadPump() {
 // handleSignalingMessage routes WebRTC signaling events (publish/offer, play/join_room, chat, ice candidate, etc.)
 func (c *Client) handleSignalingMessage(msg *models.SignalingMessage) {
 	switch msg.Event {
+	case "ping":
+		c.UpdateLastPong()
+		pongPayload, _ := json.Marshal(map[string]any{"timestamp": time.Now().Unix()})
+		if enc, err := (&models.SignalingMessage{
+			Event:   "pong",
+			RoomID:  msg.RoomID,
+			Payload: pongPayload,
+		}).Encode(); err == nil {
+			c.SafeSend(enc)
+		}
+
+	case "pong":
+		c.UpdateLastPong()
+
 	case "create_room", "publish", "offer":
 		c.handlePublishOffer(msg)
 
@@ -232,10 +266,10 @@ func (c *Client) handleSignalingMessage(msg *models.SignalingMessage) {
 	case "pk_stop", "stop_pk", "end_pk", "pk_end":
 		c.handlePKStop(msg)
 
-	case "subscribe_cohost":
+	case "subscribe_cohost", "subscribe_co_host", "play_cohost":
 		c.handleSubscribeCoHost(msg)
 
-	case "media_state", "media_state_change", "set_media_state":
+	case "media_state", "media_state_change", "set_media_state", "track_muted", "track_unmuted", "mute_track", "mute":
 		c.handleMediaStateChange(msg)
 
 	case "sync_state", "room_info", "room_state":
@@ -243,6 +277,9 @@ func (c *Client) handleSignalingMessage(msg *models.SignalingMessage) {
 
 	case "ice", "candidate":
 		c.handleICECandidate(msg)
+
+	case "ice_restart", "restart_ice", "renegotiate_ice":
+		c.handleICERestartRequest(msg)
 
 	case "answer", "sdp_answer":
 		c.handleSDPAnswer(msg)
@@ -268,6 +305,23 @@ func (c *Client) handlePublishOffer(msg *models.SignalingMessage) {
 	roomID := msg.RoomID
 	if roomID == "" {
 		roomID = "default-room"
+	}
+
+	// Access Control: If a user tries to publish a track (Host/Co-host) but their token claim says can_publish: false, forcefully reject the WebRTC offer.
+	if c.Claims != nil && !c.Claims.AllowsPublishing() {
+		log.Printf("[Access Control] Forcefully rejected publish offer from client %s (can_publish=false or insufficient role '%s')\n", c.ID, c.Claims.Role)
+		errPayload, _ := json.Marshal(map[string]any{
+			"status_code": 403,
+			"error":       "Forbidden: token claims do not permit publishing (can_publish: false)",
+		})
+		if enc, err := (&models.SignalingMessage{
+			Event:   "error",
+			RoomID:  roomID,
+			Payload: errPayload,
+		}).Encode(); err == nil {
+			c.SafeSend(enc)
+		}
+		return
 	}
 
 	// Extract display name, avatar URL, and dynamic metadata if provided
@@ -331,6 +385,23 @@ func (c *Client) handlePublishOffer(msg *models.SignalingMessage) {
 	// Retrieve or create room
 	room, exists := c.RoomManager.GetRoom(roomID)
 	if !exists {
+		// If server is in draining mode, reject creating new rooms with 503 Service Unavailable
+		if IsServerDraining() {
+			log.Printf("[Drain Mode] Rejected new room creation '%s' for host %s: 503 Service Unavailable (Server Draining)\n", roomID, c.ID)
+			errPayload, _ := json.Marshal(map[string]any{
+				"status_code": 503,
+				"error":       "Service Unavailable: Server is draining for shutdown/maintenance",
+			})
+			if enc, err := (&models.SignalingMessage{
+				Event:   "error",
+				RoomID:  roomID,
+				Payload: errPayload,
+			}).Encode(); err == nil {
+				c.SafeSend(enc)
+			}
+			return
+		}
+
 		var err error
 		room, err = c.RoomManager.CreateRoom(roomID, c.ID)
 		if err != nil {
@@ -496,22 +567,34 @@ func (c *Client) handlePublishOffer(msg *models.SignalingMessage) {
 
 	// Register ICE and candidate callbacks ONLY if brand new PeerConnection
 	if existingPC == nil {
+		var restartTimer *time.Timer
+		var restartMu sync.Mutex
+
 		pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 			log.Printf("Publisher %s ICE Connection State (Room: %s): %s\n", c.ID, roomID, state.String())
-			if state == webrtc.ICEConnectionStateDisconnected {
-				log.Printf("Publisher %s ICE state 'Disconnected' (transient network dip). Waiting for reconnection or ICE restart...\n", c.ID)
+			if state == webrtc.ICEConnectionStateConnected || state == webrtc.ICEConnectionStateCompleted {
+				restartMu.Lock()
+				if restartTimer != nil {
+					restartTimer.Stop()
+					restartTimer = nil
+				}
+				restartMu.Unlock()
+				log.Printf("Publisher %s ICE connected/recovered successfully in Room %s\n", c.ID, roomID)
 				return
 			}
-			if state == webrtc.ICEConnectionStateFailed {
-				log.Printf("Publisher %s ICE state '%s'. Initiating Grace Period for Room '%s'...\n", c.ID, state.String(), roomID)
-				c.mu.Lock()
-				if c.PeerConnection == pc {
-					c.PeerConnection = nil
-					c.mu.Unlock()
-					c.RoomManager.HandleClientDisconnect(c)
-				} else {
-					c.mu.Unlock()
+			if state == webrtc.ICEConnectionStateDisconnected || state == webrtc.ICEConnectionStateFailed {
+				log.Printf("Publisher %s ICE state '%s' (WiFi-to-Cellular switch or network dip). Scheduling auto ICE restart in 2 seconds...\n", c.ID, state.String())
+				restartMu.Lock()
+				if restartTimer != nil {
+					restartTimer.Stop()
 				}
+				restartTimer = time.AfterFunc(2*time.Second, func() {
+					if pc.ICEConnectionState() == webrtc.ICEConnectionStateDisconnected || pc.ICEConnectionState() == webrtc.ICEConnectionStateFailed {
+						log.Printf("[ICE Restart] Auto-triggering ICE restart for publisher %s in Room %s...\n", c.ID, roomID)
+						c.TriggerICERestart(roomID)
+					}
+				})
+				restartMu.Unlock()
 			}
 		})
 
@@ -623,6 +706,23 @@ func (c *Client) handleViewerJoinPlay(msg *models.SignalingMessage) {
 		roomID = "default-room"
 	}
 
+	// Access Control: If a user tries to subscribe/play but their token claim says can_subscribe: false, reject.
+	if c.Claims != nil && !c.Claims.AllowsSubscribing() {
+		log.Printf("[Access Control] Rejected subscribe request from client %s (can_subscribe=false)\n", c.ID)
+		errPayload, _ := json.Marshal(map[string]any{
+			"status_code": 403,
+			"error":       "Forbidden: token claims do not permit subscribing (can_subscribe: false)",
+		})
+		if enc, err := (&models.SignalingMessage{
+			Event:   "error",
+			RoomID:  roomID,
+			Payload: errPayload,
+		}).Encode(); err == nil {
+			c.SafeSend(enc)
+		}
+		return
+	}
+
 	// Extract display name, avatar URL, and dynamic metadata if provided
 	if msg.DisplayName != "" {
 		c.mu.Lock()
@@ -720,6 +820,83 @@ func (c *Client) handleViewerJoinPlay(msg *models.SignalingMessage) {
 		return
 	}
 
+	// Check Redis for the room's host node (e.g. Node A vs current Node B)
+	var hostNodeID string
+	if b := c.RoomManager.GetBroker(); b != nil && b.IsActive() {
+		hostNodeID, _ = b.GetRoomNodeMap(context.TODO(), roomID)
+	}
+
+	currentNodeID := c.RoomManager.GetNodeID()
+	if currentNodeID == "" {
+		_, pubAddr := c.RoomManager.GetServerConfig()
+		currentNodeID = pubAddr
+	}
+
+	// If the host is on Node A and current node is Node B, do NOT initialize a local Pion PeerConnection yet.
+	// Instead, serialize Viewer's WebRTC Offer into JSON and publish to Node A via Redis channel signaling.<room_id>.<viewer_id>
+	isRemoteHost := hostNodeID != "" && currentNodeID != "" && hostNodeID != currentNodeID
+	if isRemoteHost {
+		c.mu.Lock()
+		c.RoomID = roomID
+		c.Role = "viewer"
+		c.mu.Unlock()
+
+		log.Printf("[Edge Node Routing] Room %s host is on Node '%s' (current node: '%s'). Serializing Viewer %s WebRTC Offer & publishing to Redis channel 'signaling.%s.%s'\n",
+			roomID, hostNodeID, currentNodeID, c.ID, roomID, c.ID)
+
+		// Register viewer in the room signaling state
+		_ = c.RoomManager.JoinViewer(roomID, c)
+
+		// Late Joiner Sync: Fetch latest RoomState from Redis and send room_info_sync immediately
+		if state := c.RoomManager.GetRoomState(roomID); state != nil {
+			stateJSON, _ := json.Marshal(state)
+			syncMsg := models.SignalingMessage{
+				Event:   "room_info_sync",
+				RoomID:  roomID,
+				UserID:  c.ID,
+				Payload: stateJSON,
+			}
+			if encoded, err := syncMsg.Encode(); err == nil {
+				c.SafeSend(encoded)
+			}
+		}
+
+		// Serialize Viewer's WebRTC Offer into JSON and publish to Node A via Redis channel
+		if b := c.RoomManager.GetBroker(); b != nil && b.IsActive() {
+			offerPayload := msg.Payload
+			offerMsg := &models.SignalingMessage{
+				Event:      "offer",
+				RoomID:     roomID,
+				UserID:     c.ID,
+				Payload:    offerPayload,
+				TargetUser: hostNodeID,
+			}
+			if pubErr := b.PublishViewerSignaling(roomID, c.ID, offerMsg); pubErr != nil {
+				log.Printf("[Edge Node] Failed to publish viewer offer to Redis for Room %s: %v\n", roomID, pubErr)
+			} else {
+				log.Printf("[Edge Node] Published Viewer %s WebRTC Offer to Node A via channel signaling.%s.%s\n", c.ID, roomID, c.ID)
+			}
+
+			// Subscribe to return signaling messages (SDP Answer / Host ICE candidates) from Node A
+			// Node B relays the Answer and ICE candidates back to the Viewer's WebSocket connection
+			_, _ = b.SubscribeViewerSignaling(roomID, c.ID, func(returnMsg *models.SignalingMessage) {
+				if returnMsg != nil && returnMsg.UserID != c.ID {
+					log.Printf("[Edge Node B] Relaying %s message from Origin Node A back to Viewer %s WebSocket (Room %s)\n",
+						returnMsg.Event, c.ID, roomID)
+					if encoded, err := returnMsg.Encode(); err == nil {
+						c.SafeSend(encoded)
+					}
+				}
+			})
+		}
+
+		// On Edge servers, trigger stream cascading from Origin node
+		if cascadeMgr := c.RoomManager.GetCascadeManager(); cascadeMgr != nil && room != nil {
+			_ = cascadeMgr.EnsureCascaded(room)
+		}
+		return
+	}
+
 	// Setup PeerConnection with host's tracks attached and dynamic TURN REST credentials
 	pc, err := internalWebRTC.HandleViewerConnection(c.WebRTCAPI, c.RoomManager, roomID, internalWebRTC.GetDynamicRTCConfiguration(c.ID))
 	if err != nil {
@@ -748,23 +925,35 @@ func (c *Client) handleViewerJoinPlay(msg *models.SignalingMessage) {
 	c.PeerConnection = pc
 	c.mu.Unlock()
 
-	// Clean up viewer from room on Failed ICE state (graceful: do not disconnect on transient Disconnected or closed)
+	// Graceful ICE Connection State handling with auto ICE restart
+	var restartTimer *time.Timer
+	var restartMu sync.Mutex
+
 	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		log.Printf("Viewer %s ICE Connection State (Room: %s): %s\n", c.ID, roomID, state.String())
-		if state == webrtc.ICEConnectionStateDisconnected {
-			log.Printf("Viewer %s ICE state 'Disconnected' (transient network dip). Waiting for reconnection or ICE restart...\n", c.ID)
+		if state == webrtc.ICEConnectionStateConnected || state == webrtc.ICEConnectionStateCompleted {
+			restartMu.Lock()
+			if restartTimer != nil {
+				restartTimer.Stop()
+				restartTimer = nil
+			}
+			restartMu.Unlock()
+			log.Printf("Viewer %s ICE connected/recovered successfully in Room %s\n", c.ID, roomID)
 			return
 		}
-		if state == webrtc.ICEConnectionStateFailed {
-			log.Printf("Viewer %s ICE state '%s'. Removing viewer from Room '%s' and cleaning up...\n", c.ID, state.String(), roomID)
-			c.mu.Lock()
-			if c.PeerConnection == pc {
-				c.PeerConnection = nil
-				c.mu.Unlock()
-				c.RoomManager.HandleClientDisconnect(c)
-			} else {
-				c.mu.Unlock()
+		if state == webrtc.ICEConnectionStateDisconnected || state == webrtc.ICEConnectionStateFailed {
+			log.Printf("Viewer %s ICE state '%s' (WiFi-to-Cellular switch or network dip). Scheduling auto ICE restart in 2 seconds...\n", c.ID, state.String())
+			restartMu.Lock()
+			if restartTimer != nil {
+				restartTimer.Stop()
 			}
+			restartTimer = time.AfterFunc(2*time.Second, func() {
+				if pc.ICEConnectionState() == webrtc.ICEConnectionStateDisconnected || pc.ICEConnectionState() == webrtc.ICEConnectionStateFailed {
+					log.Printf("[ICE Restart] Auto-triggering ICE restart for viewer %s in Room %s...\n", c.ID, roomID)
+					c.TriggerICERestart(roomID)
+				}
+			})
+			restartMu.Unlock()
 		}
 	})
 
@@ -957,9 +1146,12 @@ func (c *Client) handleSetMainSeat(msg *models.SignalingMessage) {
 	})
 }
 
-// handleChatMessage broadcasts live room chat messages to host and all viewers
+// handleChatMessage broadcasts live room chat messages to host and all viewers (and cross-room DataChannels if linked in PK)
 func (c *Client) handleChatMessage(msg *models.SignalingMessage) {
 	roomID := msg.RoomID
+	if roomID == "" {
+		roomID = c.RoomID
+	}
 	if roomID == "" {
 		log.Printf("Chat message rejected: missing room_id from client %s\n", c.ID)
 		return
@@ -970,10 +1162,12 @@ func (c *Client) handleChatMessage(msg *models.SignalingMessage) {
 		msg.UserID = c.ID
 	}
 
-	// Broadcast chat message to host and all viewers in the room
-	if err := c.RoomManager.BroadcastToRoom(roomID, msg); err != nil {
-		log.Printf("Failed to broadcast chat in room %s: %v\n", roomID, err)
-		return
+	// Broadcast chat message to host and all viewers in the room (and linked PK room)
+	c.RoomManager.BroadcastSignalingToLinkedRooms(roomID, msg)
+
+	// Cross-broadcast raw chat message over WebRTC DataChannel ("room-events") to linked rooms
+	if encoded, err := msg.Encode(); err == nil {
+		c.RoomManager.BroadcastToLinkedRooms(roomID, c.ID, "room-events", encoded)
 	}
 
 	// Store bounded chat in Redis (strictly kept at max 50 items with LTRIM and 24h TTL)
@@ -981,12 +1175,15 @@ func (c *Client) handleChatMessage(msg *models.SignalingMessage) {
 		_ = broker.PushChatMessage(context.TODO(), roomID, msg)
 	}
 
-	log.Printf("Broadcasted chat message from user %s in Room %s\n", c.ID, roomID)
+	log.Printf("Broadcasted chat message from user %s in Room %s (linked mesh)\n", c.ID, roomID)
 }
 
-// handleGiftMessage processes gift donations, increments host score, and broadcasts 'gift_received' event to the room
+// handleGiftMessage processes targeted gift donations, increments target host score, and broadcasts pk_gift_overlay to both rooms
 func (c *Client) handleGiftMessage(msg *models.SignalingMessage) {
 	roomID := msg.RoomID
+	if roomID == "" {
+		roomID = c.RoomID
+	}
 	if roomID == "" {
 		log.Printf("Gift message rejected: missing room_id from client %s\n", c.ID)
 		return
@@ -998,16 +1195,22 @@ func (c *Client) handleGiftMessage(msg *models.SignalingMessage) {
 		return
 	}
 
-	// Parse gift coins/points/value from payload
+	// Parse gift coins/points/value and target_host_id from payload
 	var giftPayload struct {
-		GiftID string `json:"gift_id"`
-		Coins  int    `json:"coins"`
-		Points int    `json:"points"`
-		Amount int    `json:"amount"`
-		Value  int    `json:"value"`
+		GiftID       string `json:"gift_id"`
+		Gift         string `json:"gift"`
+		TargetHostID string `json:"target_host_id"`
+		ReceiverID   string `json:"receiver_id"`
+		Coins        int    `json:"coins"`
+		Points       int    `json:"points"`
+		Amount       int    `json:"amount"`
+		Value        int    `json:"value"`
 	}
 
 	points := 10 // default points if not explicitly specified
+	giftName := "gift"
+	targetHostID := room.HostID
+
 	if len(msg.Payload) > 0 {
 		if err := json.Unmarshal(msg.Payload, &giftPayload); err == nil {
 			if giftPayload.Coins > 0 {
@@ -1019,70 +1222,161 @@ func (c *Client) handleGiftMessage(msg *models.SignalingMessage) {
 			} else if giftPayload.Amount > 0 {
 				points = giftPayload.Amount
 			}
+
+			if giftPayload.GiftID != "" {
+				giftName = giftPayload.GiftID
+			} else if giftPayload.Gift != "" {
+				giftName = giftPayload.Gift
+			}
+
+			if giftPayload.TargetHostID != "" {
+				targetHostID = giftPayload.TargetHostID
+			} else if giftPayload.ReceiverID != "" {
+				targetHostID = giftPayload.ReceiverID
+			}
 		}
 	}
 
-	// Increment host score atomically in Redis and update room state
-	newScore := c.RoomManager.AddGiftScore(roomID, int64(points))
+	// Determine recipient room for targeted gifting
+	targetRoomID := roomID
+	if targetHostID != "" && targetHostID != room.HostID {
+		// Check linked room or find target room by host
+		linkedID := room.GetLinkedRoom()
+		if linkedID != "" {
+			if linkedRoom, ok := c.RoomManager.GetRoom(linkedID); ok && linkedRoom != nil {
+				if linkedRoom.HostID == targetHostID {
+					targetRoomID = linkedID
+				}
+			}
+		}
+		if targetRoomID == roomID && c.RoomManager.pkManager != nil {
+			if session, ok := c.RoomManager.pkManager.GetPKSession(roomID); ok && session != nil {
+				if session.HostID1 == targetHostID {
+					targetRoomID = session.RoomID1
+				} else if session.HostID2 == targetHostID {
+					targetRoomID = session.RoomID2
+				}
+			}
+		}
+	}
+
+	// Increment target host score atomically in Redis and update room state
+	newScore := c.RoomManager.AddGiftScore(targetRoomID, int64(points))
 
 	senderID := msg.UserID
 	if senderID == "" {
 		senderID = c.ID
 	}
-
-	// Prepare gift_processed broadcast payload
-	respPayload, err := json.Marshal(map[string]any{
-		"event":        "gift_processed",
-		"sender":       senderID,
-		"sender_id":    senderID,
-		"gift_id":      giftPayload.GiftID,
-		"coins":        points,
-		"points_added": points,
-		"new_score":    newScore,
-		"room_id":      roomID,
-		"host_id":      room.HostID,
-	})
-	if err != nil {
-		log.Printf("Failed to marshal gift_processed payload: %v\n", err)
-		return
+	senderName := c.UserName
+	if senderName == "" {
+		senderName = senderID
 	}
 
-	broadcastMsg := &models.SignalingMessage{
-		Event:   "gift_processed",
-		RoomID:  roomID,
-		UserID:  senderID,
-		Payload: respPayload,
+	// Check if this room is in an active PK battle
+	var pkSession *models.PKSession
+	if c.RoomManager.pkManager != nil {
+		pkSession, _ = c.RoomManager.pkManager.GetPKSession(roomID)
 	}
 
-	if err := c.RoomManager.BroadcastToRoom(roomID, broadcastMsg); err != nil {
-		log.Printf("Failed to broadcast gift_processed in room %s: %v\n", roomID, err)
-		return
+	if pkSession != nil {
+		// Sync PK battle scores for both rooms
+		hostAPoints := int64(0)
+		hostBPoints := int64(0)
+
+		if r1, ok := c.RoomManager.GetRoom(pkSession.RoomID1); ok && r1 != nil {
+			hostAPoints = int64(r1.GetHostScore())
+		}
+		if r2, ok := c.RoomManager.GetRoom(pkSession.RoomID2); ok && r2 != nil {
+			hostBPoints = int64(r2.GetHostScore())
+		}
+
+		pkOverlayPayload, _ := json.Marshal(map[string]any{
+			"type":           "pk_gift_overlay",
+			"event":          "pk_gift_overlay",
+			"session_id":     pkSession.SessionID,
+			"sender_name":    senderName,
+			"sender_id":      senderID,
+			"gift":           giftName,
+			"gift_id":        giftName,
+			"receiver_id":    targetHostID,
+			"target_host_id": targetHostID,
+			"host_a_points":  hostAPoints,
+			"host_b_points":  hostBPoints,
+			"room_a_score":   hostAPoints,
+			"room_b_score":   hostBPoints,
+			"coins":          points,
+			"points_added":   points,
+		})
+
+		overlayMsg := &models.SignalingMessage{
+			Action:  "pk_gift_overlay",
+			Event:   "pk_gift_overlay",
+			RoomID:  roomID,
+			UserID:  senderID,
+			Payload: pkOverlayPayload,
+		}
+
+		// 1. Broadcast PK overlay to BOTH rooms simultaneously via WebSocket
+		c.RoomManager.BroadcastSignalingToLinkedRooms(roomID, overlayMsg)
+
+		// 2. Broadcast PK overlay to BOTH rooms simultaneously via DataChannels
+		c.RoomManager.BroadcastToLinkedRooms(roomID, senderID, "room-events", pkOverlayPayload)
+
+		// 3. Update real-time score sync
+		c.RoomManager.pkManager.SyncPKScore(roomID, hostAPoints)
+
+	} else {
+		// Standard single-room gift processing
+		respPayload, err := json.Marshal(map[string]any{
+			"event":        "gift_processed",
+			"sender":       senderID,
+			"sender_id":    senderID,
+			"sender_name":  senderName,
+			"gift_id":      giftName,
+			"coins":        points,
+			"points_added": points,
+			"new_score":    newScore,
+			"room_id":      targetRoomID,
+			"host_id":      targetHostID,
+		})
+		if err != nil {
+			log.Printf("Failed to marshal gift_processed payload: %v\n", err)
+			return
+		}
+
+		broadcastMsg := &models.SignalingMessage{
+			Event:   "gift_processed",
+			RoomID:  targetRoomID,
+			UserID:  senderID,
+			Payload: respPayload,
+		}
+
+		_ = c.RoomManager.BroadcastToRoom(targetRoomID, broadcastMsg)
+		c.RoomManager.BroadcastToLinkedRooms(targetRoomID, senderID, "room-events", respPayload)
 	}
 
-	// Also broadcast gift_received for backwards compatibility
-	_ = c.RoomManager.BroadcastToRoom(roomID, &models.SignalingMessage{
-		Event:   "gift_received",
-		RoomID:  roomID,
-		UserID:  senderID,
-		Payload: respPayload,
-	})
-
-	// Trigger gift_sent webhook event
+	// Trigger GiftSent webhook event
 	if webhookDispatcher := c.RoomManager.GetWebhookDispatcher(); webhookDispatcher != nil {
 		webhookDispatcher.Dispatch(api.WebhookEvent{
-			Event:  api.EventGiftSent,
-			RoomID: roomID,
-			UserID: senderID,
+			EventType: api.EventGiftSent,
+			RoomID:    targetRoomID,
+			UserID:    senderID,
 			Data: map[string]any{
-				"gift_id":   giftPayload.GiftID,
-				"coins":     points,
-				"host_id":   room.HostID,
-				"new_score": newScore,
+				"gift_id":        giftName,
+				"coins":          points,
+				"host_id":        targetHostID,
+				"target_host_id": targetHostID,
+				"new_score":      newScore,
 			},
 		})
 	}
 
-	log.Printf("Gift processed atomically for Host %s in Room %s from %s (added: %d, new_score: %d)\n", room.HostID, roomID, senderID, points, newScore)
+	log.Printf("Gift '%s' processed for Host %s (Room: %s) from %s (added: %d, new_score: %d)\n", giftName, targetHostID, targetRoomID, senderID, points, newScore)
+}
+
+// HandleGiftMessageDirect public entrypoint for processing gifts from REST API or tests
+func (c *Client) HandleGiftMessageDirect(msg *models.SignalingMessage) {
+	c.handleGiftMessage(msg)
 }
 
 // handleRoomStateSync sends the current cached RoomState to the requesting client
@@ -1110,17 +1404,66 @@ func (c *Client) handleRoomStateSync(msg *models.SignalingMessage) {
 	}
 }
 
-// handleMediaStateChange updates a client's mute/unmute state and broadcasts to the room
+// handleMediaStateChange updates a client's mute/unmute state and broadcasts to the room via WebSocket & DataChannel
 func (c *Client) handleMediaStateChange(msg *models.SignalingMessage) {
 	roomID := msg.RoomID
 	if roomID == "" {
+		roomID = c.RoomID
+	}
+	if roomID == "" {
 		return
 	}
-	var state models.MediaState
-	if len(msg.Payload) > 0 {
-		_ = json.Unmarshal(msg.Payload, &state)
+
+	var parsedReq struct {
+		Type       string `json:"type"`
+		Event      string `json:"event"`
+		TrackID    string `json:"track_id"`
+		Muted      *bool  `json:"muted"`
+		Kind       string `json:"kind"` // "video" or "audio"
+		MutedAudio *bool  `json:"muted_audio"`
+		MutedVideo *bool  `json:"muted_video"`
 	}
-	c.RoomManager.SetMediaState(roomID, c.ID, state)
+
+	if len(msg.Payload) > 0 {
+		_ = json.Unmarshal(msg.Payload, &parsedReq)
+	}
+
+	currentState := models.MediaState{}
+	if room, exists := c.RoomManager.GetRoom(roomID); exists && room != nil {
+		if st, found := room.GetMediaState(c.ID); found {
+			currentState = st
+		}
+	}
+
+	isMuted := false
+	if parsedReq.Muted != nil {
+		isMuted = *parsedReq.Muted
+	} else if msg.Event == "track_muted" {
+		isMuted = true
+	} else if msg.Event == "track_unmuted" {
+		isMuted = false
+	}
+
+	trackKind := parsedReq.Kind
+	if trackKind == "" {
+		if parsedReq.MutedAudio != nil {
+			trackKind = "audio"
+			isMuted = *parsedReq.MutedAudio
+		} else if parsedReq.MutedVideo != nil {
+			trackKind = "video"
+			isMuted = *parsedReq.MutedVideo
+		} else {
+			trackKind = "video"
+		}
+	}
+
+	if trackKind == "audio" {
+		currentState.MutedAudio = isMuted
+	} else {
+		currentState.MutedVideo = isMuted
+	}
+
+	c.RoomManager.SetMediaState(roomID, c.ID, currentState)
 
 	roomState := c.RoomManager.GetRoomState(roomID)
 	var mediaStates map[string]models.MediaState
@@ -1128,20 +1471,36 @@ func (c *Client) handleMediaStateChange(msg *models.SignalingMessage) {
 		mediaStates = roomState.MediaStates
 	}
 
+	trackID := parsedReq.TrackID
+	if trackID == "" {
+		trackID = fmt.Sprintf("%s_%s", c.ID, trackKind)
+	}
+
 	payload, _ := json.Marshal(map[string]any{
-		"event":        "media_state_updated",
+		"type":         "track_muted",
+		"event":        "track_muted",
+		"track_id":     trackID,
+		"muted":        isMuted,
+		"kind":         trackKind,
 		"user_id":      c.ID,
-		"muted_audio":  state.MutedAudio,
-		"muted_video":  state.MutedVideo,
+		"muted_audio":  currentState.MutedAudio,
+		"muted_video":  currentState.MutedVideo,
 		"media_states": mediaStates,
 	})
 
+	// 1. Broadcast to all Viewers via WebSocket
 	_ = c.RoomManager.BroadcastToRoom(roomID, &models.SignalingMessage{
-		Event:   "media_state_updated",
+		Action:  "track_muted",
+		Event:   "track_muted",
 		RoomID:  roomID,
 		UserID:  c.ID,
 		Payload: payload,
 	})
+
+	// 2. Broadcast immediately to all Viewers via WebRTC DataChannel ("room-events")
+	if room, exists := c.RoomManager.GetRoom(roomID); exists && room != nil {
+		room.BroadcastDataChannelMessage(c.ID, "room-events", payload)
+	}
 }
 
 // handleSeatRequest forwards a viewer's co-host / seat request directly to the room's host
@@ -1647,8 +2006,40 @@ func (c *Client) handleICECandidate(msg *models.SignalingMessage) {
 	pc := c.PeerConnection
 	c.mu.Unlock()
 
-	// Safety check 1: silently ignore late ICE candidate if PeerConnection is nil or already closed
+	// If PeerConnection is nil on this node (e.g. Edge Node B), check if Room host is on Node A and publish ICE candidate via Redis channel
 	if pc == nil || pc.ConnectionState() == webrtc.PeerConnectionStateClosed {
+		if b := c.RoomManager.GetBroker(); b != nil && b.IsActive() {
+			roomID := msg.RoomID
+			if roomID == "" {
+				c.mu.Lock()
+				roomID = c.RoomID
+				c.mu.Unlock()
+			}
+			if roomID != "" {
+				hostNodeID, _ := b.GetRoomNodeMap(context.TODO(), roomID)
+				currentNodeID := c.RoomManager.GetNodeID()
+				if currentNodeID == "" {
+					_, pubAddr := c.RoomManager.GetServerConfig()
+					currentNodeID = pubAddr
+				}
+				if hostNodeID != "" && currentNodeID != "" && hostNodeID != currentNodeID {
+					// Serialize Viewer's ICE candidate into JSON and publish to Node A via Redis channel
+					iceMsg := &models.SignalingMessage{
+						Event:      "ice",
+						RoomID:     roomID,
+						UserID:     c.ID,
+						Payload:    msg.Payload,
+						TargetUser: hostNodeID,
+					}
+					if err := b.PublishViewerSignaling(roomID, c.ID, iceMsg); err != nil {
+						log.Printf("[Edge Node] Failed to publish viewer ICE candidate to Redis for Room %s: %v\n", roomID, err)
+					} else {
+						log.Printf("[Edge Node] Published Viewer %s ICE candidate to Node A via channel signaling.%s.%s\n", c.ID, roomID, c.ID)
+					}
+					return
+				}
+			}
+		}
 		return
 	}
 
@@ -1720,6 +2111,71 @@ func (c *Client) handleSDPAnswer(msg *models.SignalingMessage) {
 	if c.RoomManager != nil {
 		c.RoomManager.SendPLIToHost(msg.RoomID)
 	}
+}
+
+// TriggerICERestart generates a new WebRTC offer with ICERestart: true and sends it to the client
+func (c *Client) TriggerICERestart(roomID string) {
+	c.mu.Lock()
+	pc := c.PeerConnection
+	c.mu.Unlock()
+
+	if pc == nil || pc.ConnectionState() == webrtc.PeerConnectionStateClosed {
+		log.Printf("[ICE Restart] Cannot restart ICE: PeerConnection closed or nil for client %s\n", c.ID)
+		return
+	}
+
+	if pc.SignalingState() != webrtc.SignalingStateStable {
+		log.Printf("[ICE Restart] Cannot restart ICE: PeerConnection signaling state is %s (must be stable)\n", pc.SignalingState().String())
+		return
+	}
+
+	if roomID == "" {
+		roomID = c.RoomID
+	}
+
+	log.Printf("[ICE Restart] Generating new WebRTC Offer with ICERestart: true for client %s in Room '%s'\n", c.ID, roomID)
+
+	offer, err := pc.CreateOffer(&webrtc.OfferOptions{
+		ICERestart: true,
+	})
+	if err != nil {
+		log.Printf("[ICE Restart] Failed to create ICE restart offer for client %s: %v\n", c.ID, err)
+		return
+	}
+
+	if err := pc.SetLocalDescription(offer); err != nil {
+		log.Printf("[ICE Restart] Failed to set local description (ICE restart) for client %s: %v\n", c.ID, err)
+		return
+	}
+
+	offerJSON, err := json.Marshal(offer)
+	if err != nil {
+		log.Printf("[ICE Restart] Failed to marshal ICE restart offer for client %s: %v\n", c.ID, err)
+		return
+	}
+
+	restartMsg := &models.SignalingMessage{
+		Action:  "offer",
+		Event:   "offer",
+		RoomID:  roomID,
+		UserID:  c.ID,
+		Payload: offerJSON,
+	}
+
+	if encoded, err := restartMsg.Encode(); err == nil {
+		c.SafeSend(encoded)
+		log.Printf("[ICE Restart] Dispatched ICE restart offer to client %s for Room %s\n", c.ID, roomID)
+	}
+}
+
+// handleICERestartRequest handles an explicit ice_restart request sent from the client SDK
+func (c *Client) handleICERestartRequest(msg *models.SignalingMessage) {
+	roomID := msg.RoomID
+	if roomID == "" {
+		roomID = c.RoomID
+	}
+	log.Printf("[ICE Restart] Received client-initiated ICE restart request from %s in Room %s\n", c.ID, roomID)
+	c.TriggerICERestart(roomID)
 }
 
 // SafeSend sends message bytes to client.Send channel without panicking if channel is closed or full

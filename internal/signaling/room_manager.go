@@ -6,27 +6,62 @@ import (
 	"errors"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/rtcp"
-	pionWebRTC "github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v3"
 	"omnicast/internal/api"
 	"omnicast/internal/broker"
 	"omnicast/internal/config"
+	"omnicast/internal/metrics"
 	"omnicast/internal/models"
 	internalWebRTC "omnicast/internal/webrtc"
 )
 
+// isServerDraining is a globally accessible atomic boolean initialized to false,
+// indicating whether the media server is currently draining connections during graceful shutdown.
+var isServerDraining atomic.Bool
+
+// activeRoomsWG is a sync.WaitGroup that tracks the number of currently active rooms
+var activeRoomsWG sync.WaitGroup
+
+// IsServerDraining returns whether the media server is currently in draining mode
+func IsServerDraining() bool {
+	return isServerDraining.Load()
+}
+
+// SetServerDraining sets the global server draining flag
+func SetServerDraining(draining bool) {
+	isServerDraining.Store(draining)
+}
+
+// GetActiveRoomsWaitGroup returns the sync.WaitGroup tracking active rooms
+func GetActiveRoomsWaitGroup() *sync.WaitGroup {
+	return &activeRoomsWG
+}
+
+// GetActiveRoomsWG returns the sync.WaitGroup tracking active rooms on RoomManager
+func (rm *RoomManager) GetActiveRoomsWG() *sync.WaitGroup {
+	if rm.activeRoomsWG != nil {
+		return rm.activeRoomsWG
+	}
+	return &activeRoomsWG
+}
+
 // RoomManager manages all active streaming rooms and provides thread-safe operations
 type RoomManager struct {
 	activeRooms       map[string]*models.Room
+	activeRoomsWG     *sync.WaitGroup
 	webhookDispatcher *api.WebhookDispatcher
 	broker            *broker.RedisBroker
 	cascadeManager    *internalWebRTC.CascadeManager
 	pkManager         *PKManager
 	workerPool        *WorkerPool
+	webrtcAPI         *webrtc.API
 	serverRole        string
 	serverAddr        string
+	nodeID            string
 	pendingScores     map[string]int64
 	pendingScoreMu    sync.Mutex
 	mu                sync.RWMutex
@@ -162,11 +197,39 @@ func (rm *RoomManager) SetServerConfig(role, publicAddr string) {
 	rm.serverAddr = publicAddr
 }
 
+// SetNodeID sets the current node/server ID (e.g. node-xxx)
+func (rm *RoomManager) SetNodeID(nodeID string) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	rm.nodeID = nodeID
+}
+
+// GetNodeID returns the current node/server ID
+func (rm *RoomManager) GetNodeID() string {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	return rm.nodeID
+}
+
 // GetServerConfig returns role and public address of this server
 func (rm *RoomManager) GetServerConfig() (role, publicAddr string) {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
 	return rm.serverRole, rm.serverAddr
+}
+
+// SetWebRTCAPI sets the Pion WebRTC API instance for the room manager
+func (rm *RoomManager) SetWebRTCAPI(api *webrtc.API) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	rm.webrtcAPI = api
+}
+
+// GetWebRTCAPI returns the Pion WebRTC API instance
+func (rm *RoomManager) GetWebRTCAPI() *webrtc.API {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	return rm.webrtcAPI
 }
 
 // SetCascadeManager attaches a CascadeManager instance for Edge nodes
@@ -197,6 +260,123 @@ func (rm *RoomManager) GetWebhookDispatcher() *api.WebhookDispatcher {
 	return rm.webhookDispatcher
 }
 
+// HandleRemoteViewerSignaling handles inter-node signaling from Edge Node B for a remote viewer:
+// Node A processes the Viewer's Offer, creates a WebRTC SDP Answer, and publishes it back to Node B via Redis.
+func (rm *RoomManager) HandleRemoteViewerSignaling(roomID, viewerID string, msg *models.SignalingMessage) {
+	if msg == nil || viewerID == "" {
+		return
+	}
+
+	room, exists := rm.GetRoom(roomID)
+	if !exists || room == nil {
+		return
+	}
+
+	switch msg.Event {
+	case "offer":
+		// Parse remote SDP offer from Viewer
+		var offer webrtc.SessionDescription
+		if err := json.Unmarshal(msg.Payload, &offer); err != nil {
+			var sdpWrapper struct {
+				SDP  string `json:"sdp"`
+				Type string `json:"type"`
+			}
+			if err2 := json.Unmarshal(msg.Payload, &sdpWrapper); err2 == nil && sdpWrapper.SDP != "" {
+				offer = webrtc.SessionDescription{
+					Type: webrtc.SDPTypeOffer,
+					SDP:  sdpWrapper.SDP,
+				}
+			}
+		}
+		if offer.Type == 0 {
+			offer.Type = webrtc.SDPTypeOffer
+		}
+
+		api := rm.GetWebRTCAPI()
+		if api == nil {
+			log.Printf("[Node A Origin] WebRTC API not configured on RoomManager for remote viewer %s\n", viewerID)
+			return
+		}
+
+		// Initialize Pion PeerConnection on Node A for this remote viewer
+		pc, err := internalWebRTC.HandleViewerConnection(api, rm, roomID, internalWebRTC.GetDynamicRTCConfiguration(viewerID))
+		if err != nil {
+			log.Printf("[Node A Origin] Failed to handle remote viewer PeerConnection for %s: %v\n", viewerID, err)
+			return
+		}
+
+		room.AddRemoteViewerPeerConnection(viewerID, pc)
+
+		// Forward local ICE candidates generated on Node A back to Node B via Redis
+		pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
+			if candidate == nil {
+				return
+			}
+			candJSON, err := json.Marshal(candidate.ToJSON())
+			if err != nil {
+				return
+			}
+			iceResp := &models.SignalingMessage{
+				Event:      "ice",
+				RoomID:     roomID,
+				UserID:     rm.nodeID,
+				TargetUser: viewerID,
+				Payload:    candJSON,
+			}
+			if rm.broker != nil && rm.broker.IsActive() {
+				_ = rm.broker.PublishViewerSignaling(roomID, viewerID, iceResp)
+			}
+		})
+
+		// Set Remote Description (Offer) and generate Answer
+		if err := pc.SetRemoteDescription(offer); err != nil {
+			log.Printf("[Node A Origin] Failed to set remote description for viewer %s: %v\n", viewerID, err)
+			return
+		}
+
+		answer, err := pc.CreateAnswer(nil)
+		if err != nil {
+			log.Printf("[Node A Origin] Failed to create answer for viewer %s: %v\n", viewerID, err)
+			return
+		}
+
+		gatherComplete := webrtc.GatheringCompletePromise(pc)
+		if err := pc.SetLocalDescription(answer); err != nil {
+			log.Printf("[Node A Origin] Failed to set local description for viewer %s: %v\n", viewerID, err)
+			return
+		}
+		<-gatherComplete
+
+		answerPayload, _ := json.Marshal(pc.LocalDescription())
+		answerMsg := &models.SignalingMessage{
+			Event:      "answer",
+			RoomID:     roomID,
+			UserID:     rm.nodeID,
+			TargetUser: viewerID,
+			Payload:    answerPayload,
+		}
+
+		// Publish Answer back to Node B via Redis channel signaling.<room_id>.<viewer_id>
+		if rm.broker != nil && rm.broker.IsActive() {
+			if err := rm.broker.PublishViewerSignaling(roomID, viewerID, answerMsg); err != nil {
+				log.Printf("[Node A Origin] Failed to publish SDP Answer to Redis for viewer %s: %v\n", viewerID, err)
+			} else {
+				log.Printf("[Node A Origin] Successfully created & published SDP Answer back to Node B via channel signaling.%s.%s\n", roomID, viewerID)
+			}
+		}
+
+	case "ice":
+		// Add remote ICE candidate sent by Viewer on Node B
+		if remotePC := room.GetRemoteViewerPeerConnection(viewerID); remotePC != nil {
+			var candidateInit webrtc.ICECandidateInit
+			if err := json.Unmarshal(msg.Payload, &candidateInit); err == nil && candidateInit.Candidate != "" {
+				_ = remotePC.AddICECandidate(candidateInit)
+				log.Printf("[Node A Origin] Added ICE candidate from remote viewer %s\n", viewerID)
+			}
+		}
+	}
+}
+
 // CreateRoom creates a new Room with the provided hostID in a thread-safe manner
 func (rm *RoomManager) CreateRoom(roomID, hostID string) (*models.Room, error) {
 	rm.mu.Lock()
@@ -208,28 +388,45 @@ func (rm *RoomManager) CreateRoom(roomID, hostID string) (*models.Room, error) {
 
 	room := models.NewRoom(roomID, hostID)
 	rm.activeRooms[roomID] = room
+	if rm.activeRoomsWG != nil {
+		rm.activeRoomsWG.Add(1)
+	}
 
 	// Start 1-second presence batcher to throttle joins/leaves without CPU spikes
 	room.StartPresenceBatcher(1*time.Second, func(joins []*models.Participant, leaves []string, count int, list []*models.Participant) {
 		rm.broadcastPresenceBatch(room.RoomID, joins, leaves, count, list)
 	})
 
-	// Subscribe to Redis room channel if broker is active
+	// Subscribe to Redis room channel and register room_node_map:<room_id> = <current_node_id> with TTL
 	if rm.broker != nil && rm.broker.IsActive() {
 		_ = rm.broker.SubscribeRoom(roomID)
 
-		// If Origin server, register this room in Redis Global Registry
+		nodeID := rm.nodeID
+		if nodeID == "" {
+			nodeID = rm.serverAddr
+		}
+		if nodeID == "" {
+			nodeID = "origin-node-1"
+		}
+		_ = rm.broker.SetRoomNodeMap(context.TODO(), roomID, nodeID, 24*time.Hour)
+
+		// If Origin server, register this room in Redis Global Registry and subscribe to remote viewer signaling pattern
 		if rm.serverRole == "origin" || rm.serverRole == "" {
 			_ = rm.broker.RegisterRoomOrigin(roomID, rm.serverAddr, 24*time.Hour)
+
+			// Node A subscribes to signaling.<room_id>.* to process remote viewer offers and ICE candidates from Edge nodes
+			_, _ = rm.broker.SubscribeRoomSignalingPattern(roomID, func(viewerID string, msg *models.SignalingMessage) {
+				rm.HandleRemoteViewerSignaling(roomID, viewerID, msg)
+			})
 		}
 	}
 
-	// Trigger room_started webhook event
+	// Trigger RoomStarted webhook event
 	if rm.webhookDispatcher != nil {
 		rm.webhookDispatcher.Dispatch(api.WebhookEvent{
-			Event:  api.EventRoomStarted,
-			RoomID: roomID,
-			UserID: hostID,
+			EventType: api.EventRoomStarted,
+			RoomID:    roomID,
+			UserID:    hostID,
 			Data: map[string]any{
 				"host_id":    hostID,
 				"created_at": room.CreatedAt.Format(time.RFC3339),
@@ -239,6 +436,10 @@ func (rm *RoomManager) CreateRoom(roomID, hostID string) (*models.Room, error) {
 
 	// Synchronize initial RoomState to Redis without re-locking rm.mu
 	syncRoomStateInternal(room, rm.broker)
+
+	// Prometheus Metrics: increment active rooms and participants
+	metrics.IncActiveRooms()
+	metrics.IncActiveParticipants()
 
 	return room, nil
 }
@@ -287,18 +488,21 @@ func (rm *RoomManager) JoinViewer(roomID string, viewerClient *Client) error {
 		_ = rm.broker.SubscribeRoom(roomID)
 	}
 
-	// Trigger user_joined webhook event
+	// Trigger participant_joined webhook event
 	if dispatcher != nil {
 		dispatcher.Dispatch(api.WebhookEvent{
-			Event:  api.EventUserJoined,
-			RoomID: roomID,
-			UserID: viewerClient.ID,
+			EventType: api.EventParticipantJoined,
+			RoomID:    roomID,
+			UserID:    viewerClient.ID,
 			Data: map[string]any{
 				"role":         viewerClient.Role,
 				"viewer_count": room.ViewersCount(),
 			},
 		})
 	}
+
+	// Prometheus Metrics: increment active participants
+	metrics.IncActiveParticipants()
 
 	// Synchronize updated state to Redis immediately for late joiners
 	rm.SyncRoomState(roomID)
@@ -337,12 +541,16 @@ func (rm *RoomManager) RemoveViewer(roomID, viewerID string) {
 	room.RemoveParticipant(viewerID)
 	room.RemoveCoHostTrack(viewerID)
 	room.EnqueuePresenceLeave(viewerID)
+	room.UnregisterDataChannel(viewerID)
+
+	// Prometheus Metrics: decrement active participants
+	metrics.DecActiveParticipants()
 
 	if dispatcher != nil {
 		dispatcher.Dispatch(api.WebhookEvent{
-			Event:  api.EventUserLeft,
-			RoomID: roomID,
-			UserID: viewerID,
+			EventType: api.EventParticipantLeft,
+			RoomID:    roomID,
+			UserID:    viewerID,
 			Data: map[string]any{
 				"viewer_count": room.ViewersCount(),
 			},
@@ -428,6 +636,9 @@ func (rm *RoomManager) RemoveRoom(roomID string) {
 	if room, exists := rm.activeRooms[roomID]; exists {
 		room.SetTracks(nil, nil)
 		delete(rm.activeRooms, roomID)
+		if rm.activeRoomsWG != nil {
+			rm.activeRoomsWG.Done()
+		}
 	}
 }
 
@@ -450,6 +661,70 @@ func (rm *RoomManager) BroadcastToRoom(roomID string, msg *models.SignalingMessa
 
 	// Local broadcast with cached JSON byte array
 	return broadcastToRoomInternal(room, msg)
+}
+
+// BroadcastToLinkedRooms broadcasts a binary payload to DataChannels of ALL Viewers in Room A AND ALL Viewers in Room B
+func (rm *RoomManager) BroadcastToLinkedRooms(senderRoomID, senderID string, label string, payload []byte) {
+	rm.mu.RLock()
+	roomA, existsA := rm.activeRooms[senderRoomID]
+	rm.mu.RUnlock()
+
+	if !existsA || roomA == nil {
+		return
+	}
+
+	// 1. Broadcast to sender room's DataChannels
+	roomA.BroadcastDataChannelMessage(senderID, label, payload)
+
+	// 2. If room is linked in a PK battle, cross-broadcast to linked room's DataChannels
+	linkedRoomID := roomA.GetLinkedRoom()
+	if linkedRoomID == "" && rm.pkManager != nil {
+		if session, ok := rm.pkManager.GetPKSession(senderRoomID); ok && session != nil {
+			if session.RoomID1 == senderRoomID {
+				linkedRoomID = session.RoomID2
+			} else {
+				linkedRoomID = session.RoomID1
+			}
+		}
+	}
+
+	if linkedRoomID != "" && linkedRoomID != senderRoomID {
+		rm.mu.RLock()
+		roomB, existsB := rm.activeRooms[linkedRoomID]
+		rm.mu.RUnlock()
+		if existsB && roomB != nil {
+			roomB.BroadcastDataChannelMessage("", label, payload)
+		}
+	}
+}
+
+// BroadcastSignalingToLinkedRooms broadcasts a signaling message to all participants in Room A and linked Room B
+func (rm *RoomManager) BroadcastSignalingToLinkedRooms(senderRoomID string, msg *models.SignalingMessage) {
+	_ = rm.BroadcastToRoom(senderRoomID, msg)
+
+	rm.mu.RLock()
+	roomA, existsA := rm.activeRooms[senderRoomID]
+	rm.mu.RUnlock()
+	if !existsA || roomA == nil {
+		return
+	}
+
+	linkedRoomID := roomA.GetLinkedRoom()
+	if linkedRoomID == "" && rm.pkManager != nil {
+		if session, ok := rm.pkManager.GetPKSession(senderRoomID); ok && session != nil {
+			if session.RoomID1 == senderRoomID {
+				linkedRoomID = session.RoomID2
+			} else {
+				linkedRoomID = session.RoomID1
+			}
+		}
+	}
+
+	if linkedRoomID != "" && linkedRoomID != senderRoomID {
+		linkedMsg := *msg
+		linkedMsg.RoomID = linkedRoomID
+		_ = rm.BroadcastToRoom(linkedRoomID, &linkedMsg)
+	}
 }
 
 // BroadcastRawBytesToRoom dispatches pre-marshaled JSON byte array to all room participants without re-marshaling
@@ -523,7 +798,7 @@ func broadcastToRoomInternal(room *models.Room, msg *models.SignalingMessage) er
 
 // AddTrackAndRenegotiate adds a new media track (e.g. Co-host video/audio) to all connected viewers and the main host in the room,
 // and sends renegotiated SDP offers over WebSocket.
-func (rm *RoomManager) AddTrackAndRenegotiate(roomID string, track *pionWebRTC.TrackLocalStaticRTP, coHostID string) {
+func (rm *RoomManager) AddTrackAndRenegotiate(roomID string, track *webrtc.TrackLocalStaticRTP, coHostID string) {
 	rm.mu.RLock()
 	room, exists := rm.activeRooms[roomID]
 	rm.mu.RUnlock()
@@ -545,7 +820,7 @@ func (rm *RoomManager) AddTrackAndRenegotiate(roomID string, track *pionWebRTC.T
 		pc := client.PeerConnection
 		client.mu.Unlock()
 
-		if pc == nil || pc.ConnectionState() == pionWebRTC.PeerConnectionStateClosed {
+		if pc == nil || pc.ConnectionState() == webrtc.PeerConnectionStateClosed {
 			return
 		}
 
@@ -569,7 +844,7 @@ func (rm *RoomManager) AddTrackAndRenegotiate(roomID string, track *pionWebRTC.T
 		}
 
 		// Send sdp_offer signaling message to client
-		offerJSON, err := json.Marshal(offer)
+		offerPayload, err := json.Marshal(offer)
 		if err != nil {
 			return
 		}
@@ -578,7 +853,7 @@ func (rm *RoomManager) AddTrackAndRenegotiate(roomID string, track *pionWebRTC.T
 			Event:   "sdp_offer",
 			RoomID:  roomID,
 			UserID:  targetID,
-			Payload: offerJSON,
+			Payload: offerPayload,
 		}
 		if encoded, err := offerMsg.Encode(); err == nil {
 			if client.SafeSend(encoded) {
@@ -602,7 +877,7 @@ func (rm *RoomManager) AddTrackAndRenegotiate(roomID string, track *pionWebRTC.T
 	// Force immediate PLI to Host so all viewers receive a fresh keyframe on renegotiation
 	hostPC := room.GetHostPeerConnection()
 	ssrc := room.GetHostVideoSSRC()
-	if hostPC != nil && ssrc != 0 && hostPC.ConnectionState() != pionWebRTC.PeerConnectionStateClosed {
+	if hostPC != nil && ssrc != 0 && hostPC.ConnectionState() != webrtc.PeerConnectionStateClosed {
 		_ = hostPC.WriteRTCP([]rtcp.Packet{
 			&rtcp.PictureLossIndication{MediaSSRC: ssrc},
 		})
@@ -777,12 +1052,12 @@ func (rm *RoomManager) CloseRoomAndNotifyWithReason(roomID, hostID, reason strin
 		_ = rm.broker.UnlinkAllRoomKeys(context.TODO(), roomID)
 	}
 
-	// Trigger room_ended webhook event
+	// Trigger RoomEnded webhook event
 	if rm.webhookDispatcher != nil {
 		rm.webhookDispatcher.Dispatch(api.WebhookEvent{
-			Event:  api.EventRoomEnded,
-			RoomID: roomID,
-			UserID: hostID,
+			EventType: api.EventRoomEnded,
+			RoomID:    roomID,
+			UserID:    hostID,
 			Data: map[string]any{
 				"host_id":    hostID,
 				"host_score": room.GetHostScore(),
@@ -848,6 +1123,14 @@ func (rm *RoomManager) CloseRoomAndNotifyWithReason(roomID, hostID, reason strin
 	// Clear media tracks & switchers
 	room.SetTracks(nil, nil)
 	delete(rm.activeRooms, roomID)
+	if rm.activeRoomsWG != nil {
+		rm.activeRoomsWG.Done()
+	}
+
+	// Prometheus Metrics: decrement active rooms and participants (for host)
+	metrics.DecActiveRooms()
+	metrics.DecActiveParticipants()
+
 	log.Printf("[Kill Switch] Room '%s' completely wiped from memory and network.\n", roomID)
 }
 

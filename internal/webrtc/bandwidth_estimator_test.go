@@ -197,3 +197,31 @@ func TestEvaluateBitrateLayer(t *testing.T) {
 		t.Fatalf("expected layer 'q' for 200kbps, got '%s'", layer)
 	}
 }
+
+func TestBandwidthEstimator_CongestionAndSpatialLayer(t *testing.T) {
+	be := NewBandwidthEstimator(2_000_000)
+
+	// Good network: 0% loss, 2 Mbps -> S=2 (High)
+	if be.IsCongested() {
+		t.Fatalf("expected not congested initially")
+	}
+	if s := be.EvaluateSpatialLayer(); s != 2 {
+		t.Fatalf("expected spatial layer 2 for good network, got %d", s)
+	}
+
+	// Moderate Congestion: 6% loss -> S=1 (Drop S2, forward S0 and S1)
+	be.Update(1_200_000, 6.0, 50*time.Millisecond)
+	if !be.IsCongested() {
+		t.Fatalf("expected congested when packet loss is 6%%")
+	}
+	if s := be.EvaluateSpatialLayer(); s != 1 {
+		t.Fatalf("expected spatial layer 1 (drop S2) on 6%% loss, got %d", s)
+	}
+
+	// Severe Congestion: 20% loss or 300 kbps -> S=0 (Low)
+	be.Update(300_000, 20.0, 200*time.Millisecond)
+	if s := be.EvaluateSpatialLayer(); s != 0 {
+		t.Fatalf("expected spatial layer 0 on severe congestion, got %d", s)
+	}
+}
+

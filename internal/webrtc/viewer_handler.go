@@ -65,15 +65,59 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 
 	viewerID := fmt.Sprintf("viewer_%d", time.Now().UnixNano())
 
+	// Create WebRTC DataChannels for ultra-low-latency in-room messaging (LiveKit style)
+	// 1. "room-events" (ordered: true) for reliable chat messages and state updates
+	orderedTrue := true
+	if eventsDC, err := peerConnection.CreateDataChannel("room-events", &webrtc.DataChannelInit{
+		Ordered: &orderedTrue,
+	}); err == nil && eventsDC != nil {
+		room.RegisterDataChannel(viewerID, eventsDC)
+		eventsDC.OnMessage(func(msg webrtc.DataChannelMessage) {
+			room.BroadcastDataChannelMessage(viewerID, "room-events", msg.Data)
+		})
+	}
+
+	// 2. "room-reactions" (ordered: false) for high-frequency loss-tolerant events (flying hearts/reactions)
+	orderedFalse := false
+	if reactionsDC, err := peerConnection.CreateDataChannel("room-reactions", &webrtc.DataChannelInit{
+		Ordered: &orderedFalse,
+	}); err == nil && reactionsDC != nil {
+		room.RegisterDataChannel(viewerID, reactionsDC)
+		reactionsDC.OnMessage(func(msg webrtc.DataChannelMessage) {
+			room.BroadcastDataChannelMessage(viewerID, "room-reactions", msg.Data)
+		})
+	}
+
+	// Listen for remote client-initiated DataChannels
+	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
+		room.RegisterDataChannel(viewerID, d)
+		d.OnMessage(func(msg webrtc.DataChannelMessage) {
+			room.BroadcastDataChannelMessage(viewerID, d.Label(), msg.Data)
+		})
+	})
+
+	// Handle ICE connection state changes for cleanup
+	peerConnection.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
+		if state == webrtc.ICEConnectionStateFailed || state == webrtc.ICEConnectionStateClosed || state == webrtc.ICEConnectionStateDisconnected {
+			room.UnregisterDataChannel(viewerID)
+		}
+	})
+
+	// Canonical Name (CNAME) & Stream ID matching for WebRTC Lip-Sync (RFC 3550 & WebRTC spec)
+	cname := fmt.Sprintf("omnicast-stream-%s", room.RoomID)
+
 	var switcher *TrackSwitcher
 	var viewerVideoTrack *webrtc.TrackLocalStaticRTP
+	var videoSender *webrtc.RTPSender
+	var audioSender *webrtc.RTPSender
+
 	if videoTrack != nil {
-		// Create dedicated egress TrackLocalStaticRTP for this viewer
+		// Create dedicated egress TrackLocalStaticRTP for this viewer with matching CNAME
 		var trackErr error
 		viewerVideoTrack, trackErr = webrtc.NewTrackLocalStaticRTP(
 			videoTrack.Codec(),
 			videoTrack.ID(),
-			videoTrack.StreamID(),
+			cname,
 		)
 		if trackErr != nil {
 			log.Printf("Failed to create TrackLocalStaticRTP for viewer: %v\n", trackErr)
@@ -102,7 +146,8 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 			room.RegisterTrackSwitcher(viewerID, switcher)
 		}
 
-		videoSender, addErr := peerConnection.AddTrack(viewerVideoTrack)
+		var addErr error
+		videoSender, addErr = peerConnection.AddTrack(viewerVideoTrack)
 		if addErr != nil {
 			log.Printf("Failed to add video track to viewer PeerConnection (Room %s): %v\n", room.RoomID, addErr)
 			if room != nil {
@@ -130,7 +175,8 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 
 	// Add host's AudioTrack if available
 	if room.AudioTrack != nil {
-		audioSender, trackErr := peerConnection.AddTrack(room.AudioTrack)
+		var trackErr error
+		audioSender, trackErr = peerConnection.AddTrack(room.AudioTrack)
 		if trackErr != nil {
 			log.Printf("Failed to add audio track to viewer PeerConnection (Room %s): %v\n", room.RoomID, trackErr)
 			_ = peerConnection.Close()
@@ -140,6 +186,26 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 		// Read incoming RTCP feedback from viewer for audio
 		ReadRTCP(audioSender, room, viewerID, nil, nil)
 		log.Printf("Attached host audio track to viewer for Room: %s\n", room.RoomID)
+	}
+
+	// Phase 19: Periodic RTCP Sender Reports for Lip-Sync
+	if syncObj := room.GetTimeSynchronizer(); syncObj != nil {
+		if ts, ok := syncObj.(*TimeSynchronizer); ok && ts != nil {
+			if switcher != nil && switcher.tsAdjuster != nil {
+				ts.SetTimestampAdjuster(switcher.tsAdjuster)
+			}
+			stopSR := make(chan struct{})
+			peerConnection.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
+				if state == webrtc.ICEConnectionStateClosed || state == webrtc.ICEConnectionStateFailed {
+					select {
+					case <-stopSR:
+					default:
+						close(stopSR)
+					}
+				}
+			})
+			StartPeriodicSenderReports(peerConnection, videoSender, audioSender, ts, stopSR)
+		}
 	}
 
 	// Add existing Co-Host tracks if any co-hosts are already active in the room
@@ -397,12 +463,21 @@ func ReadRTCP(sender *webrtc.RTPSender, room *models.Room, viewerID string, swit
 							}
 						}
 
-						if switcher != nil && switcher.GetCurrentLayer() == LayerHigh {
-							log.Printf("[ABR Packet Loss] Room %s: Viewer %s NACK detected, downgrading layer '%s' -> '%s'\n",
-								room.RoomID, viewerID, LayerHigh, LayerMedium)
-							switcher.SwitchLayer(LayerMedium)
-							if room != nil {
-								room.SendPLIThrottled(1 * time.Second)
+						if switcher != nil {
+							if switcher.GetSpatialLayer() >= 2 {
+								log.Printf("[ABR Packet Loss] Room %s: Viewer %s NACK detected, dropping spatial layer S=2 -> S=1\n",
+									room.RoomID, viewerID)
+								switcher.DropHighestSpatialLayer()
+								if room != nil {
+									room.SendPLIThrottled(1 * time.Second)
+								}
+							} else if switcher.GetCurrentLayer() == LayerHigh {
+								log.Printf("[ABR Packet Loss] Room %s: Viewer %s NACK detected, downgrading layer '%s' -> '%s'\n",
+									room.RoomID, viewerID, LayerHigh, LayerMedium)
+								switcher.SwitchLayer(LayerMedium)
+								if room != nil {
+									room.SendPLIThrottled(1 * time.Second)
+								}
 							}
 						}
 					case *rtcp.PictureLossIndication:
@@ -481,6 +556,19 @@ func ReadRTCP(sender *webrtc.RTPSender, room *models.Room, viewerID string, swit
 						// Intercept and process TWCC (Transport-Wide Congestion Control) feedback report
 						log.Printf("[TWCC Feedback] Room %s: Viewer %s TWCC feedback received (BaseSeq: %d, StatusCount: %d, Deltas: %d)\n",
 							room.RoomID, viewerID, p.BaseSequenceNumber, p.PacketStatusCount, len(p.RecvDeltas))
+
+						// When TWCC bandwidth estimator detects network congestion, instruct TrackSwitcher to drop highest spatial layer
+						if switcher != nil {
+							total, lost := ParseTWCCLoss(p)
+							if total > 0 {
+								lossPercent := (float64(lost) / float64(total)) * 100.0
+								if lossPercent > LossThresholdHigh {
+									log.Printf("[TWCC Congestion] Room %s: Viewer %s detected %.2f%% loss -> Dropping highest spatial layer (S=2 -> S=1)\n",
+										room.RoomID, viewerID, lossPercent)
+									switcher.DropHighestSpatialLayer()
+								}
+							}
+						}
 					case *rtcp.ReceiverReport:
 						// Parse RTCP Receiver Reports (RR) to extract Round-Trip Time (RTT) and reception quality
 						rtt := ExtractRTTFromReceiverReport(p, time.Now())

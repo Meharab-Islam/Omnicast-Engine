@@ -966,22 +966,49 @@
       ]
     };
 
-    // Fetch dynamic STUN/TURN ICE Servers from GET /api/ice-servers
+    // Fetch dynamic STUN/TURN ICE Servers from GET /turn_credentials or /api/ice-servers
     async function fetchIceServersConfig() {
       try {
-        const res = await fetch('/api/ice-servers');
+        // 1. Primary: Fetch temporary credentials from /turn_credentials
+        const res = await fetch(`/turn_credentials?user_id=${encodeURIComponent(myUserID)}`);
         if (res.ok) {
           const data = await res.json();
-          if (data && data.iceServers) {
-            console.log("Using ICE Servers:", data.iceServers);
-            rtcConfig = { iceServers: data.iceServers };
+          if (data && data.uris && data.username && data.password) {
+            rtcConfig = {
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                {
+                  urls: data.uris,
+                  username: data.username,
+                  credential: data.password
+                }
+              ],
+              iceTransportPolicy: 'all',
+              iceCandidatePoolSize: 2
+            };
+            console.log("[Web Client] Using TURN credentials with TCP/UDP fallback:", rtcConfig.iceServers);
+            return rtcConfig;
+          }
+        }
+
+        // 2. Fallback: /api/ice-servers
+        const fallbackRes = await fetch('/api/ice-servers');
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          if (fallbackData && fallbackData.iceServers) {
+            console.log("[Web Client] Using ICE Servers:", fallbackData.iceServers);
+            rtcConfig = {
+              iceServers: fallbackData.iceServers,
+              iceTransportPolicy: 'all',
+              iceCandidatePoolSize: 2
+            };
             return rtcConfig;
           }
         }
       } catch (err) {
-        console.warn("Could not fetch /api/ice-servers, fallback to default STUN:", err);
+        console.warn("[Web Client] Could not fetch /turn_credentials, fallback to default STUN:", err);
       }
-      console.log("Using ICE Servers:", rtcConfig.iceServers);
+      console.log("[Web Client] Using ICE Servers:", rtcConfig.iceServers);
       return rtcConfig;
     }
 

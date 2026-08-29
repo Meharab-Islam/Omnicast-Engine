@@ -39,6 +39,42 @@ func (t *TimestampAdjuster) Adjust(inTS uint32) uint32 {
 	return outTS
 }
 
+// AdjustContinuous smoothly advances output timestamps across dropped SVC layer frames or layer switches.
+// Packets belonging to the same input frame (inTS == lastInTS) retain identical output timestamps,
+// while new frames advance monotonically to maintain a stable clock for the decoder.
+func (t *TimestampAdjuster) AdjustContinuous(inTS uint32, defaultStep uint32) uint32 {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if defaultStep == 0 {
+		defaultStep = DefaultFrameDuration90kHz
+	}
+
+	if !t.initialized {
+		t.lastInTS = inTS
+		t.lastOutTS = inTS
+		t.offset = 0
+		t.initialized = true
+		return t.lastOutTS
+	}
+
+	if inTS == t.lastInTS {
+		// Same frame (multi-packet frame): output timestamp must match preceding packet
+		return t.lastOutTS
+	}
+
+	// Calculate delta
+	delta := inTS - t.lastInTS
+	if delta > 90000 { // Large jump or discontinuity -> smooth with default step
+		delta = defaultStep
+	}
+
+	t.lastInTS = inTS
+	t.lastOutTS += delta
+	t.offset = t.lastOutTS - inTS
+	return t.lastOutTS
+}
+
 // Rewrite computes the adjusted timestamp for inTS without modifying the internal state
 func (t *TimestampAdjuster) Rewrite(inTS uint32) uint32 {
 	t.mu.RLock()

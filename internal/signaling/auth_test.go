@@ -3,6 +3,8 @@ package signaling
 import (
 	"testing"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func TestJWTAuthentication(t *testing.T) {
@@ -28,6 +30,12 @@ func TestJWTAuthentication(t *testing.T) {
 	}
 	if claims.RoomID != "room-101" {
 		t.Errorf("Expected room_id 'room-101', got '%s'", claims.RoomID)
+	}
+	if !claims.AllowsPublishing() {
+		t.Errorf("Host should be allowed to publish by default")
+	}
+	if !claims.AllowsSubscribing() {
+		t.Errorf("Host should be allowed to subscribe by default")
 	}
 
 	// 3. Test Invalid Secret
@@ -64,5 +72,32 @@ func TestJWTAuthentication(t *testing.T) {
 	}
 	if userClaims.UserID != "u_bob" || userClaims.UserName != "Bob Smith" || userClaims.AvatarURL != "https://img.com/bob.png" {
 		t.Fatalf("Unexpected user claims: %+v", userClaims)
+	}
+
+	// 7. Test Explicit Granular Permissions (can_publish: false, can_subscribe: true)
+	canPublishFalse := false
+	canSubscribeTrue := true
+	customClaims := UserClaims{
+		UserID:       "usr_restricted",
+		Role:         "host",
+		CanPublish:   &canPublishFalse,
+		CanSubscribe: &canSubscribeTrue,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, customClaims)
+	tokenStr, _ := tok.SignedString([]byte(secret))
+
+	parsedClaims, err := ValidateToken(tokenStr, secret)
+	if err != nil {
+		t.Fatalf("Failed to validate token with custom claims: %v", err)
+	}
+	if parsedClaims.AllowsPublishing() {
+		t.Errorf("Expected AllowsPublishing() to return false for can_publish: false")
+	}
+	if !parsedClaims.AllowsSubscribing() {
+		t.Errorf("Expected AllowsSubscribing() to return true for can_subscribe: true")
 	}
 }

@@ -35,6 +35,27 @@ func (s *SequenceNumberAdjuster) Adjust(inSeq uint16) uint16 {
 	return outSeq
 }
 
+// NextContiguous emits a strictly contiguous sequence number (lastOutSeq + 1)
+// regardless of any skipped, filtered, or dropped SVC layer packets in the input stream.
+// It recalculates the offset dynamically so the Viewer's decoder receives a 100% gapless stream.
+func (s *SequenceNumberAdjuster) NextContiguous(inSeq uint16) uint16 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.initialized {
+		s.lastInSeq = inSeq
+		s.lastOutSeq = inSeq
+		s.offset = 0
+		s.initialized = true
+		return s.lastOutSeq
+	}
+
+	s.lastInSeq = inSeq
+	s.lastOutSeq++
+	s.offset = s.lastOutSeq - inSeq
+	return s.lastOutSeq
+}
+
 // Rewrite computes the adjusted sequence number for inSeq without updating internal state
 func (s *SequenceNumberAdjuster) Rewrite(inSeq uint16) uint16 {
 	s.mu.RLock()

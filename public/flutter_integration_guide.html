@@ -501,8 +501,25 @@
   }
 
   <span class="k">final</span> data = jsonDecode(res.body);
-  <span class="k">final</span> rawIce = (data[<span class="s">'ice_servers'</span>] <span class="k">as</span> <span class="t">List</span>? ?? []);
-  <span class="k">final</span> iceServers = rawIce.map((e) =&gt; <span class="t">Map</span>&lt;<span class="t">String</span>, <span class="t">dynamic</span>&gt;.from(e)).toList();
+  <span class="k">var</span> iceServers = (data[<span class="s">'ice_servers'</span>] <span class="k">as</span> <span class="t">List</span>? ?? [])
+      .map((e) =&gt; <span class="t">Map</span>&lt;<span class="t">String</span>, <span class="t">dynamic</span>&gt;.from(e))
+      .toList();
+
+  <span class="c">// /turn_credentials থেকে ডাইনামিক TCP/UDP TURN ক্রেডেনশিয়াল ফেচ করা</span>
+  <span class="k">try</span> {
+    <span class="k">final</span> turnRes = <span class="k">await</span> http.get(<span class="t">Uri</span>.parse(<span class="s">'$hostUrl/turn_credentials?user_id=$userId'</span>));
+    <span class="k">if</span> (turnRes.statusCode == <span class="n">200</span>) {
+      <span class="k">final</span> turnData = jsonDecode(turnRes.body);
+      iceServers = [
+        {<span class="s">'urls'</span>: <span class="s">'stun:stun.l.google.com:19302'</span>},
+        {
+          <span class="s">'urls'</span>: turnData[<span class="s">'uris'</span>],
+          <span class="s">'username'</span>: turnData[<span class="s">'username'</span>],
+          <span class="s">'credential'</span>: turnData[<span class="s">'password'</span>],
+        }
+      ];
+    }
+  } <span class="k">catch</span> (_) {}
 
   <span class="k">return</span> <span class="t">AuthResponse</span>(token: data[<span class="s">'token'</span>], iceServers: iceServers);
 }

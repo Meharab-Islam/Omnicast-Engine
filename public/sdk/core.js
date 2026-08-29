@@ -367,11 +367,28 @@ class LiveMediaCore extends EventEmitter {
         }
         break;
 
-      // 7. Media State Updated (Mute / Unmute)
+      // 7. Track Muted / Media State Updated (Mute / Unmute)
+      case 'track_muted':
       case 'media_state_updated':
         if (payload) {
+          const isMuted = payload.muted !== undefined ? payload.muted : (payload.muted_video || false);
+          const kind = payload.kind || (payload.muted_audio !== undefined ? 'audio' : 'video');
+          const userId = payload.user_id || msg.user_id;
+          const trackId = payload.track_id || `${userId}_${kind}`;
+
+          this.emit('onTrackMuted', {
+            type: 'track_muted',
+            trackId: trackId,
+            muted: isMuted,
+            kind: kind,
+            userId: userId,
+            mutedAudio: payload.muted_audio || false,
+            mutedVideo: payload.muted_video || false,
+            mediaStates: payload.media_states || {},
+            raw: msg
+          });
           this.emit('onMediaStateUpdated', {
-            userId: payload.user_id || msg.user_id,
+            userId: userId,
             mutedAudio: payload.muted_audio || false,
             mutedVideo: payload.muted_video || false,
             mediaStates: payload.media_states || {},
@@ -574,22 +591,52 @@ class LiveMediaCore extends EventEmitter {
   // ==========================================================================
 
   /**
-   * Fetches dynamic STUN/TURN ICE servers configuration from the server
+   * Fetches dynamic STUN/TURN ICE servers configuration from the server (/turn_credentials or /api/ice-servers)
+   * and injects them into the RTCPeerConnection config, ensuring seamless fallback to TCP/Relay if direct UDP fails.
    * @returns {Promise<RTCConfiguration>}
    */
   async fetchIceServers() {
     try {
-      const res = await fetch('/api/ice-servers');
+      const uid = this.currentUserID || `user-${Date.now()}`;
+      // 1. Primary: Fetch temporary time-limited credentials from /turn_credentials
+      const res = await fetch(`/turn_credentials?user_id=${encodeURIComponent(uid)}`);
       if (res.ok) {
         const data = await res.json();
-        if (data && data.iceServers) {
-          console.log("Using ICE Servers:", data.iceServers);
-          this.rtcConfig = { iceServers: data.iceServers };
+        if (data && data.uris && data.username && data.password) {
+          const iceServers = [
+            { urls: 'stun:stun.l.google.com:19302' },
+            {
+              urls: data.uris,
+              username: data.username,
+              credential: data.password
+            }
+          ];
+          console.log("[Omnicast SDK] Configured TURN credentials with TCP/UDP fallback:", iceServers);
+          this.rtcConfig = {
+            iceServers: iceServers,
+            iceTransportPolicy: 'all',
+            iceCandidatePoolSize: 2
+          };
+          return this.rtcConfig;
+        }
+      }
+
+      // 2. Fallback to /api/ice-servers
+      const fallbackRes = await fetch('/api/ice-servers');
+      if (fallbackRes.ok) {
+        const fallbackData = await fallbackRes.json();
+        if (fallbackData && fallbackData.iceServers) {
+          console.log("[Omnicast SDK] Using ICE Servers from /api/ice-servers:", fallbackData.iceServers);
+          this.rtcConfig = {
+            iceServers: fallbackData.iceServers,
+            iceTransportPolicy: 'all',
+            iceCandidatePoolSize: 2
+          };
           return this.rtcConfig;
         }
       }
     } catch (err) {
-      console.warn("Could not fetch /api/ice-servers, using default:", err);
+      console.warn("[Omnicast SDK] Could not fetch dynamic TURN credentials, using defaults:", err);
     }
     return this.rtcConfig;
   }
@@ -718,15 +765,34 @@ class LiveMediaCore extends EventEmitter {
       }
     };
 
-    // ICE Connection state change
+    // ICE Connection state change (Seamless WiFi-to-4G Network Switching)
     this.peerConnection.oniceconnectionstatechange = () => {
-      this.emit('onIceStateChange', this.peerConnection.iceConnectionState);
+      const state = this.peerConnection.iceConnectionState;
+      this.emit('onIceStateChange', state);
+      if (state === 'disconnected' || state === 'failed') {
+        console.warn(`[Omnicast SDK] ICE State is '${state}'. Network shift detected (WiFi/Cellular). Requesting ICE Restart...`);
+        this.restartIce();
+      }
     };
 
     // PeerConnection general state change
     this.peerConnection.onconnectionstatechange = () => {
       this.emit('onConnectionStateChange', this.peerConnection.connectionState);
     };
+  }
+
+  /**
+   * Triggers an ICE Restart to renegotiate network paths seamlessly without tearing down media tracks
+   */
+  restartIce() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      console.log('[Omnicast SDK] Dispatched ICE Restart request to SFU');
+      this.sendSignalingMessage('ice_restart', {
+        event: 'ice_restart',
+        room_id: this.roomId,
+        user_id: this.userId
+      });
+    }
   }
 
   /**

@@ -266,6 +266,33 @@ func (be *BandwidthEstimator) ProcessReceiverReport(rr *rtcp.ReceiverReport) tim
 	return be.GetRTT()
 }
 
+// IsCongested returns true if the current network conditions indicate congestion
+// (packet loss > 5% or estimated bitrate < 1 Mbps).
+func (be *BandwidthEstimator) IsCongested() bool {
+	be.mu.RLock()
+	defer be.mu.RUnlock()
+	return be.packetLoss > LossThresholdHigh || be.currentBitrate < 1_000_000
+}
+
+// EvaluateSpatialLayer determines the maximum allowed VP9 Spatial Layer (S0, S1, or S2) based on network congestion:
+// - If severe congestion (loss > 15% or bitrate < 500 kbps) -> returns 0 (Low, S=0 only)
+// - If moderate congestion (loss > 5% or bitrate < 1 Mbps) -> returns 1 (Medium, drops S=2, only forwarding S=0 and S=1)
+// - If good network conditions (loss <= 5% and bitrate >= 1 Mbps) -> returns 2 (High, forwarding S=0, S=1, S=2)
+func (be *BandwidthEstimator) EvaluateSpatialLayer() uint8 {
+	be.mu.RLock()
+	loss := be.packetLoss
+	bitrate := be.currentBitrate
+	be.mu.RUnlock()
+
+	if loss > 15.0 || (bitrate > 0 && bitrate < 500_000) {
+		return 0 // S0 only
+	}
+	if loss > LossThresholdHigh || (bitrate > 0 && bitrate < 1_000_000) {
+		return 1 // Drop S2, forward S0 and S1
+	}
+	return 2 // S0, S1, S2
+}
+
 // EvaluateBitrateLayer determines the target simulcast layer based on estimated bitrate:
 // - Target 'f' if bitrate > 1000 kbps (1,000,000 bps)
 // - Target 'h' if bitrate > 500 kbps (500,000 bps)

@@ -234,3 +234,235 @@ func TestIsVP8Keyframe(t *testing.T) {
 		t.Fatalf("expected keyframeExtended to return true")
 	}
 }
+
+func TestTrackSwitcher_VP9SingleTrackSVC(t *testing.T) {
+	outTrack, err := webrtc.NewTrackLocalStaticRTP(
+		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP9, ClockRate: 90000},
+		"video",
+		"stream",
+	)
+	if err != nil {
+		t.Fatalf("Failed to create outTrack: %v", err)
+	}
+
+	switcher := NewTrackSwitcher(outTrack, "q") // starts at S=0 (Low)
+	if switcher.GetSpatialLayer() != 0 {
+		t.Fatalf("expected initial spatial layer 0, got %d", switcher.GetSpatialLayer())
+	}
+
+	// 1. Send S0 (Low) packet -> should forward
+	// Byte 0: I=0, P=0 (Keyframe), L=1 (0x20), F=0, B=1 (0x08) -> 0x28
+	// Byte 1: Layer indices: TID=0, U=0, SID=0 (0x00) -> 0x00
+	// Byte 2: TL0PICIDX -> 0x01
+	pktS0 := &rtp.Packet{
+		Header: rtp.Header{
+			SequenceNumber: 100,
+			Timestamp:      1000,
+		},
+		Payload: []byte{0x28, 0x00, 0x01, 0xAA},
+	}
+	_ = switcher.WriteRTP("default", pktS0)
+
+	// 2. Send S1 (Medium) packet while current layer is S0 -> should be DROPPED
+	// Byte 1: SID=1 -> 1<<1 = 0x02
+	pktS1Dropped := &rtp.Packet{
+		Header: rtp.Header{
+			SequenceNumber: 101,
+			Timestamp:      1000,
+		},
+		Payload: []byte{0x28, 0x02, 0x01, 0xBB},
+	}
+	_ = switcher.WriteRTP("default", pktS1Dropped)
+
+	// 3. Switch to Medium layer ('h' -> S1)
+	switcher.SwitchLayer("h")
+	if switcher.GetTargetLayer() != "h" {
+		t.Fatalf("expected target layer 'h'")
+	}
+
+	// Send an S1 P-frame (P=1 -> 0x68) while waiting for keyframe/up-switch -> should be dropped
+	pktS1Pframe := &rtp.Packet{
+		Header: rtp.Header{
+			SequenceNumber: 102,
+			Timestamp:      4000,
+		},
+		Payload: []byte{0x68, 0x02, 0x02, 0xCC},
+	}
+	_ = switcher.WriteRTP("default", pktS1Pframe)
+
+	if switcher.GetSpatialLayer() != 0 {
+		t.Fatalf("expected switcher to remain on S0 until keyframe/up-switch, got %d", switcher.GetSpatialLayer())
+	}
+
+	// Send S1 Keyframe (P=0, B=1 -> 0x28, SID=1 -> 0x02) -> should trigger up-switch to S1!
+	pktS1Keyframe := &rtp.Packet{
+		Header: rtp.Header{
+			SequenceNumber: 103,
+			Timestamp:      7000,
+		},
+		Payload: []byte{0x28, 0x02, 0x03, 0xDD},
+	}
+	_ = switcher.WriteRTP("default", pktS1Keyframe)
+
+	if switcher.GetSpatialLayer() != 1 {
+		t.Fatalf("expected switcher to switch to S1 on keyframe, got %d", switcher.GetSpatialLayer())
+	}
+	if switcher.GetCurrentLayer() != "h" {
+		t.Fatalf("expected current layer 'h', got '%s'", switcher.GetCurrentLayer())
+	}
+}
+
+func TestTrackSwitcher_DropHighestSpatialLayerOnCongestion(t *testing.T) {
+	outTrack, _ := webrtc.NewTrackLocalStaticRTP(
+		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP9, ClockRate: 90000},
+		"video",
+		"stream",
+	)
+
+	switcher := NewTrackSwitcher(outTrack, "f") // Starts at S=2 (High / Full)
+	if switcher.GetSpatialLayer() != 2 {
+		t.Fatalf("expected initial spatial layer 2, got %d", switcher.GetSpatialLayer())
+	}
+
+	// 1. Trigger Congestion (loss > 5%) -> should drop S=2 down to S=1
+	handled := switcher.HandleCongestion(6.5, 800_000)
+	if !handled {
+		t.Fatalf("expected HandleCongestion to return true")
+	}
+	if switcher.GetSpatialLayer() != 1 {
+		t.Fatalf("expected spatial layer dropped to 1, got %d", switcher.GetSpatialLayer())
+	}
+	if switcher.GetCurrentLayer() != "h" {
+		t.Fatalf("expected current layer 'h', got '%s'", switcher.GetCurrentLayer())
+	}
+
+	// 2. Severe Congestion (loss > 15%) -> should drop S=1 down to S=0
+	handled = switcher.HandleCongestion(18.0, 300_000)
+	if !handled {
+		t.Fatalf("expected HandleCongestion to return true on second drop")
+	}
+	if switcher.GetSpatialLayer() != 0 {
+		t.Fatalf("expected spatial layer dropped to 0, got %d", switcher.GetSpatialLayer())
+	}
+	if switcher.GetCurrentLayer() != "q" {
+		t.Fatalf("expected current layer 'q', got '%s'", switcher.GetCurrentLayer())
+	}
+
+	// 3. Already at S=0 -> cannot drop further
+	handled = switcher.HandleCongestion(20.0, 200_000)
+	if handled {
+		t.Fatalf("expected HandleCongestion to return false when already at S=0")
+	}
+}
+
+func TestTrackSwitcher_TemporalLayerDropping(t *testing.T) {
+	outTrack, _ := webrtc.NewTrackLocalStaticRTP(
+		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP9, ClockRate: 90000},
+		"video",
+		"stream",
+	)
+
+	switcher := NewTrackSwitcher(outTrack, "f") // Starts at S=2, T=2 (Full 30fps)
+	if switcher.GetTemporalLayer() != 2 {
+		t.Fatalf("expected initial temporal layer 2, got %d", switcher.GetTemporalLayer())
+	}
+
+	// 1. Send packet with T=0 (Base layer) -> should forward
+	// Byte 0: I=0, P=0, L=1 (0x20), B=1 (0x08) -> 0x28
+	// Byte 1: TID=0 (0x00), U=0, SID=2 (2<<1 = 0x04) -> 0x04
+	// Byte 2: TL0PICIDX -> 0x01
+	pktT0 := &rtp.Packet{
+		Header:  rtp.Header{SequenceNumber: 100, Timestamp: 1000},
+		Payload: []byte{0x28, 0x04, 0x01, 0xAA},
+	}
+	_ = switcher.WriteRTP("default", pktT0)
+
+	// 2. Drop highest temporal layer (drop T=2, keeping T=0 and T=1) due to slight constraint
+	newT := switcher.DropHighestTemporalLayer()
+	if newT != 1 || switcher.GetTemporalLayer() != 1 {
+		t.Fatalf("expected temporal layer dropped to 1, got %d", switcher.GetTemporalLayer())
+	}
+
+	// 3. Packet with T=2 -> should be DROPPED
+	// Byte 1: TID=2 (2<<5 = 0x40), SID=2 (0x04) -> 0x44
+	pktT2 := &rtp.Packet{
+		Header:  rtp.Header{SequenceNumber: 101, Timestamp: 2000},
+		Payload: []byte{0x28, 0x44, 0x01, 0xBB},
+	}
+	_ = switcher.WriteRTP("default", pktT2)
+
+	// 4. Packet with T=1 -> should be FORWARDED
+	// Byte 1: TID=1 (1<<5 = 0x20), SID=2 (0x04) -> 0x24
+	pktT1 := &rtp.Packet{
+		Header:  rtp.Header{SequenceNumber: 102, Timestamp: 3000},
+		Payload: []byte{0x28, 0x24, 0x01, 0xCC},
+	}
+	_ = switcher.WriteRTP("default", pktT1)
+
+	// 5. HandleTemporalConstraint test
+	handled := switcher.HandleTemporalConstraint(true)
+	if !handled {
+		t.Fatalf("expected HandleTemporalConstraint to drop T=1 to T=0")
+	}
+	if switcher.GetTemporalLayer() != 0 {
+		t.Fatalf("expected temporal layer 0, got %d", switcher.GetTemporalLayer())
+	}
+}
+
+func TestTrackSwitcher_ContiguousSequenceNumbersOnSVCDrop(t *testing.T) {
+	outTrack, _ := webrtc.NewTrackLocalStaticRTP(
+		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP9, ClockRate: 90000},
+		"video",
+		"stream",
+	)
+
+	switcher := NewTrackSwitcher(outTrack, "f") // Starts at S=2, T=2
+	// Drop T=2 -> only forward T=0 and T=1
+	switcher.SetTemporalLayer(1)
+
+	// Feed packets where odd sequence numbers have T=2 (which get dropped):
+	// Packet 1: inSeq 100, T=0 -> FORWARDED (outSeq 100)
+	// Packet 2: inSeq 101, T=2 -> DROPPED
+	// Packet 3: inSeq 102, T=1 -> FORWARDED (outSeq 101)
+	// Packet 4: inSeq 103, T=2 -> DROPPED
+	// Packet 5: inSeq 104, T=0 -> FORWARDED (outSeq 102)
+
+	pkt1 := &rtp.Packet{
+		Header:  rtp.Header{SequenceNumber: 100, Timestamp: 1000},
+		Payload: []byte{0x28, 0x04, 0x01, 0xAA}, // T=0, SID=2
+	}
+	_ = switcher.WriteRTP("default", pkt1)
+
+	pkt2 := &rtp.Packet{
+		Header:  rtp.Header{SequenceNumber: 101, Timestamp: 2000},
+		Payload: []byte{0x28, 0x44, 0x01, 0xBB}, // T=2 (dropped)
+	}
+	_ = switcher.WriteRTP("default", pkt2)
+
+	pkt3 := &rtp.Packet{
+		Header:  rtp.Header{SequenceNumber: 102, Timestamp: 3000},
+		Payload: []byte{0x28, 0x24, 0x01, 0xCC}, // T=1, SID=2
+	}
+	_ = switcher.WriteRTP("default", pkt3)
+
+	pkt4 := &rtp.Packet{
+		Header:  rtp.Header{SequenceNumber: 103, Timestamp: 4000},
+		Payload: []byte{0x28, 0x44, 0x01, 0xDD}, // T=2 (dropped)
+	}
+	_ = switcher.WriteRTP("default", pkt4)
+
+	pkt5 := &rtp.Packet{
+		Header:  rtp.Header{SequenceNumber: 104, Timestamp: 5000},
+		Payload: []byte{0x28, 0x04, 0x01, 0xEE}, // T=0, SID=2
+	}
+	_ = switcher.WriteRTP("default", pkt5)
+
+	// Verify that the switcher's lastOutSeq is 102 (strictly 100, 101, 102 without gaps!)
+	if switcher.lastOutSeq != 102 {
+		t.Fatalf("expected lastOutSeq to be strictly contiguous 102, got %d", switcher.lastOutSeq)
+	}
+}
+
+
+
+

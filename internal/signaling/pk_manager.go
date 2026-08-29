@@ -67,17 +67,29 @@ func (pkm *PKManager) StartPK(roomID1, roomID2 string) error {
 
 	log.Printf("[PK Battle] Starting cross-room routing between Room '%s' (Host: %s) and Room '%s' (Host: %s)...\n", roomID1, room1.HostID, roomID2, room2.HostID)
 
-	// 1. Cross-route Host 1's video track into Room 2 viewers & host with dynamic renegotiation
+	// 1. Cross-route Host 1's video & audio track into Room 2 viewers & host with dynamic renegotiation
 	if track1 := room1.GetDefaultViewerVideoTrack(); track1 != nil {
 		pkm.roomManager.AddTrackAndRenegotiate(roomID2, track1, "pk-"+room1.HostID)
-		log.Printf("[PK Battle] Injected Room 1 Host track into Room 2 viewers & host\n")
+		log.Printf("[PK Battle] Injected Room 1 Host video track into Room 2 viewers & host\n")
+	}
+	if audio1 := room1.AudioTrack; audio1 != nil {
+		pkm.roomManager.AddTrackAndRenegotiate(roomID2, audio1, "pk-"+room1.HostID+"-audio")
+		log.Printf("[PK Battle] Injected Room 1 Host audio track into Room 2 viewers & host\n")
 	}
 
-	// 2. Cross-route Host 2's video track into Room 1 viewers & host with dynamic renegotiation
+	// 2. Cross-route Host 2's video & audio track into Room 1 viewers & host with dynamic renegotiation
 	if track2 := room2.GetDefaultViewerVideoTrack(); track2 != nil {
 		pkm.roomManager.AddTrackAndRenegotiate(roomID1, track2, "pk-"+room2.HostID)
-		log.Printf("[PK Battle] Injected Room 2 Host track into Room 1 viewers & host\n")
+		log.Printf("[PK Battle] Injected Room 2 Host video track into Room 1 viewers & host\n")
 	}
+	if audio2 := room2.AudioTrack; audio2 != nil {
+		pkm.roomManager.AddTrackAndRenegotiate(roomID1, audio2, "pk-"+room2.HostID+"-audio")
+		log.Printf("[PK Battle] Injected Room 2 Host audio track into Room 1 viewers & host\n")
+	}
+
+	// Link rooms bidirectionally for cross-room DataChannel mesh & events
+	room1.SetLinkedRoom(roomID2)
+	room2.SetLinkedRoom(roomID1)
 
 	// Create and register PK session
 	sessionID := fmt.Sprintf("%s_%s", roomID1, roomID2)
@@ -254,13 +266,17 @@ func (pkm *PKManager) StopPK(roomID string) error {
 	// Remove cross-routed tracks & clear PKState on both rooms
 	if r1, ok := pkm.roomManager.GetRoom(session.RoomID1); ok && r1 != nil {
 		r1.SetPKState(nil)
+		r1.SetLinkedRoom("")
 		pkm.roomManager.SyncRoomState(session.RoomID1)
 		pkm.roomManager.RemoveTrackAndRenegotiate(session.RoomID2, "pk-"+r1.HostID)
+		pkm.roomManager.RemoveTrackAndRenegotiate(session.RoomID2, "pk-"+r1.HostID+"-audio")
 	}
 	if r2, ok := pkm.roomManager.GetRoom(session.RoomID2); ok && r2 != nil {
 		r2.SetPKState(nil)
+		r2.SetLinkedRoom("")
 		pkm.roomManager.SyncRoomState(session.RoomID2)
 		pkm.roomManager.RemoveTrackAndRenegotiate(session.RoomID1, "pk-"+r2.HostID)
+		pkm.roomManager.RemoveTrackAndRenegotiate(session.RoomID1, "pk-"+r2.HostID+"-audio")
 	}
 
 	endPayload, _ := json.Marshal(map[string]any{
@@ -285,6 +301,16 @@ func (pkm *PKManager) StopPK(roomID string) error {
 
 	log.Printf("PK battle ended between Room '%s' and Room '%s'.\n", session.RoomID1, session.RoomID2)
 	return nil
+}
+
+// LinkRooms is an alias for establishing Native PK Bridging cross-track injection between RoomA and RoomB
+func (pkm *PKManager) LinkRooms(roomID1, roomID2 string) error {
+	return pkm.StartPK(roomID1, roomID2)
+}
+
+// UnlinkRooms is an alias for tearing down Native PK Bridging between RoomA and RoomB
+func (pkm *PKManager) UnlinkRooms(roomID string) error {
+	return pkm.StopPK(roomID)
 }
 
 // GetPKSession retrieves the active PK session for a room

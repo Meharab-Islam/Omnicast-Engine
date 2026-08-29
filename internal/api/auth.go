@@ -20,11 +20,14 @@ const (
 
 // UserClaims defines the JWT payload structure for authenticated streaming
 type UserClaims struct {
-	UserID    string `json:"user_id"`
-	UserName  string `json:"user_name,omitempty"`
-	AvatarURL string `json:"avatar_url,omitempty"`
-	Role      string `json:"role,omitempty"`
-	RoomID    string `json:"room_id,omitempty"`
+	UserID       string          `json:"user_id"`
+	UserName     string          `json:"user_name,omitempty"`
+	AvatarURL    string          `json:"avatar_url,omitempty"`
+	Role         string          `json:"role,omitempty"`
+	RoomID       string          `json:"room_id,omitempty"`
+	CanPublish   *bool           `json:"can_publish,omitempty"`
+	CanSubscribe *bool           `json:"can_subscribe,omitempty"`
+	Permissions  map[string]bool `json:"permissions,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -37,11 +40,15 @@ type ICEServerJSON struct {
 
 // TokenRequest represents the JSON body payload for /api/auth/token
 type TokenRequest struct {
-	APIKey    string `json:"api_key"`
-	APISecret string `json:"api_secret"`
-	UserID    string `json:"user_id"`
-	UserName  string `json:"user_name"`
-	AvatarURL string `json:"avatar_url"`
+	APIKey       string `json:"api_key"`
+	APISecret    string `json:"api_secret"`
+	UserID       string `json:"user_id"`
+	UserName     string `json:"user_name"`
+	AvatarURL    string `json:"avatar_url"`
+	Role         string `json:"role,omitempty"`
+	RoomID       string `json:"room_id,omitempty"`
+	CanPublish   *bool  `json:"can_publish,omitempty"`
+	CanSubscribe *bool  `json:"can_subscribe,omitempty"`
 }
 
 // TokenResponse represents the JSON response returned by /api/auth/token
@@ -99,18 +106,29 @@ func NewAuthHandler() *AuthHandler {
 
 // GenerateUserToken generates a signed JWT token containing user profile details
 func GenerateUserToken(userID, userName, avatarURL, secret string, duration time.Duration) (string, error) {
+	return GenerateTokenWithPermissions(userID, userName, avatarURL, "user", "", nil, nil, secret, duration)
+}
+
+// GenerateTokenWithPermissions generates a signed JWT token containing custom permissions (can_publish, can_subscribe)
+func GenerateTokenWithPermissions(userID, userName, avatarURL, role, roomID string, canPublish, canSubscribe *bool, secret string, duration time.Duration) (string, error) {
 	if secret == "" {
 		secret = os.Getenv("JWT_SECRET")
 		if secret == "" {
 			secret = DefaultJWTSecret
 		}
 	}
+	if role == "" {
+		role = "user"
+	}
 
 	claims := UserClaims{
-		UserID:    userID,
-		UserName:  userName,
-		AvatarURL: avatarURL,
-		Role:      "user",
+		UserID:       userID,
+		UserName:     userName,
+		AvatarURL:    avatarURL,
+		Role:         role,
+		RoomID:       roomID,
+		CanPublish:   canPublish,
+		CanSubscribe: canSubscribe,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -193,8 +211,8 @@ func (h *AuthHandler) HandleTokenGeneration(c *fiber.Ctx) error {
 		})
 	}
 
-	// Generate 24-hour JWT token
-	token, err := GenerateUserToken(req.UserID, req.UserName, req.AvatarURL, h.jwtSecret, 24*time.Hour)
+	// Generate 24-hour JWT token with granular permissions
+	token, err := GenerateTokenWithPermissions(req.UserID, req.UserName, req.AvatarURL, req.Role, req.RoomID, req.CanPublish, req.CanSubscribe, h.jwtSecret, 24*time.Hour)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(TokenResponse{
 			Status: "error",

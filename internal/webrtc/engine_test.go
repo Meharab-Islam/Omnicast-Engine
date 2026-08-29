@@ -13,3 +13,15 @@ func TestInitWebRTC(t *testing.T) {
 		t.Fatal("Expected non-nil webrtc.API instance")
 	}
 }
+
+func TestInitWebRTCWithTCPListener(t *testing.T) {
+	api, err := InitWebRTCWithTCPListener(nil)
+	if err != nil {
+		t.Fatalf("InitWebRTCWithTCPListener failed with nil listener: %v", err)
+	}
+	if api == nil {
+		t.Fatal("Expected non-nil webrtc.API instance")
+	}
+}
+
+

@@ -529,8 +529,35 @@
 
       this.token = data.token;
       if (data.ice_servers && Array.isArray(data.ice_servers)) {
-        this.iceConfig = { iceServers: data.ice_servers };
+        this.iceConfig = {
+          iceServers: data.ice_servers,
+          iceTransportPolicy: 'all',
+          iceCandidatePoolSize: 2
+        };
       }
+
+      // Fetch dynamic TURN credentials with TCP/UDP fallback
+      try {
+        const turnRes = await fetch(`${this.hostUrl.replace(/\/$/, '')}/turn_credentials?user_id=${encodeURIComponent(this.userId)}`);
+        if (turnRes.ok) {
+          const turnData = await turnRes.json();
+          if (turnData && turnData.uris && turnData.username && turnData.password) {
+            this.iceConfig = {
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                {
+                  urls: turnData.uris,
+                  username: turnData.username,
+                  credential: turnData.password
+                }
+              ],
+              iceTransportPolicy: 'all',
+              iceCandidatePoolSize: 2
+            };
+          }
+        }
+      } catch (_) {}
+
       return data;
     }
 
@@ -727,9 +754,20 @@
             }
             break;
 
+          case 'track_muted':
           case 'media_state_updated':
-            if (payload && payload.user_id) {
-              this.state.updateMediaState(payload.user_id, payload);
+            if (payload && (payload.user_id || payload.userId)) {
+              const uId = payload.user_id || payload.userId;
+              this.state.updateMediaState(uId, payload);
+              this.emit('onTrackMuted', {
+                type: 'track_muted',
+                userId: uId,
+                trackId: payload.track_id,
+                kind: payload.kind || (payload.muted_audio !== undefined ? 'audio' : 'video'),
+                muted: payload.muted !== undefined ? payload.muted : (payload.muted_video || false),
+                mutedAudio: payload.muted_audio || false,
+                mutedVideo: payload.muted_video || false
+              });
             }
             break;
 

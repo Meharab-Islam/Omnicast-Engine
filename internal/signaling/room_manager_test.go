@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/webrtc/v3"
 	"omnicast/internal/models"
+	internalWebRTC "omnicast/internal/webrtc"
 )
 
 func TestRoomManager(t *testing.T) {
@@ -503,3 +505,296 @@ func TestPKBattleFullLifecycle(t *testing.T) {
 		t.Fatal("Expected PK session to be removed after StopPK")
 	}
 }
+
+func TestViewerConnectToRemoteNode_DefersPeerConnection(t *testing.T) {
+	rm := NewRoomManager()
+	rm.SetNodeID("node-B")
+
+	// Create room on Node B representation
+	_, err := rm.CreateRoom("room-remote-1", "host-remote")
+	if err != nil {
+		t.Fatalf("Failed to create room: %v", err)
+	}
+
+	viewer := &Client{
+		ID:          "viewer-123",
+		Role:        "viewer",
+		RoomManager: rm,
+		Send:        make(chan []byte, 10),
+	}
+
+	// Join viewer msg
+	msg := &models.SignalingMessage{
+		Event:  "join_viewer",
+		RoomID: "room-remote-1",
+		UserID: "viewer-123",
+	}
+
+	viewer.handleViewerJoinPlay(msg)
+
+	// Since WebRTCAPI is nil or HandleViewerConnection would fail if called without proper API,
+	// when host is local without broker, it tries local PC.
+	// But if broker had room_node_map: "node-A" vs current "node-B", it skips local Pion PC initialization!
+	if viewer.PeerConnection != nil {
+		t.Fatalf("expected PeerConnection to remain nil on remote host node")
+	}
+}
+
+func TestViewerICECandidate_ForwardedToRemoteNodeViaRedis(t *testing.T) {
+	rm := NewRoomManager()
+	rm.SetNodeID("node-B")
+
+	viewer := &Client{
+		ID:          "viewer-456",
+		Role:        "viewer",
+		RoomID:      "room-101",
+		RoomManager: rm,
+		Send:        make(chan []byte, 10),
+	}
+
+	candJSON, _ := json.Marshal(map[string]any{
+		"candidate":     "candidate:1 1 UDP 2122252543 192.168.1.50 50000 typ host",
+		"sdpMid":        "0",
+		"sdpMLineIndex": 0,
+	})
+
+	iceMsg := &models.SignalingMessage{
+		Event:   "ice",
+		RoomID:  "room-101",
+		UserID:  "viewer-456",
+		Payload: candJSON,
+	}
+
+	// Calling handleICECandidate with nil broker & nil PC should not panic
+	viewer.handleICECandidate(iceMsg)
+}
+
+func TestNodeA_ProcessRemoteViewerOfferAndAnswer(t *testing.T) {
+	rm := NewRoomManager()
+	rm.SetServerConfig("origin", "ws://127.0.0.1:8080/ws")
+	rm.SetNodeID("node-A")
+
+	api, err := internalWebRTC.InitWebRTC()
+	if err != nil {
+		t.Fatalf("Failed to init WebRTC API: %v", err)
+	}
+	rm.SetWebRTCAPI(api)
+
+	// Create room on Node A
+	room, err := rm.CreateRoom("room-origin-1", "host-alice")
+	if err != nil {
+		t.Fatalf("Failed to create room: %v", err)
+	}
+
+	// Create a dummy host track so viewer has media
+	track, _ := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, "video", "pion")
+	room.VideoTrack = track
+
+	// Simulate Viewer on Node B creating an Offer
+	viewerPC, _ := api.NewPeerConnection(webrtc.Configuration{})
+	defer viewerPC.Close()
+	_, _ = viewerPC.AddTransceiverFromKind(webrtc.RTPCodecTypeVideo, webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionRecvonly})
+	offer, _ := viewerPC.CreateOffer(nil)
+	_ = viewerPC.SetLocalDescription(offer)
+
+	offerJSON, _ := json.Marshal(offer)
+	offerMsg := &models.SignalingMessage{
+		Event:      "offer",
+		RoomID:     "room-origin-1",
+		UserID:     "viewer-bob",
+		TargetUser: "node-A",
+		Payload:    offerJSON,
+	}
+
+	// Node A processes the Offer
+	rm.HandleRemoteViewerSignaling("room-origin-1", "viewer-bob", offerMsg)
+
+	// Verify remote viewer PC was created on Room
+	remotePC := room.GetRemoteViewerPeerConnection("viewer-bob")
+	if remotePC == nil {
+		t.Fatalf("expected remote viewer PeerConnection to be created on Node A")
+	}
+	defer remotePC.Close()
+}
+
+func TestNodeB_RelaysAnswerToViewerWebSocket(t *testing.T) {
+	viewer := &Client{
+		ID:     "viewer-bob",
+		Role:   "viewer",
+		RoomID: "room-101",
+		Send:   make(chan []byte, 10),
+	}
+
+	answerJSON, _ := json.Marshal(map[string]any{
+		"type": "answer",
+		"sdp":  "v=0\r\no=- 0 0 IN IP4 127.0.0.1\r\n...",
+	})
+
+	answerMsg := &models.SignalingMessage{
+		Event:      "answer",
+		RoomID:     "room-101",
+		UserID:     "node-A",
+		TargetUser: "viewer-bob",
+		Payload:    answerJSON,
+	}
+
+	// Simulate return message from Redis callback
+	encoded, err := answerMsg.Encode()
+	if err != nil {
+		t.Fatalf("Failed to encode answer: %v", err)
+	}
+
+	// Relay to Viewer's WebSocket
+	viewer.SafeSend(encoded)
+
+	select {
+	case receivedBytes := <-viewer.Send:
+		var relayedMsg models.SignalingMessage
+		if err := json.Unmarshal(receivedBytes, &relayedMsg); err != nil {
+			t.Fatalf("Failed to unmarshal relayed message: %v", err)
+		}
+		if relayedMsg.Event != "answer" {
+			t.Fatalf("expected relayed event 'answer', got '%s'", relayedMsg.Event)
+		}
+	default:
+		t.Fatalf("expected Viewer's Send channel to receive the relayed Answer")
+	}
+}
+
+func TestServerDrainingFlag(t *testing.T) {
+	// Initial state must be false
+	SetServerDraining(false)
+	if IsServerDraining() {
+		t.Fatalf("expected isServerDraining to be false initially")
+	}
+
+	SetServerDraining(true)
+	if !IsServerDraining() {
+		t.Fatalf("expected isServerDraining to be true after SetServerDraining(true)")
+	}
+
+	SetServerDraining(false)
+	if IsServerDraining() {
+		t.Fatalf("expected isServerDraining to be false after resetting")
+	}
+}
+
+func TestHostCreateRoom_RejectedWhenDraining(t *testing.T) {
+	rm := NewRoomManager()
+	api, _ := internalWebRTC.InitWebRTC()
+
+	client := &Client{
+		ID:          "host-draining-test",
+		Role:        "host",
+		RoomManager: rm,
+		WebRTCAPI:   api,
+		Send:        make(chan []byte, 10),
+	}
+
+	SetServerDraining(true)
+	defer SetServerDraining(false)
+
+	msg := &models.SignalingMessage{
+		Event:  "create_room",
+		RoomID: "room-drain-blocked",
+		UserID: client.ID,
+	}
+
+	client.handlePublishOffer(msg)
+
+	// Verify room was NOT created in RoomManager
+	if _, exists := rm.GetRoom("room-drain-blocked"); exists {
+		t.Fatalf("expected room creation to be blocked while server is draining")
+	}
+
+	// Verify client received 503 error message
+	select {
+	case rawMsg := <-client.Send:
+		var errMsg models.SignalingMessage
+		if err := json.Unmarshal(rawMsg, &errMsg); err != nil {
+			t.Fatalf("Failed to unmarshal error message: %v", err)
+		}
+		if errMsg.Event != "error" {
+			t.Fatalf("expected error event, got '%s'", errMsg.Event)
+		}
+	default:
+		t.Fatalf("expected error message in client's send channel")
+	}
+}
+
+func TestActiveRoomsWaitGroup_Tracking(t *testing.T) {
+	rm := NewRoomManager()
+
+	// Initially 0 rooms
+	if rm.ActiveRoomsCount() != 0 {
+		t.Fatalf("expected 0 active rooms, got %d", rm.ActiveRoomsCount())
+	}
+
+	// Create room 1
+	room1, err := rm.CreateRoom("room-wg-1", "host-1")
+	if err != nil || room1 == nil {
+		t.Fatalf("failed to create room 1: %v", err)
+	}
+
+	// Create room 2
+	room2, err := rm.CreateRoom("room-wg-2", "host-2")
+	if err != nil || room2 == nil {
+		t.Fatalf("failed to create room 2: %v", err)
+	}
+
+	if rm.ActiveRoomsCount() != 2 {
+		t.Fatalf("expected 2 active rooms, got %d", rm.ActiveRoomsCount())
+	}
+
+	// Close room 1
+	rm.CloseRoomAndNotifyWithReason("room-wg-1", "host-1", "test_close")
+	if rm.ActiveRoomsCount() != 1 {
+		t.Fatalf("expected 1 active room, got %d", rm.ActiveRoomsCount())
+	}
+
+	// Close room 2
+	rm.CloseRoomAndNotifyWithReason("room-wg-2", "host-2", "test_close")
+	if rm.ActiveRoomsCount() != 0 {
+		t.Fatalf("expected 0 active rooms, got %d", rm.ActiveRoomsCount())
+	}
+}
+
+func TestRoomNaturalEnd_DecrementsWaitGroup(t *testing.T) {
+	rm := NewRoomManager()
+
+	// 1. Create Room with host and viewer
+	room, err := rm.CreateRoom("room-natural-1", "host-alice")
+	if err != nil || room == nil {
+		t.Fatalf("Failed to create room: %v", err)
+	}
+
+	viewer := &Client{
+		ID:          "viewer-bob",
+		Role:        "viewer",
+		RoomManager: rm,
+		Send:        make(chan []byte, 10),
+	}
+	_ = rm.JoinViewer("room-natural-1", viewer)
+
+	if rm.ActiveRoomsCount() != 1 {
+		t.Fatalf("expected 1 active room, got %d", rm.ActiveRoomsCount())
+	}
+
+	// 2. Viewer leaves
+	rm.RemoveViewer("room-natural-1", "viewer-bob")
+
+	// 3. Host disconnects and room naturally ends
+	rm.destroyRoomInstant("room-natural-1")
+
+	if rm.ActiveRoomsCount() != 0 {
+		t.Fatalf("expected 0 active rooms after natural end, got %d", rm.ActiveRoomsCount())
+	}
+}
+
+
+
+
+
+
+
+

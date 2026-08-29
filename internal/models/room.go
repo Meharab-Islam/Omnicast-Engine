@@ -56,6 +56,21 @@ type Room struct {
 	viewportManager  any `json:"-"` // *webrtc.ViewportManager
 	fanOutDispatcher any `json:"-"` // *webrtc.FanOutDispatcher
 
+	// Phase 7: Remote Edge Viewer PeerConnections & UDP RTP Cascading
+	remoteViewerPCs map[string]*webrtc.PeerConnection `json:"-"`
+	udpForwarder    any                               `json:"-"` // *webrtc.UDPRTPForwarder
+	udpReceiver     any                               `json:"-"` // *webrtc.UDPRTPReceiver
+
+	// Phase 16: Ultra-Low-Latency WebRTC DataChannels
+	orderedDataChannels map[string]*webrtc.DataChannel `json:"-"` // "room-events" (ordered: true) for chat/state
+	lossyDataChannels   map[string]*webrtc.DataChannel `json:"-"` // "room-reactions" (ordered: false) for reactions
+
+	// Phase 19: Time Synchronizer for A/V Lip-Sync (RTCP Sender Reports)
+	timeSynchronizer any `json:"-"` // *webrtc.TimeSynchronizer
+
+	// Phase 21: Native PK Bridging & Linked Rooms
+	linkedRoomID string `json:"-"`
+
 	// Presence Batching & Throttling
 	pendingJoins    []*Participant
 	pendingLeaves   []string
@@ -69,27 +84,29 @@ type Room struct {
 // NewRoom creates and initializes a new Room with default room name, current timestamp, and default main seat
 func NewRoom(roomID, hostID string) *Room {
 	return &Room{
-		RoomID:       roomID,
-		RoomName:     roomID,
-		RoomType:     "video",
-		HostID:       hostID,
-		MainSeatID:   hostID,
-		HostScore:    0,
-		CreatedAt:    time.Now().UTC(),
-		Viewers:      make(map[string]any),
-		Participants: make(map[string]*Participant),
-		ActiveSeats:  map[string]string{"0": hostID},
-		MediaStates:    make(map[string]MediaState),
-		VideoTracks:    make(map[string]*webrtc.TrackLocalStaticRTP),
-		VideoSSRCs:     make(map[string]uint32),
-		CoHostTracks:   make(map[string]*CoHostMedia),
-		TrackSwitchers: make(map[string]any),
-		PacketBuffers:  make(map[string]any),
-		bannedUsers:    make(map[string]bool),
+		RoomID:              roomID,
+		RoomName:            roomID,
+		RoomType:            "video",
+		HostID:              hostID,
+		MainSeatID:          hostID,
+		HostScore:           0,
+		CreatedAt:           time.Now().UTC(),
+		Viewers:             make(map[string]any),
+		Participants:        make(map[string]*Participant),
+		ActiveSeats:         map[string]string{"0": hostID},
+		MediaStates:         make(map[string]MediaState),
+		VideoTracks:         make(map[string]*webrtc.TrackLocalStaticRTP),
+		VideoSSRCs:          make(map[string]uint32),
+		CoHostTracks:        make(map[string]*CoHostMedia),
+		TrackSwitchers:      make(map[string]any),
+		PacketBuffers:       make(map[string]any),
+		bannedUsers:         make(map[string]bool),
 		participantReconnectTimers: make(map[string]*time.Timer),
-		pendingJoins:   make([]*Participant, 0),
-		pendingLeaves:  make([]string, 0),
-		stopPresence:   make(chan struct{}),
+		orderedDataChannels: make(map[string]*webrtc.DataChannel),
+		lossyDataChannels:   make(map[string]*webrtc.DataChannel),
+		pendingJoins:        make([]*Participant, 0),
+		pendingLeaves:       make([]string, 0),
+		stopPresence:        make(chan struct{}),
 	}
 }
 
@@ -99,26 +116,29 @@ func NewRoomWithName(roomID, roomName, hostID string) *Room {
 		roomName = roomID
 	}
 	return &Room{
-		RoomID:       roomID,
-		RoomName:     roomName,
-		RoomType:     "video",
-		HostID:       hostID,
-		MainSeatID:   hostID,
-		HostScore:    0,
-		CreatedAt:    time.Now().UTC(),
-		Viewers:      make(map[string]any),
-		Participants: make(map[string]*Participant),
-		ActiveSeats:    map[string]string{"0": hostID},
-		MediaStates:    make(map[string]MediaState),
-		VideoTracks:    make(map[string]*webrtc.TrackLocalStaticRTP),
-		CoHostTracks:   make(map[string]*CoHostMedia),
-		TrackSwitchers: make(map[string]any),
-		PacketBuffers:  make(map[string]any),
-		bannedUsers:    make(map[string]bool),
+		RoomID:              roomID,
+		RoomName:            roomName,
+		RoomType:            "video",
+		HostID:              hostID,
+		MainSeatID:          hostID,
+		HostScore:           0,
+		CreatedAt:           time.Now().UTC(),
+		Viewers:             make(map[string]any),
+		Participants:        make(map[string]*Participant),
+		ActiveSeats:         map[string]string{"0": hostID},
+		MediaStates:         make(map[string]MediaState),
+		VideoTracks:         make(map[string]*webrtc.TrackLocalStaticRTP),
+		VideoSSRCs:          make(map[string]uint32),
+		CoHostTracks:        make(map[string]*CoHostMedia),
+		TrackSwitchers:      make(map[string]any),
+		PacketBuffers:       make(map[string]any),
+		bannedUsers:         make(map[string]bool),
 		participantReconnectTimers: make(map[string]*time.Timer),
-		pendingJoins:   make([]*Participant, 0),
-		pendingLeaves:  make([]string, 0),
-		stopPresence:   make(chan struct{}),
+		orderedDataChannels: make(map[string]*webrtc.DataChannel),
+		lossyDataChannels:   make(map[string]*webrtc.DataChannel),
+		pendingJoins:        make([]*Participant, 0),
+		pendingLeaves:       make([]string, 0),
+		stopPresence:        make(chan struct{}),
 	}
 }
 
@@ -738,6 +758,35 @@ func (r *Room) GetCoHostPeerConnection(coHostID string) *webrtc.PeerConnection {
 	return nil
 }
 
+// AddRemoteViewerPeerConnection adds a remote viewer PeerConnection for inter-node cascading
+func (r *Room) AddRemoteViewerPeerConnection(viewerID string, pc *webrtc.PeerConnection) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.remoteViewerPCs == nil {
+		r.remoteViewerPCs = make(map[string]*webrtc.PeerConnection)
+	}
+	r.remoteViewerPCs[viewerID] = pc
+}
+
+// GetRemoteViewerPeerConnection retrieves the remote viewer PeerConnection
+func (r *Room) GetRemoteViewerPeerConnection(viewerID string) *webrtc.PeerConnection {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.remoteViewerPCs == nil {
+		return nil
+	}
+	return r.remoteViewerPCs[viewerID]
+}
+
+// RemoveRemoteViewerPeerConnection removes a remote viewer PeerConnection
+func (r *Room) RemoveRemoteViewerPeerConnection(viewerID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.remoteViewerPCs != nil {
+		delete(r.remoteViewerPCs, viewerID)
+	}
+}
+
 // SetCoHostVideoSSRC assigns the incoming video SSRC for a co-host
 func (r *Room) SetCoHostVideoSSRC(coHostID string, ssrc uint32) {
 	r.mu.Lock()
@@ -1203,4 +1252,123 @@ func (r *Room) SetFanOutDispatcher(d any) {
 	r.fanOutDispatcher = d
 }
 
+// GetUDPForwarder returns the UDPRTPForwarder instance
+func (r *Room) GetUDPForwarder() any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.udpForwarder
+}
 
+// SetUDPForwarder sets the UDPRTPForwarder instance
+func (r *Room) SetUDPForwarder(f any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.udpForwarder = f
+}
+
+// GetUDPReceiver returns the UDPRTPReceiver instance
+func (r *Room) GetUDPReceiver() any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.udpReceiver
+}
+
+// SetUDPReceiver sets the UDPRTPReceiver instance
+func (r *Room) SetUDPReceiver(rec any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.udpReceiver = rec
+}
+
+// RegisterDataChannel registers an active WebRTC DataChannel (ordered chat or lossy reactions) for a participant
+func (r *Room) RegisterDataChannel(peerID string, dc *webrtc.DataChannel) {
+	if dc == nil || peerID == "" {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.orderedDataChannels == nil {
+		r.orderedDataChannels = make(map[string]*webrtc.DataChannel)
+	}
+	if r.lossyDataChannels == nil {
+		r.lossyDataChannels = make(map[string]*webrtc.DataChannel)
+	}
+
+	if dc.Ordered() || dc.Label() == "room-events" {
+		r.orderedDataChannels[peerID] = dc
+	} else {
+		r.lossyDataChannels[peerID] = dc
+	}
+}
+
+// UnregisterDataChannel unregisters all DataChannels for a disconnected participant
+func (r *Room) UnregisterDataChannel(peerID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	delete(r.orderedDataChannels, peerID)
+	delete(r.lossyDataChannels, peerID)
+}
+
+// BroadcastDataChannelMessage broadcasts a binary payload to all active DataChannels in this room
+func (r *Room) BroadcastDataChannelMessage(senderID string, label string, msg []byte) {
+	r.mu.RLock()
+	var targets []*webrtc.DataChannel
+
+	if label == "room-reactions" || label == "reactions" {
+		targets = make([]*webrtc.DataChannel, 0, len(r.lossyDataChannels))
+		for pid, dc := range r.lossyDataChannels {
+			if pid != senderID && dc != nil && dc.ReadyState() == webrtc.DataChannelStateOpen {
+				targets = append(targets, dc)
+			}
+		}
+	} else {
+		// Default to ordered "room-events" DataChannels
+		targets = make([]*webrtc.DataChannel, 0, len(r.orderedDataChannels))
+		for pid, dc := range r.orderedDataChannels {
+			if pid != senderID && dc != nil && dc.ReadyState() == webrtc.DataChannelStateOpen {
+				targets = append(targets, dc)
+			}
+		}
+	}
+	r.mu.RUnlock()
+
+	// Asynchronous non-blocking broadcast fan-out to all active DataChannels
+	for _, dc := range targets {
+		_ = dc.Send(msg)
+	}
+}
+
+// BroadcastDataChannelText broadcasts a string text message to all active DataChannels in this room
+func (r *Room) BroadcastDataChannelText(senderID string, label string, text string) {
+	r.BroadcastDataChannelMessage(senderID, label, []byte(text))
+}
+
+// GetTimeSynchronizer returns the TimeSynchronizer instance for Lip-Sync
+func (r *Room) GetTimeSynchronizer() any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.timeSynchronizer
+}
+
+// SetTimeSynchronizer sets the TimeSynchronizer instance for Lip-Sync
+func (r *Room) SetTimeSynchronizer(ts any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.timeSynchronizer = ts
+}
+
+// GetLinkedRoom returns the linked room ID if this room is in a PK battle
+func (r *Room) GetLinkedRoom() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.linkedRoomID
+}
+
+// SetLinkedRoom sets the linked room ID for cross-room PK bridging
+func (r *Room) SetLinkedRoom(linkedID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.linkedRoomID = linkedID
+}

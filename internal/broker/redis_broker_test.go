@@ -85,4 +85,36 @@ func TestRedisBroker_NilOperations(t *testing.T) {
 	if err != nil {
 		t.Fatal("expected nil error on BatchRefreshRoomTTLs of nil broker")
 	}
+
+	err = b.SetRoomNodeMap(context.TODO(), "room-101", "node-1", 0)
+	if err == nil {
+		t.Fatal("expected error on SetRoomNodeMap of nil broker")
+	}
+
+	_, err = b.GetRoomNodeMap(context.TODO(), "room-101")
+	if err == nil {
+		t.Fatal("expected error on GetRoomNodeMap of nil broker")
+	}
+
+	err = b.PublishViewerSignaling("room-101", "viewer-1", nil)
+	if err == nil {
+		t.Fatal("expected error on PublishViewerSignaling of nil broker")
+	}
+
+	_, err = b.SubscribeViewerSignaling("room-101", "viewer-1", nil)
+	if err == nil {
+		t.Fatal("expected error on SubscribeViewerSignaling of nil broker")
+	}
+
+	b.UnsubscribeViewerSignaling("room-101", "viewer-1")
 }
+
+func TestFormatViewerSignalingChannel(t *testing.T) {
+	channel := FormatViewerSignalingChannel("room_101", "viewer_456")
+	expected := "signaling.room_101.viewer_456"
+	if channel != expected {
+		t.Fatalf("expected channel '%s', got '%s'", expected, channel)
+	}
+}
+
+

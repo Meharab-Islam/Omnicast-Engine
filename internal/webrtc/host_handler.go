@@ -2,19 +2,23 @@ package webrtc
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"sync"
 
+	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3"
+	"omnicast/internal/metrics"
 	"omnicast/internal/models"
 )
 
+// ScalabilityModeL3T3 defines the Scalable Video Coding (SVC) mode with 3 spatial layers and 3 temporal layers
+const ScalabilityModeL3T3 = "L3T3"
+
 // HandleHostConnection creates a WebRTC PeerConnection for the broadcaster/host,
+// configures the video transceiver to request SVC (Scalable Video Coding) with L3T3 mode (3 spatial, 3 temporal layers),
 // sets up OnTrack handler, and reads incoming RTP packets in a background goroutine to write to room tracks.
-// Supports Simulcast layers ('q' = Low, 'h' = Medium, 'f' = High) via track.RID().
 func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Configuration) (*webrtc.PeerConnection, error) {
 	if api == nil {
 		return nil, errors.New("webrtc api instance is required")
@@ -30,6 +34,63 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 	}
 	room.SetHostPeerConnection(peerConnection)
 
+	// Initialize TimeSynchronizer for precise A/V Lip-Sync (RFC 3550)
+	timeSync := NewTimeSynchronizer(nil)
+	room.SetTimeSynchronizer(timeSync)
+
+	// Configure Video Transceiver for SVC (Scalable Video Coding) requesting L3T3 scalability mode
+	if _, err := peerConnection.AddTransceiverFromKind(
+		webrtc.RTPCodecTypeVideo,
+		webrtc.RTPTransceiverInit{
+			Direction: webrtc.RTPTransceiverDirectionRecvonly,
+		},
+	); err != nil {
+		log.Printf("[SVC Setup] Note: Transceiver init returned %v (proceeding with SDP negotiation)\n", err)
+	}
+
+	// Configure Audio Transceiver
+	if _, err := peerConnection.AddTransceiverFromKind(
+		webrtc.RTPCodecTypeAudio,
+		webrtc.RTPTransceiverInit{
+			Direction: webrtc.RTPTransceiverDirectionRecvonly,
+		},
+	); err != nil {
+		log.Printf("[Audio Setup] Note: Transceiver init returned %v\n", err)
+	}
+
+	// Create WebRTC DataChannels for ultra-low-latency in-room messaging (LiveKit style)
+	// 1. "room-events" (ordered: true) for reliable chat messages and state updates
+	orderedTrue := true
+	if eventsDC, err := peerConnection.CreateDataChannel("room-events", &webrtc.DataChannelInit{
+		Ordered: &orderedTrue,
+	}); err == nil && eventsDC != nil {
+		room.RegisterDataChannel(room.HostID, eventsDC)
+		eventsDC.OnMessage(func(msg webrtc.DataChannelMessage) {
+			// Instantly fan-out byte payload to all active Viewers in this specific room
+			room.BroadcastDataChannelMessage(room.HostID, "room-events", msg.Data)
+		})
+	}
+
+	// 2. "room-reactions" (ordered: false) for high-frequency loss-tolerant events (flying hearts/reactions)
+	orderedFalse := false
+	if reactionsDC, err := peerConnection.CreateDataChannel("room-reactions", &webrtc.DataChannelInit{
+		Ordered: &orderedFalse,
+	}); err == nil && reactionsDC != nil {
+		room.RegisterDataChannel(room.HostID, reactionsDC)
+		reactionsDC.OnMessage(func(msg webrtc.DataChannelMessage) {
+			// Instantly fan-out reaction payload to all active Viewers in this specific room
+			room.BroadcastDataChannelMessage(room.HostID, "room-reactions", msg.Data)
+		})
+	}
+
+	// Listen for remote client-initiated DataChannels
+	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
+		room.RegisterDataChannel(room.HostID, d)
+		d.OnMessage(func(msg webrtc.DataChannelMessage) {
+			room.BroadcastDataChannelMessage(room.HostID, d.Label(), msg.Data)
+		})
+	})
+
 	// Maintain a separate ring buffer for every incoming video track from the Host
 	packetBuffers := make(map[string]*PacketBuffer)
 	var pbMu sync.RWMutex
@@ -39,14 +100,32 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 		rid := remoteTrack.RID()
 		log.Printf("Host track received: Kind=%s, RID=%s\n", remoteTrack.Kind().String(), rid)
 
-		// Get or create dedicated PacketBuffer for this video track layer
+		// Intercept incoming RTCP Sender Reports from the publisher to update NTP-to-RTP wall-clock mapping
+		if receiver != nil {
+			go func(r *webrtc.RTPReceiver, kind webrtc.RTPCodecType) {
+				rtcpBuf := make([]byte, 1500)
+				for {
+					n, _, rtcpErr := r.Read(rtcpBuf)
+					if rtcpErr != nil {
+						return
+					}
+					pkts, unmarshalErr := rtcp.Unmarshal(rtcpBuf[:n])
+					if unmarshalErr != nil {
+						continue
+					}
+					for _, p := range pkts {
+						if sr, ok := p.(*rtcp.SenderReport); ok && sr != nil {
+							timeSync.ProcessSenderReport(sr, kind)
+						}
+					}
+				}
+			}(receiver, remoteTrack.Kind())
+		}
+
+		// Get or create dedicated PacketBuffer for the host's video stream (non-simulcast single high-quality track)
 		var pktBuffer *PacketBuffer
 		if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
-			layerKey := rid
-			if layerKey == "" {
-				layerKey = "default"
-			}
-
+			layerKey := "default"
 			pbMu.Lock()
 			if pb, exists := packetBuffers[layerKey]; exists && pb != nil {
 				pktBuffer = pb
@@ -61,14 +140,11 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 		}
 
 		trackID := remoteTrack.ID()
-		if rid != "" {
-			trackID = fmt.Sprintf("%s-%s", remoteTrack.ID(), rid)
-		}
 
 		var localTrack *webrtc.TrackLocalStaticRTP
 		var trackErr error
 
-		// Register track into the room
+		// Register track into the room without standard simulcast (RID 'q', 'h', 'f')
 		switch remoteTrack.Kind() {
 		case webrtc.RTPCodecTypeVideo:
 			// Strict Security Check: Drop and ignore video tracks in audio-only rooms
@@ -78,49 +154,25 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 				return
 			}
 
-			if rid == "" {
-				// Non-simulcast standard video track
-				if existing := room.GetVideoTrack(); existing != nil {
-					localTrack = existing
-					log.Printf("Re-bound existing default VideoTrack on Host reconnect for Room: %s\n", room.RoomID)
-				} else {
-					localTrack, trackErr = webrtc.NewTrackLocalStaticRTP(
-						remoteTrack.Codec().RTPCodecCapability,
-						trackID,
-						remoteTrack.StreamID(),
-					)
-					if trackErr != nil {
-						log.Printf("Failed to create TrackLocalStaticRTP for host track: %v\n", trackErr)
-						return
-					}
-					room.SetVideoTrack(localTrack)
-					log.Printf("Default non-simulcast video track registered for Room: %s (SSRC: %d)\n", room.RoomID, remoteTrack.SSRC())
-				}
-				room.SetVideoTrackSSRC("default", uint32(remoteTrack.SSRC()))
-				room.SetHostVideoSSRC(uint32(remoteTrack.SSRC()))
+			// Single high-quality video track for the Publisher (Non-simulcast direct stream)
+			if existing := room.GetVideoTrack(); existing != nil {
+				localTrack = existing
+				log.Printf("Re-bound existing primary VideoTrack on Host reconnect for Room: %s\n", room.RoomID)
 			} else {
-				// Simulcast quality layer ('q' = Low, 'h' = Medium, 'f' = High)
-				if existing := room.GetVideoTrackByRID(rid); existing != nil {
-					localTrack = existing
-					log.Printf("Re-bound existing Simulcast layer (RID: '%s') on Host reconnect for Room: %s\n", rid, room.RoomID)
-				} else {
-					localTrack, trackErr = webrtc.NewTrackLocalStaticRTP(
-						remoteTrack.Codec().RTPCodecCapability,
-						trackID,
-						remoteTrack.StreamID(),
-					)
-					if trackErr != nil {
-						log.Printf("Failed to create TrackLocalStaticRTP for host track (RID: '%s'): %v\n", rid, trackErr)
-						return
-					}
-					room.SetVideoTrackRID(rid, localTrack)
-					log.Printf("Simulcast video layer (RID: '%s') registered in Room.VideoTracks for Room: %s (SSRC: %d)\n", rid, room.RoomID, remoteTrack.SSRC())
+				localTrack, trackErr = webrtc.NewTrackLocalStaticRTP(
+					remoteTrack.Codec().RTPCodecCapability,
+					trackID,
+					remoteTrack.StreamID(),
+				)
+				if trackErr != nil {
+					log.Printf("Failed to create TrackLocalStaticRTP for host track: %v\n", trackErr)
+					return
 				}
-				room.SetVideoTrackSSRC(rid, uint32(remoteTrack.SSRC()))
-				if rid == "h" || room.GetHostVideoSSRC() == 0 {
-					room.SetHostVideoSSRC(uint32(remoteTrack.SSRC()))
-				}
+				room.SetVideoTrack(localTrack)
+				log.Printf("Primary video track registered for Room: %s (SSRC: %d, Non-simulcast)\n", room.RoomID, remoteTrack.SSRC())
 			}
+			room.SetVideoTrackSSRC("default", uint32(remoteTrack.SSRC()))
+			room.SetHostVideoSSRC(uint32(remoteTrack.SSRC()))
 
 		case webrtc.RTPCodecTypeAudio:
 			if existing := room.GetAudioTrack(); existing != nil {
@@ -157,6 +209,9 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 					}
 					return
 				}
+
+				// Prometheus Metrics: Record inbound bandwidth bytes
+				metrics.AddBytesReceived(n)
 
 				// 1. Store a copy of the packet in the track's PacketBuffer BEFORE forwarding
 				var parsedPkt *rtp.Packet
@@ -199,17 +254,27 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 					return
 				}
 
-				// 3. Fan out to active viewer TrackSwitchers for dynamic ABR switching
+				// 3. Fan out to active viewer TrackSwitchers for direct high-quality playback
 				if parsedPkt != nil {
 					switchers := room.GetAllTrackSwitchers()
 					if len(switchers) > 0 {
-						effectiveRID := rid
-						if effectiveRID == "" {
-							effectiveRID = "h"
-						}
 						for _, s := range switchers {
 							if ts, ok := s.(*TrackSwitcher); ok && ts != nil {
-								_ = ts.WriteRTP(effectiveRID, parsedPkt)
+								_ = ts.WriteRTP(ts.GetCurrentLayer(), parsedPkt)
+							}
+						}
+					}
+				}
+
+				// 4. Inter-Node Cascading: Forward Host's RTP packets directly to Edge Node B(s) via raw UDP
+				if forwarderAny := room.GetUDPForwarder(); forwarderAny != nil {
+					if forwarder, ok := forwarderAny.(*UDPRTPForwarder); ok && forwarder != nil {
+						if parsedPkt != nil {
+							_ = forwarder.ForwardRTP(parsedPkt)
+						} else {
+							var pkt rtp.Packet
+							if err := pkt.Unmarshal(buf[:n]); err == nil {
+								_ = forwarder.ForwardRTP(&pkt)
 							}
 						}
 					}

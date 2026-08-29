@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -81,6 +82,150 @@ func (rb *RedisBroker) IsActive() bool {
 	rb.mu.RLock()
 	defer rb.mu.RUnlock()
 	return rb.isActive
+}
+
+// FormatViewerSignalingChannel returns the standardized Redis Pub/Sub channel format:
+// signaling.<room_id>.<viewer_id>
+func FormatViewerSignalingChannel(roomID, viewerID string) string {
+	return fmt.Sprintf("signaling.%s.%s", roomID, viewerID)
+}
+
+// PublishViewerSignaling publishes a direct signaling message to the dedicated channel signaling.<room_id>.<viewer_id>
+func (rb *RedisBroker) PublishViewerSignaling(roomID, viewerID string, msg *models.SignalingMessage) error {
+	if rb == nil || !rb.IsActive() {
+		return errors.New("redis broker is not active")
+	}
+
+	channel := FormatViewerSignalingChannel(roomID, viewerID)
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal viewer signaling message: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(rb.ctx, 2*time.Second)
+	defer cancel()
+
+	if err := rb.client.Publish(ctx, channel, data).Err(); err != nil {
+		return fmt.Errorf("failed to publish to viewer channel %s: %w", channel, err)
+	}
+
+	return nil
+}
+
+// SubscribeViewerSignaling subscribes to the dedicated channel signaling.<room_id>.<viewer_id>
+// and invokes the onMessage callback whenever an inter-node signaling message arrives for this viewer.
+func (rb *RedisBroker) SubscribeViewerSignaling(roomID, viewerID string, onMessage func(msg *models.SignalingMessage)) (*redis.PubSub, error) {
+	if rb == nil || !rb.IsActive() {
+		return nil, errors.New("redis broker is not active")
+	}
+
+	channel := FormatViewerSignalingChannel(roomID, viewerID)
+	rb.mu.Lock()
+	if sub, exists := rb.subscribers[channel]; exists && sub != nil {
+		rb.mu.Unlock()
+		return sub, nil
+	}
+
+	pubsub := rb.client.Subscribe(rb.ctx, channel)
+	rb.subscribers[channel] = pubsub
+	rb.mu.Unlock()
+
+	go func() {
+		ch := pubsub.Channel()
+		for {
+			select {
+			case <-rb.ctx.Done():
+				return
+			case redisMsg, ok := <-ch:
+				if !ok {
+					return
+				}
+				var sigMsg models.SignalingMessage
+				if err := json.Unmarshal([]byte(redisMsg.Payload), &sigMsg); err == nil && onMessage != nil {
+					onMessage(&sigMsg)
+				}
+			}
+		}
+	}()
+
+	log.Printf("[Redis] Subscribed to viewer signaling channel %s\n", channel)
+	return pubsub, nil
+}
+
+// UnsubscribeViewerSignaling unsubscribes and closes the channel signaling.<room_id>.<viewer_id>
+func (rb *RedisBroker) UnsubscribeViewerSignaling(roomID, viewerID string) {
+	if rb == nil {
+		return
+	}
+
+	channel := FormatViewerSignalingChannel(roomID, viewerID)
+	rb.mu.Lock()
+	defer rb.mu.Unlock()
+
+	if pubsub, exists := rb.subscribers[channel]; exists && pubsub != nil {
+		_ = pubsub.Close()
+		delete(rb.subscribers, channel)
+		log.Printf("[Redis] Unsubscribed from viewer signaling channel %s\n", channel)
+	}
+}
+
+// SubscribeRoomSignalingPattern subscribes to the pattern signaling.<room_id>.* using Redis PSubscribe.
+// Origin Node A listens to this pattern to process incoming remote viewer offers and ICE candidates from Edge nodes.
+func (rb *RedisBroker) SubscribeRoomSignalingPattern(roomID string, onMessage func(viewerID string, msg *models.SignalingMessage)) (*redis.PubSub, error) {
+	if rb == nil || !rb.IsActive() {
+		return nil, errors.New("redis broker is not active")
+	}
+
+	pattern := fmt.Sprintf("signaling.%s.*", roomID)
+	rb.mu.Lock()
+	if sub, exists := rb.subscribers[pattern]; exists && sub != nil {
+		rb.mu.Unlock()
+		return sub, nil
+	}
+
+	pubsub := rb.client.PSubscribe(rb.ctx, pattern)
+	rb.subscribers[pattern] = pubsub
+	rb.mu.Unlock()
+
+	go func() {
+		ch := pubsub.Channel()
+		prefix := fmt.Sprintf("signaling.%s.", roomID)
+		for {
+			select {
+			case <-rb.ctx.Done():
+				return
+			case redisMsg, ok := <-ch:
+				if !ok {
+					return
+				}
+				viewerID := strings.TrimPrefix(redisMsg.Channel, prefix)
+				var sigMsg models.SignalingMessage
+				if err := json.Unmarshal([]byte(redisMsg.Payload), &sigMsg); err == nil && onMessage != nil {
+					onMessage(viewerID, &sigMsg)
+				}
+			}
+		}
+	}()
+
+	log.Printf("[Redis Pattern] Node A subscribed to pattern %s\n", pattern)
+	return pubsub, nil
+}
+
+// UnsubscribeRoomSignalingPattern stops listening to pattern signaling.<room_id>.*
+func (rb *RedisBroker) UnsubscribeRoomSignalingPattern(roomID string) {
+	if rb == nil {
+		return
+	}
+
+	pattern := fmt.Sprintf("signaling.%s.*", roomID)
+	rb.mu.Lock()
+	defer rb.mu.Unlock()
+
+	if pubsub, exists := rb.subscribers[pattern]; exists && pubsub != nil {
+		_ = pubsub.Close()
+		delete(rb.subscribers, pattern)
+		log.Printf("[Redis Pattern] Unsubscribed from pattern %s\n", pattern)
+	}
 }
 
 // PublishRoomEvent publishes a signaling event (chat, gift, seat, pk, etc.) to the room's Redis channel
@@ -414,6 +559,45 @@ func (rb *RedisBroker) DeleteRoomState(ctx context.Context, roomID string) error
 	return rb.client.Del(ctx, stateKey, scoreKey).Err()
 }
 
+// SetRoomNodeMap stores the key-value pair room_node_map:<room_id> = <current_node_id> in Redis with a TTL.
+func (rb *RedisBroker) SetRoomNodeMap(ctx context.Context, roomID, nodeID string, ttl time.Duration) error {
+	if rb == nil || !rb.IsActive() {
+		return errors.New("redis broker is not active")
+	}
+
+	if ttl <= 0 {
+		ttl = 24 * time.Hour
+	}
+
+	if ctx == nil {
+		ctx = context.TODO()
+	}
+
+	key := fmt.Sprintf("room_node_map:%s", roomID)
+	return rb.client.Set(ctx, key, nodeID, ttl).Err()
+}
+
+// GetRoomNodeMap retrieves the node_id hosting the room: room_node_map:<room_id>
+func (rb *RedisBroker) GetRoomNodeMap(ctx context.Context, roomID string) (string, error) {
+	if rb == nil || !rb.IsActive() {
+		return "", errors.New("redis broker is not active")
+	}
+
+	if ctx == nil {
+		ctx = context.TODO()
+	}
+
+	key := fmt.Sprintf("room_node_map:%s", roomID)
+	val, err := rb.client.Get(ctx, key).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "", nil
+		}
+		return "", err
+	}
+	return val, nil
+}
+
 // UnlinkAllRoomKeys instantly and non-blockingly wipes all Redis keys associated with a room using UNLINK
 func (rb *RedisBroker) UnlinkAllRoomKeys(ctx context.Context, roomID string) error {
 	if rb == nil || !rb.IsActive() {
@@ -433,6 +617,7 @@ func (rb *RedisBroker) UnlinkAllRoomKeys(ctx context.Context, roomID string) err
 		fmt.Sprintf("room:%s:participants", roomID),
 		fmt.Sprintf("room:%s:banned", roomID),
 		fmt.Sprintf("room:%s:origin", roomID),
+		fmt.Sprintf("room_node_map:%s", roomID),
 		fmt.Sprintf("pk:session:%s", roomID),
 	}
 
@@ -572,12 +757,14 @@ func (rb *RedisBroker) RefreshRoomTTL(ctx context.Context, roomID string) error 
 	scoreKey := fmt.Sprintf("room:%s:score", roomID)
 	chatsKey := fmt.Sprintf("room:%s:chats", roomID)
 	originKey := fmt.Sprintf("room:%s:origin", roomID)
+	nodeMapKey := fmt.Sprintf("room_node_map:%s", roomID)
 
 	pipe := rb.client.Pipeline()
 	pipe.Expire(ctx, stateKey, 24*time.Hour)
 	pipe.Expire(ctx, scoreKey, 24*time.Hour)
 	pipe.Expire(ctx, chatsKey, 24*time.Hour)
 	pipe.Expire(ctx, originKey, 24*time.Hour)
+	pipe.Expire(ctx, nodeMapKey, 24*time.Hour)
 	_, err := pipe.Exec(ctx)
 	return err
 }
@@ -600,11 +787,13 @@ func (rb *RedisBroker) BatchRefreshRoomTTLs(ctx context.Context, roomIDs []strin
 		scoreKey := fmt.Sprintf("room:%s:score", roomID)
 		chatsKey := fmt.Sprintf("room:%s:chats", roomID)
 		originKey := fmt.Sprintf("room:%s:origin", roomID)
+		nodeMapKey := fmt.Sprintf("room_node_map:%s", roomID)
 
 		pipe.Expire(ctx, stateKey, 24*time.Hour)
 		pipe.Expire(ctx, scoreKey, 24*time.Hour)
 		pipe.Expire(ctx, chatsKey, 24*time.Hour)
 		pipe.Expire(ctx, originKey, 24*time.Hour)
+		pipe.Expire(ctx, nodeMapKey, 24*time.Hour)
 	}
 
 	_, err := pipe.Exec(ctx)
