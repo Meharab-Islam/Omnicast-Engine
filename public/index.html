@@ -1121,12 +1121,18 @@
       const roomID = 'room-' + Math.random().toString(36).substring(2, 8);
 
       try {
-        addLog('Requesting camera & microphone access (480p stable)...', 'info');
+        addLog('1. Initializing WebRTC RTCPeerConnection with STUN servers...', 'info');
 
-        // 1. Get user media with optimized 480p constraints
+        // Step 1: Initialize the RTCPeerConnection with proper STUN servers (Google STUN + dynamic TURN)
+        const iceConfig = await fetchIceServersConfig();
+        peerConnection = new RTCPeerConnection(iceConfig);
+        setupHostPeerConnection(peerConnection, roomID, roomName);
+
+        // Step 2: Call navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        addLog('2. Requesting camera & microphone access (getUserMedia)...', 'info');
         localStream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
 
-        // 2. Switch UI view
+        // Step 3: Display the local stream on the video element
         isHost = true;
         isLeaving = false;
         showRoomView(roomID, roomName);
@@ -1141,44 +1147,33 @@
         document.getElementById('mainSeatText').innerText = myUserID;
         document.getElementById('card-main-stream').setAttribute('data-user-id', myUserID);
 
-        // 3. Connect WebSocket and wait until OPEN
+        // Step 4 (Crucial Step): Iterate through the stream and use pc.addTrack(track, stream) / transceivers to attach the media
+        addLog('3. Attaching local media tracks to RTCPeerConnection...', 'info');
+        localStream.getTracks().forEach(track => {
+          if (track.kind === 'video') {
+            const videoTransceiver = peerConnection.addTransceiver(track, {
+              direction: 'sendonly',
+              streams: [localStream],
+              sendEncodings: [
+                { rid: 'f', active: true, maxBitrate: 800000 },
+                { rid: 'h', active: true, maxBitrate: 350000, scaleResolutionDownBy: 2 },
+                { rid: 'q', active: true, maxBitrate: 120000, scaleResolutionDownBy: 4 }
+              ]
+            });
+            forceVP8Codec(videoTransceiver);
+            console.log('[Host] Attached video track via Transceiver with Simulcast encodings');
+          } else {
+            peerConnection.addTrack(track, localStream);
+            console.log('[Host] Attached audio track via pc.addTrack');
+          }
+        });
+
+        // Connect WebSocket and wait until OPEN
         await initWebSocket(roomID, 'host');
 
-        // 4. Fetch dynamic ICE servers & Create WebRTC PeerConnection
-        const iceConfig = await fetchIceServersConfig();
-        peerConnection = new RTCPeerConnection(iceConfig);
-
-        setupHostPeerConnection(peerConnection, roomID, roomName);
-
-        // 5. Configure Simulcast Video Transceiver with capped bitrates to prevent network choking
-        const videoTrack = localStream.getVideoTracks()[0];
-        if (videoTrack) {
-          const videoTransceiver = peerConnection.addTransceiver(videoTrack, {
-            direction: 'sendonly',
-            streams: [localStream],
-            sendEncodings: [
-              { rid: 'f', active: true, maxBitrate: 800000 },
-              { rid: 'h', active: true, maxBitrate: 350000, scaleResolutionDownBy: 2 },
-              { rid: 'q', active: true, maxBitrate: 120000, scaleResolutionDownBy: 4 }
-            ]
-          });
-          forceVP8Codec(videoTransceiver);
-          console.log('[Host Simulcast] Added Video Transceiver with capped encodings (f:800k, h:350k, q:120k) & forced VP8');
-        }
-
-        const audioTrack = localStream.getAudioTracks()[0];
-        if (audioTrack) {
-          peerConnection.addTransceiver(audioTrack, {
-            direction: 'sendonly',
-            streams: [localStream]
-          });
-          console.log('[Host] Added Audio Transceiver');
-        }
-
-        // 6. Create Offer:
+        // Step 5: Only AFTER the tracks are added, call pc.createOffer(), set local description, and send offer payload via WebSocket
+        addLog('4. Generating WebRTC SDP Offer and sending to SFU...', 'info');
         const offer = await peerConnection.createOffer();
-
-        // 7. Local Description সেট করে সার্ভারে পাঠাও:
         await peerConnection.setLocalDescription(offer);
 
         ws.send(JSON.stringify({
