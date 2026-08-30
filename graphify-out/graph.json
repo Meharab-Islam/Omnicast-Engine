@@ -2911,7 +2911,7 @@
       "file_type": "code",
       "norm_label": "newclient()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L81"
+      "source_location": "L82"
     },
     {
       "id": "internal_signaling_client_newclientwithclaims",
@@ -2922,7 +2922,7 @@
       "file_type": "code",
       "norm_label": "newclientwithclaims()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L95"
+      "source_location": "L96"
     },
     {
       "id": "internal_signaling_hub",
@@ -3068,50 +3068,6 @@
       "source_location": "L21"
     },
     {
-      "id": "internal_webrtc_turn_auth",
-      "label": "turn_auth.go",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "Client",
-      "file_type": "code",
-      "norm_label": "turn_auth.go",
-      "source_file": "internal/webrtc/turn_auth.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "internal_webrtc_turn_auth_generateturncredentials",
-      "label": "GenerateTURNCredentials()",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "Client",
-      "file_type": "code",
-      "norm_label": "generateturncredentials()",
-      "source_file": "internal/webrtc/turn_auth.go",
-      "source_location": "L29"
-    },
-    {
-      "id": "internal_webrtc_turn_auth_getdefaulticeservers",
-      "label": "GetDefaultICEServers()",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "Client",
-      "file_type": "code",
-      "norm_label": "getdefaulticeservers()",
-      "source_file": "internal/webrtc/turn_auth.go",
-      "source_location": "L54"
-    },
-    {
-      "id": "internal_webrtc_turn_auth_getdefaulticeserversjson",
-      "label": "GetDefaultICEServersJSON()",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "Client",
-      "file_type": "code",
-      "norm_label": "getdefaulticeserversjson()",
-      "source_file": "internal/webrtc/turn_auth.go",
-      "source_location": "L93"
-    },
-    {
       "id": "internal_webrtc_turn_auth_getdynamicrtcconfiguration",
       "label": "GetDynamicRTCConfiguration()",
       "_origin": "ast",
@@ -3132,39 +3088,6 @@
       "norm_label": "webrtc.configuration",
       "source_file": "",
       "source_location": ""
-    },
-    {
-      "id": "internal_webrtc_turn_auth_test",
-      "label": "turn_auth_test.go",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "Client",
-      "file_type": "code",
-      "norm_label": "turn_auth_test.go",
-      "source_file": "internal/webrtc/turn_auth_test.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "internal_webrtc_turn_auth_test_testgenerateturncredentials",
-      "label": "TestGenerateTURNCredentials()",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "Client",
-      "file_type": "code",
-      "norm_label": "testgenerateturncredentials()",
-      "source_file": "internal/webrtc/turn_auth_test.go",
-      "source_location": "L16"
-    },
-    {
-      "id": "internal_webrtc_turn_auth_test_testgetdefaulticeservers",
-      "label": "TestGetDefaultICEServers()",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "Client",
-      "file_type": "code",
-      "norm_label": "testgetdefaulticeservers()",
-      "source_file": "internal/webrtc/turn_auth_test.go",
-      "source_location": "L52"
     },
     {
       "id": "models_signalingmessage_encode",
@@ -3197,7 +3120,7 @@
       "file_type": "code",
       "norm_label": "client",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L50"
+      "source_location": "L51"
     },
     {
       "id": "signaling_client_closesend",
@@ -3208,7 +3131,7 @@
       "file_type": "code",
       "norm_label": ".closesend()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2208"
+      "source_location": "L2215"
     },
     {
       "id": "signaling_client_getlastpong",
@@ -3219,7 +3142,7 @@
       "file_type": "code",
       "norm_label": ".getlastpong()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L76"
+      "source_location": "L77"
     },
     {
       "id": "signaling_client_handlechatmessage",
@@ -3230,7 +3153,7 @@
       "file_type": "code",
       "norm_label": ".handlechatmessage()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1150"
+      "source_location": "L1157"
     },
     {
       "id": "signaling_client_handleendroom",
@@ -3241,7 +3164,7 @@
       "file_type": "code",
       "norm_label": ".handleendroom()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2532"
+      "source_location": "L2539"
     },
     {
       "id": "signaling_client_handlegiftmessage",
@@ -3252,7 +3175,7 @@
       "file_type": "code",
       "norm_label": ".handlegiftmessage()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1182"
+      "source_location": "L1189"
     },
     {
       "id": "signaling_client_handlegiftmessagedirect",
@@ -3263,7 +3186,7 @@
       "file_type": "code",
       "norm_label": ".handlegiftmessagedirect()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1378"
+      "source_location": "L1385"
     },
     {
       "id": "signaling_client_handleicecandidate",
@@ -3274,7 +3197,7 @@
       "file_type": "code",
       "norm_label": ".handleicecandidate()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2004"
+      "source_location": "L2011"
     },
     {
       "id": "signaling_client_handleicerestartrequest",
@@ -3285,7 +3208,7 @@
       "file_type": "code",
       "norm_label": ".handleicerestartrequest()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2172"
+      "source_location": "L2179"
     },
     {
       "id": "signaling_client_handlekickparticipant",
@@ -3296,7 +3219,7 @@
       "file_type": "code",
       "norm_label": ".handlekickparticipant()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2431"
+      "source_location": "L2438"
     },
     {
       "id": "signaling_client_handlekickseat",
@@ -3307,7 +3230,7 @@
       "file_type": "code",
       "norm_label": ".handlekickseat()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1769"
+      "source_location": "L1776"
     },
     {
       "id": "signaling_client_handleleaveseat",
@@ -3318,7 +3241,7 @@
       "file_type": "code",
       "norm_label": ".handleleaveseat()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1708"
+      "source_location": "L1715"
     },
     {
       "id": "signaling_client_handlemediastatechange",
@@ -3329,7 +3252,7 @@
       "file_type": "code",
       "norm_label": ".handlemediastatechange()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1408"
+      "source_location": "L1415"
     },
     {
       "id": "signaling_client_handlepkaccept",
@@ -3340,7 +3263,7 @@
       "file_type": "code",
       "norm_label": ".handlepkaccept()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2376"
+      "source_location": "L2383"
     },
     {
       "id": "signaling_client_handlepkrequest",
@@ -3351,7 +3274,7 @@
       "file_type": "code",
       "norm_label": ".handlepkrequest()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2320"
+      "source_location": "L2327"
     },
     {
       "id": "signaling_client_handlepkstop",
@@ -3362,7 +3285,7 @@
       "file_type": "code",
       "norm_label": ".handlepkstop()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2416"
+      "source_location": "L2423"
     },
     {
       "id": "signaling_client_handlepublishoffer",
@@ -3373,7 +3296,7 @@
       "file_type": "code",
       "norm_label": ".handlepublishoffer()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L299"
+      "source_location": "L306"
     },
     {
       "id": "signaling_client_handlerequestlayer",
@@ -3384,7 +3307,7 @@
       "file_type": "code",
       "norm_label": ".handlerequestlayer()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2596"
+      "source_location": "L2603"
     },
     {
       "id": "signaling_client_handleroomstatesync",
@@ -3395,7 +3318,7 @@
       "file_type": "code",
       "norm_label": ".handleroomstatesync()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1383"
+      "source_location": "L1390"
     },
     {
       "id": "signaling_client_handlesdpanswer",
@@ -3406,7 +3329,7 @@
       "file_type": "code",
       "norm_label": ".handlesdpanswer()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2077"
+      "source_location": "L2084"
     },
     {
       "id": "signaling_client_handleseataccept",
@@ -3417,7 +3340,7 @@
       "file_type": "code",
       "norm_label": ".handleseataccept()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1580"
+      "source_location": "L1587"
     },
     {
       "id": "signaling_client_handleseatrequest",
@@ -3428,7 +3351,7 @@
       "file_type": "code",
       "norm_label": ".handleseatrequest()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1507"
+      "source_location": "L1514"
     },
     {
       "id": "signaling_client_handlesetmainseat",
@@ -3439,7 +3362,7 @@
       "file_type": "code",
       "norm_label": ".handlesetmainseat()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1094"
+      "source_location": "L1101"
     },
     {
       "id": "signaling_client_handlesetviewport",
@@ -3450,7 +3373,7 @@
       "file_type": "code",
       "norm_label": ".handlesetviewport()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2655"
+      "source_location": "L2662"
     },
     {
       "id": "signaling_client_handlesignalingmessage",
@@ -3461,7 +3384,7 @@
       "file_type": "code",
       "norm_label": ".handlesignalingmessage()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L214"
+      "source_location": "L215"
     },
     {
       "id": "signaling_client_handlesubscribecohost",
@@ -3472,7 +3395,7 @@
       "file_type": "code",
       "norm_label": ".handlesubscribecohost()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1858"
+      "source_location": "L1865"
     },
     {
       "id": "signaling_client_handleviewerjoinplay",
@@ -3483,7 +3406,7 @@
       "file_type": "code",
       "norm_label": ".handleviewerjoinplay()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L698"
+      "source_location": "L705"
     },
     {
       "id": "signaling_client_readpump",
@@ -3494,7 +3417,7 @@
       "file_type": "code",
       "norm_label": ".readpump()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L171"
+      "source_location": "L172"
     },
     {
       "id": "signaling_client_safesend",
@@ -3505,7 +3428,7 @@
       "file_type": "code",
       "norm_label": ".safesend()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2182"
+      "source_location": "L2189"
     },
     {
       "id": "signaling_client_toparticipant",
@@ -3516,7 +3439,7 @@
       "file_type": "code",
       "norm_label": ".toparticipant()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L145"
+      "source_location": "L146"
     },
     {
       "id": "signaling_client_triggericerestart",
@@ -3527,7 +3450,7 @@
       "file_type": "code",
       "norm_label": ".triggericerestart()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2117"
+      "source_location": "L2124"
     },
     {
       "id": "signaling_client_updatelastpong",
@@ -3538,7 +3461,7 @@
       "file_type": "code",
       "norm_label": ".updatelastpong()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L71"
+      "source_location": "L72"
     },
     {
       "id": "signaling_client_writejson",
@@ -3549,7 +3472,7 @@
       "file_type": "code",
       "norm_label": ".writejson()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2235"
+      "source_location": "L2242"
     },
     {
       "id": "signaling_client_writemessage",
@@ -3560,7 +3483,7 @@
       "file_type": "code",
       "norm_label": ".writemessage()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2224"
+      "source_location": "L2231"
     },
     {
       "id": "signaling_client_writepump",
@@ -3571,7 +3494,7 @@
       "file_type": "code",
       "norm_label": ".writepump()",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2247"
+      "source_location": "L2254"
     },
     {
       "id": "signaling_hub",
@@ -3728,44 +3651,22 @@
       "source_location": ""
     },
     {
-      "id": "webrtc_iceserver",
-      "label": "webrtc.ICEServer",
+      "id": "webrtc_cascademanager_connectandrelay",
+      "label": ".connectAndRelay()",
       "_origin": "ast",
       "community": 1,
       "community_name": "Client",
       "file_type": "code",
-      "norm_label": "webrtc.iceserver",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "webrtc_iceserverjson",
-      "label": "ICEServerJSON",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "Client",
-      "file_type": "code",
-      "norm_label": "iceserverjson",
-      "source_file": "internal/webrtc/turn_auth.go",
-      "source_location": "L22"
-    },
-    {
-      "id": "go_type_testing_t",
-      "label": "testing.T",
-      "_origin": "ast",
-      "community": 10,
-      "community_name": "testing.T",
-      "file_type": "code",
-      "norm_label": "testing.t",
-      "source_file": "",
-      "source_location": ""
+      "norm_label": ".connectandrelay()",
+      "source_file": "internal/webrtc/cascading.go",
+      "source_location": "L147"
     },
     {
       "id": "internal_signaling_kill_switch_test",
       "label": "kill_switch_test.go",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "kill_switch_test.go",
       "source_file": "internal/signaling/kill_switch_test.go",
@@ -3776,51 +3677,40 @@
       "label": "TestRoomManager_ForceEndRoomKillSwitch()",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "testroommanager_forceendroomkillswitch()",
       "source_file": "internal/signaling/kill_switch_test.go",
       "source_location": "L10"
     },
     {
-      "id": "internal_signaling_pk_manager_test",
-      "label": "pk_manager_test.go",
-      "_origin": "ast",
-      "community": 10,
-      "community_name": "testing.T",
-      "file_type": "code",
-      "norm_label": "pk_manager_test.go",
-      "source_file": "internal/signaling/pk_manager_test.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "internal_signaling_pk_manager_test_testpkmanager",
-      "label": "TestPKManager()",
-      "_origin": "ast",
-      "community": 10,
-      "community_name": "testing.T",
-      "file_type": "code",
-      "norm_label": "testpkmanager()",
-      "source_file": "internal/signaling/pk_manager_test.go",
-      "source_location": "L7"
-    },
-    {
       "id": "internal_signaling_room_manager_newroommanager",
       "label": "NewRoomManager()",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "newroommanager()",
       "source_file": "internal/signaling/room_manager.go",
       "source_location": "L71"
     },
     {
+      "id": "internal_signaling_room_manager_setserverdraining",
+      "label": "SetServerDraining()",
+      "_origin": "ast",
+      "community": 10,
+      "community_name": "NewRoomManager",
+      "file_type": "code",
+      "norm_label": "setserverdraining()",
+      "source_file": "internal/signaling/room_manager.go",
+      "source_location": "L35"
+    },
+    {
       "id": "internal_signaling_room_manager_test",
       "label": "room_manager_test.go",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "room_manager_test.go",
       "source_file": "internal/signaling/room_manager_test.go",
@@ -3831,7 +3721,7 @@
       "label": "TestActiveRoomsWaitGroup_Tracking()",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "testactiveroomswaitgroup_tracking()",
       "source_file": "internal/signaling/room_manager_test.go",
@@ -3842,7 +3732,7 @@
       "label": "TestAddTrackAndRenegotiate()",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "testaddtrackandrenegotiate()",
       "source_file": "internal/signaling/room_manager_test.go",
@@ -3853,7 +3743,7 @@
       "label": "TestGetAllRooms()",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "testgetallrooms()",
       "source_file": "internal/signaling/room_manager_test.go",
@@ -3864,51 +3754,29 @@
       "label": "TestHostCreateRoom_RejectedWhenDraining()",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "testhostcreateroom_rejectedwhendraining()",
       "source_file": "internal/signaling/room_manager_test.go",
       "source_location": "L682"
     },
     {
-      "id": "internal_signaling_room_manager_test_testnodea_processremoteviewerofferandanswer",
-      "label": "TestNodeA_ProcessRemoteViewerOfferAndAnswer()",
-      "_origin": "ast",
-      "community": 10,
-      "community_name": "testing.T",
-      "file_type": "code",
-      "norm_label": "testnodea_processremoteviewerofferandanswer()",
-      "source_file": "internal/signaling/room_manager_test.go",
-      "source_location": "L572"
-    },
-    {
       "id": "internal_signaling_room_manager_test_testnodeb_relaysanswertoviewerwebsocket",
       "label": "TestNodeB_RelaysAnswerToViewerWebSocket()",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "testnodeb_relaysanswertoviewerwebsocket()",
       "source_file": "internal/signaling/room_manager_test.go",
       "source_location": "L620"
     },
     {
-      "id": "internal_signaling_room_manager_test_testpkbattlefulllifecycle",
-      "label": "TestPKBattleFullLifecycle()",
-      "_origin": "ast",
-      "community": 10,
-      "community_name": "testing.T",
-      "file_type": "code",
-      "norm_label": "testpkbattlefulllifecycle()",
-      "source_file": "internal/signaling/room_manager_test.go",
-      "source_location": "L408"
-    },
-    {
       "id": "internal_signaling_room_manager_test_testroommanager",
       "label": "TestRoomManager()",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "testroommanager()",
       "source_file": "internal/signaling/room_manager_test.go",
@@ -3919,7 +3787,7 @@
       "label": "TestRoomNaturalEnd_DecrementsWaitGroup()",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "testroomnaturalend_decrementswaitgroup()",
       "source_file": "internal/signaling/room_manager_test.go",
@@ -3930,7 +3798,7 @@
       "label": "TestRoomStateSyncAndGiftScore()",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "testroomstatesyncandgiftscore()",
       "source_file": "internal/signaling/room_manager_test.go",
@@ -3941,18 +3809,29 @@
       "label": "TestSeatManagementLifecycle()",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "testseatmanagementlifecycle()",
       "source_file": "internal/signaling/room_manager_test.go",
       "source_location": "L319"
     },
     {
+      "id": "internal_signaling_room_manager_test_testserverdrainingflag",
+      "label": "TestServerDrainingFlag()",
+      "_origin": "ast",
+      "community": 10,
+      "community_name": "NewRoomManager",
+      "file_type": "code",
+      "norm_label": "testserverdrainingflag()",
+      "source_file": "internal/signaling/room_manager_test.go",
+      "source_location": "L664"
+    },
+    {
       "id": "internal_signaling_room_manager_test_testviewerconnecttoremotenode_deferspeerconnection",
       "label": "TestViewerConnectToRemoteNode_DefersPeerConnection()",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "testviewerconnecttoremotenode_deferspeerconnection()",
       "source_file": "internal/signaling/room_manager_test.go",
@@ -3963,7 +3842,7 @@
       "label": "TestViewerICECandidate_ForwardedToRemoteNodeViaRedis()",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "testviewericecandidate_forwardedtoremotenodeviaredis()",
       "source_file": "internal/signaling/room_manager_test.go",
@@ -3974,7 +3853,7 @@
       "label": "TestViewerUpdateEvent()",
       "_origin": "ast",
       "community": 10,
-      "community_name": "testing.T",
+      "community_name": "NewRoomManager",
       "file_type": "code",
       "norm_label": "testviewerupdateevent()",
       "source_file": "internal/signaling/room_manager_test.go",
@@ -4033,7 +3912,7 @@
       "file_type": "code",
       "norm_label": ".activeroomscount()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1299"
+      "source_location": "L1308"
     },
     {
       "id": "signaling_roommanager_addgiftscore",
@@ -4044,7 +3923,7 @@
       "file_type": "code",
       "norm_label": ".addgiftscore()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1260"
+      "source_location": "L1269"
     },
     {
       "id": "signaling_roommanager_addtrackandrenegotiate",
@@ -5041,17 +4920,6 @@
       "source_location": ""
     },
     {
-      "id": "go_type_sync_pool",
-      "label": "sync.Pool",
-      "_origin": "ast",
-      "community": 15,
-      "community_name": "PacketBuffer",
-      "file_type": "code",
-      "norm_label": "sync.pool",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "internal_webrtc_packet_buffer",
       "label": "packet_buffer.go",
       "_origin": "ast",
@@ -5404,44 +5272,11 @@
       "source_location": "L1"
     },
     {
-      "id": "cmd_main",
-      "label": "main.go",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": "main.go",
-      "source_file": "cmd/main.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "cmd_main_getenv",
-      "label": "getEnv()",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": "getenv()",
-      "source_file": "cmd/main.go",
-      "source_location": "L697"
-    },
-    {
-      "id": "cmd_main_main",
-      "label": "main()",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": "main()",
-      "source_file": "cmd/main.go",
-      "source_location": "L39"
-    },
-    {
       "id": "config_cascadingyaml",
       "label": "CascadingYAML",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "cascadingyaml",
       "source_file": "internal/config/config.go",
@@ -5452,7 +5287,7 @@
       "label": "CoHostingYAML",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "cohostingyaml",
       "source_file": "internal/config/config.go",
@@ -5463,7 +5298,7 @@
       "label": "Config",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "config",
       "source_file": "internal/config/config.go",
@@ -5474,7 +5309,7 @@
       "label": "InteractionsYAML",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "interactionsyaml",
       "source_file": "internal/config/config.go",
@@ -5485,7 +5320,7 @@
       "label": "ModerationYAML",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "moderationyaml",
       "source_file": "internal/config/config.go",
@@ -5496,7 +5331,7 @@
       "label": "PKBattleYAML",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "pkbattleyaml",
       "source_file": "internal/config/config.go",
@@ -5507,7 +5342,7 @@
       "label": "RoomManagementYAML",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "roommanagementyaml",
       "source_file": "internal/config/config.go",
@@ -5518,7 +5353,7 @@
       "label": "ServerYAML",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "serveryaml",
       "source_file": "internal/config/config.go",
@@ -5529,7 +5364,7 @@
       "label": "WebRTCYAML",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "webrtcyaml",
       "source_file": "internal/config/config.go",
@@ -5540,7 +5375,7 @@
       "label": "YAMLConfig",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "yamlconfig",
       "source_file": "internal/config/config.go",
@@ -5551,7 +5386,7 @@
       "label": "config.go",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "config.go",
       "source_file": "internal/config/config.go",
@@ -5562,7 +5397,7 @@
       "label": "DetectPublicIP()",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "detectpublicip()",
       "source_file": "internal/config/config.go",
@@ -5573,7 +5408,7 @@
       "label": "GenerateRandomKey()",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "generaterandomkey()",
       "source_file": "internal/config/config.go",
@@ -5584,7 +5419,7 @@
       "label": "LoadOrGenerateConfig()",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "loadorgenerateconfig()",
       "source_file": "internal/config/config.go",
@@ -5595,7 +5430,7 @@
       "label": "PrintStartupBanner()",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "printstartupbanner()",
       "source_file": "internal/config/config.go",
@@ -5606,7 +5441,7 @@
       "label": "config_test.go",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "config_test.go",
       "source_file": "internal/config/config_test.go",
@@ -5617,7 +5452,7 @@
       "label": "TestGenerateRandomKey()",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "testgeneraterandomkey()",
       "source_file": "internal/config/config_test.go",
@@ -5628,132 +5463,11 @@
       "label": "TestLoadOrGenerateConfig_WithYAML()",
       "_origin": "ast",
       "community": 17,
-      "community_name": "main",
+      "community_name": "config.go",
       "file_type": "code",
       "norm_label": "testloadorgenerateconfig_withyaml()",
       "source_file": "internal/config/config_test.go",
       "source_location": "L20"
-    },
-    {
-      "id": "internal_signaling_auth",
-      "label": "signaling/auth.go",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": "signaling/auth.go",
-      "source_file": "internal/signaling/auth.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "internal_signaling_auth_generatetoken",
-      "label": "GenerateToken()",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": "generatetoken()",
-      "source_file": "internal/signaling/auth.go",
-      "source_location": "L102"
-    },
-    {
-      "id": "internal_signaling_auth_generateusertoken",
-      "label": "GenerateUserToken()",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": "generateusertoken()",
-      "source_file": "internal/signaling/auth.go",
-      "source_location": "L79"
-    },
-    {
-      "id": "internal_signaling_auth_getjwtsecret",
-      "label": "GetJWTSecret()",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": "getjwtsecret()",
-      "source_file": "internal/signaling/auth.go",
-      "source_location": "L70"
-    },
-    {
-      "id": "internal_signaling_auth_go_jwt_registeredclaims",
-      "label": "jwt.RegisteredClaims",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": "jwt.registeredclaims",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "internal_signaling_auth_test",
-      "label": "signaling/auth_test.go",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": "signaling/auth_test.go",
-      "source_file": "internal/signaling/auth_test.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "internal_signaling_auth_test_testjwtauthentication",
-      "label": "TestJWTAuthentication()",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": "testjwtauthentication()",
-      "source_file": "internal/signaling/auth_test.go",
-      "source_location": "L10"
-    },
-    {
-      "id": "internal_signaling_auth_validatetoken",
-      "label": "ValidateToken()",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": "validatetoken()",
-      "source_file": "internal/signaling/auth.go",
-      "source_location": "L124"
-    },
-    {
-      "id": "signaling_userclaims",
-      "label": "UserClaims",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": "userclaims",
-      "source_file": "internal/signaling/auth.go",
-      "source_location": "L15"
-    },
-    {
-      "id": "signaling_userclaims_allowspublishing",
-      "label": ".AllowsPublishing()",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": ".allowspublishing()",
-      "source_file": "internal/signaling/auth.go",
-      "source_location": "L30"
-    },
-    {
-      "id": "signaling_userclaims_allowssubscribing",
-      "label": ".AllowsSubscribing()",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": ".allowssubscribing()",
-      "source_file": "internal/signaling/auth.go",
-      "source_location": "L54"
     },
     {
       "id": "pkg_omnicast",
@@ -5776,6 +5490,17 @@
       "community_name": "FanOutDispatcher",
       "file_type": "code",
       "norm_label": "github.com/pion/rtp.header",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "go_type_sync_pool",
+      "label": "sync.Pool",
+      "_origin": "ast",
+      "community": 19,
+      "community_name": "FanOutDispatcher",
+      "file_type": "code",
+      "norm_label": "sync.pool",
       "source_file": "",
       "source_location": ""
     },
@@ -6055,105 +5780,6 @@
       "source_location": ""
     },
     {
-      "id": "go_type_time_time",
-      "label": "time.Time",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": "time.time",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "internal_webrtc_pli_throttler",
-      "label": "pli_throttler.go",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": "pli_throttler.go",
-      "source_file": "internal/webrtc/pli_throttler.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "internal_webrtc_pli_throttler_cansendpli",
-      "label": "CanSendPLI()",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": "cansendpli()",
-      "source_file": "internal/webrtc/pli_throttler.go",
-      "source_location": "L15"
-    },
-    {
-      "id": "internal_webrtc_pli_throttler_forcesendpli",
-      "label": "ForceSendPLI()",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": "forcesendpli()",
-      "source_file": "internal/webrtc/pli_throttler.go",
-      "source_location": "L20"
-    },
-    {
-      "id": "internal_webrtc_pli_throttler_newplithrottler",
-      "label": "NewPLIThrottler()",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": "newplithrottler()",
-      "source_file": "internal/webrtc/pli_throttler.go",
-      "source_location": "L33"
-    },
-    {
-      "id": "internal_webrtc_pli_throttler_test",
-      "label": "pli_throttler_test.go",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": "pli_throttler_test.go",
-      "source_file": "internal/webrtc/pli_throttler_test.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "internal_webrtc_pli_throttler_test_testplithrottler_basicthrottling",
-      "label": "TestPLIThrottler_BasicThrottling()",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": "testplithrottler_basicthrottling()",
-      "source_file": "internal/webrtc/pli_throttler_test.go",
-      "source_location": "L9"
-    },
-    {
-      "id": "internal_webrtc_pli_throttler_test_testplithrottler_concurrentaccess",
-      "label": "TestPLIThrottler_ConcurrentAccess()",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": "testplithrottler_concurrentaccess()",
-      "source_file": "internal/webrtc/pli_throttler_test.go",
-      "source_location": "L63"
-    },
-    {
-      "id": "internal_webrtc_pli_throttler_test_testplithrottler_resetandclear",
-      "label": "TestPLIThrottler_ResetAndClear()",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": "testplithrottler_resetandclear()",
-      "source_file": "internal/webrtc/pli_throttler_test.go",
-      "source_location": "L39"
-    },
-    {
       "id": "internal_webrtc_time_synchronizer",
       "label": "time_synchronizer.go",
       "_origin": "ast",
@@ -6328,83 +5954,6 @@
       "norm_label": "testtimestampadjuster_wraparound()",
       "source_file": "internal/webrtc/ts_adjuster_test.go",
       "source_location": "L65"
-    },
-    {
-      "id": "webrtc_plithrottler",
-      "label": "PLIThrottler",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": "plithrottler",
-      "source_file": "internal/webrtc/pli_throttler.go",
-      "source_location": "L26"
-    },
-    {
-      "id": "webrtc_plithrottler_cansendpli",
-      "label": ".CanSendPLI()",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": ".cansendpli()",
-      "source_file": "internal/webrtc/pli_throttler.go",
-      "source_location": "L47"
-    },
-    {
-      "id": "webrtc_plithrottler_clear",
-      "label": ".Clear()",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": ".clear()",
-      "source_file": "internal/webrtc/pli_throttler.go",
-      "source_location": "L88"
-    },
-    {
-      "id": "webrtc_plithrottler_forcesendpli",
-      "label": ".ForceSendPLI()",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": ".forcesendpli()",
-      "source_file": "internal/webrtc/pli_throttler.go",
-      "source_location": "L74"
-    },
-    {
-      "id": "webrtc_plithrottler_lastsenttime",
-      "label": ".LastSentTime()",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": ".lastsenttime()",
-      "source_file": "internal/webrtc/pli_throttler.go",
-      "source_location": "L95"
-    },
-    {
-      "id": "webrtc_plithrottler_reset",
-      "label": ".Reset()",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": ".reset()",
-      "source_file": "internal/webrtc/pli_throttler.go",
-      "source_location": "L81"
-    },
-    {
-      "id": "webrtc_plithrottler_shouldsend",
-      "label": ".ShouldSend()",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "TimestampAdjuster",
-      "file_type": "code",
-      "norm_label": ".shouldsend()",
-      "source_file": "internal/webrtc/pli_throttler.go",
-      "source_location": "L68"
     },
     {
       "id": "webrtc_rtpcodectype",
@@ -6660,6 +6209,72 @@
       "source_location": "L31"
     },
     {
+      "id": "internal_webrtc_viewport_manager",
+      "label": "viewport_manager.go",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": "viewport_manager.go",
+      "source_file": "internal/webrtc/viewport_manager.go",
+      "source_location": "L1"
+    },
+    {
+      "id": "internal_webrtc_viewport_manager_newviewportmanager",
+      "label": "NewViewportManager()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": "newviewportmanager()",
+      "source_file": "internal/webrtc/viewport_manager.go",
+      "source_location": "L20"
+    },
+    {
+      "id": "internal_webrtc_viewport_manager_test",
+      "label": "viewport_manager_test.go",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": "viewport_manager_test.go",
+      "source_file": "internal/webrtc/viewport_manager_test.go",
+      "source_location": "L1"
+    },
+    {
+      "id": "internal_webrtc_viewport_manager_test_testviewportmanager_defaultsandvisibility",
+      "label": "TestViewportManager_DefaultsAndVisibility()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": "testviewportmanager_defaultsandvisibility()",
+      "source_file": "internal/webrtc/viewport_manager_test.go",
+      "source_location": "L7"
+    },
+    {
+      "id": "internal_webrtc_viewport_manager_test_testviewportmanager_resetandremove",
+      "label": "TestViewportManager_ResetAndRemove()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": "testviewportmanager_resetandremove()",
+      "source_file": "internal/webrtc/viewport_manager_test.go",
+      "source_location": "L58"
+    },
+    {
+      "id": "internal_webrtc_viewport_manager_test_testviewportmanager_setvisibletracks",
+      "label": "TestViewportManager_SetVisibleTracks()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": "testviewportmanager_setvisibletracks()",
+      "source_file": "internal/webrtc/viewport_manager_test.go",
+      "source_location": "L27"
+    },
+    {
       "id": "webrtc_abrcontroller",
       "label": "ABRController",
       "_origin": "ast",
@@ -6746,6 +6361,193 @@
       "norm_label": ".switchsubscriber()",
       "source_file": "internal/webrtc/abr.go",
       "source_location": "L103"
+    },
+    {
+      "id": "webrtc_sequencenumberadjuster",
+      "label": "SequenceNumberAdjuster",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": "sequencenumberadjuster",
+      "source_file": "internal/webrtc/seq_adjuster.go",
+      "source_location": "L9"
+    },
+    {
+      "id": "webrtc_sequencenumberadjuster_adjust",
+      "label": ".Adjust()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".adjust()",
+      "source_file": "internal/webrtc/seq_adjuster.go",
+      "source_location": "L27"
+    },
+    {
+      "id": "webrtc_sequencenumberadjuster_getoffset",
+      "label": ".GetOffset()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".getoffset()",
+      "source_file": "internal/webrtc/seq_adjuster.go",
+      "source_location": "L78"
+    },
+    {
+      "id": "webrtc_sequencenumberadjuster_isinitialized",
+      "label": ".IsInitialized()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".isinitialized()",
+      "source_file": "internal/webrtc/seq_adjuster.go",
+      "source_location": "L106"
+    },
+    {
+      "id": "webrtc_sequencenumberadjuster_lastinseq",
+      "label": ".LastInSeq()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".lastinseq()",
+      "source_file": "internal/webrtc/seq_adjuster.go",
+      "source_location": "L92"
+    },
+    {
+      "id": "webrtc_sequencenumberadjuster_lastoutseq",
+      "label": ".LastOutSeq()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".lastoutseq()",
+      "source_file": "internal/webrtc/seq_adjuster.go",
+      "source_location": "L99"
+    },
+    {
+      "id": "webrtc_sequencenumberadjuster_nextcontiguous",
+      "label": ".NextContiguous()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".nextcontiguous()",
+      "source_file": "internal/webrtc/seq_adjuster.go",
+      "source_location": "L41"
+    },
+    {
+      "id": "webrtc_sequencenumberadjuster_reset",
+      "label": ".Reset()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".reset()",
+      "source_file": "internal/webrtc/seq_adjuster.go",
+      "source_location": "L113"
+    },
+    {
+      "id": "webrtc_sequencenumberadjuster_rewrite",
+      "label": ".Rewrite()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".rewrite()",
+      "source_file": "internal/webrtc/seq_adjuster.go",
+      "source_location": "L60"
+    },
+    {
+      "id": "webrtc_sequencenumberadjuster_setoffset",
+      "label": ".SetOffset()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".setoffset()",
+      "source_file": "internal/webrtc/seq_adjuster.go",
+      "source_location": "L85"
+    },
+    {
+      "id": "webrtc_sequencenumberadjuster_switch",
+      "label": ".Switch()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".switch()",
+      "source_file": "internal/webrtc/seq_adjuster.go",
+      "source_location": "L68"
+    },
+    {
+      "id": "webrtc_viewportmanager",
+      "label": "ViewportManager",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": "viewportmanager",
+      "source_file": "internal/webrtc/viewport_manager.go",
+      "source_location": "L13"
+    },
+    {
+      "id": "webrtc_viewportmanager_getactiveviewportcount",
+      "label": ".GetActiveViewportCount()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".getactiveviewportcount()",
+      "source_file": "internal/webrtc/viewport_manager.go",
+      "source_location": "L106"
+    },
+    {
+      "id": "webrtc_viewportmanager_getvisibletracks",
+      "label": ".GetVisibleTracks()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".getvisibletracks()",
+      "source_file": "internal/webrtc/viewport_manager.go",
+      "source_location": "L82"
+    },
+    {
+      "id": "webrtc_viewportmanager_istrackvisible",
+      "label": ".IsTrackVisible()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".istrackvisible()",
+      "source_file": "internal/webrtc/viewport_manager.go",
+      "source_location": "L62"
+    },
+    {
+      "id": "webrtc_viewportmanager_removeviewer",
+      "label": ".RemoveViewer()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".removeviewer()",
+      "source_file": "internal/webrtc/viewport_manager.go",
+      "source_location": "L99"
+    },
+    {
+      "id": "webrtc_viewportmanager_setvisibletracks",
+      "label": ".SetVisibleTracks()",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "sync.RWMutex",
+      "file_type": "code",
+      "norm_label": ".setvisibletracks()",
+      "source_file": "internal/webrtc/viewport_manager.go",
+      "source_location": "L29"
     },
     {
       "id": "entrypoint",
@@ -6843,17 +6645,6 @@
       "norm_label": "roommanager",
       "source_file": "",
       "source_location": ""
-    },
-    {
-      "id": "internal_signaling_pk_manager_newpkmanager",
-      "label": "NewPKManager()",
-      "_origin": "ast",
-      "community": 22,
-      "community_name": "PKManager",
-      "file_type": "code",
-      "norm_label": "newpkmanager()",
-      "source_file": "internal/signaling/pk_manager.go",
-      "source_location": "L23"
     },
     {
       "id": "signaling_pkmanager",
@@ -7480,7 +7271,7 @@
       "file_type": "code",
       "norm_label": "syncroomstateinternal()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1215"
+      "source_location": "L1224"
     },
     {
       "id": "signaling_roommanager_broadcastpresencebatch",
@@ -7513,7 +7304,7 @@
       "file_type": "code",
       "norm_label": ".getroomstate()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1238"
+      "source_location": "L1247"
     },
     {
       "id": "signaling_roommanager_removetrackandrenegotiate",
@@ -7546,7 +7337,7 @@
       "file_type": "code",
       "norm_label": ".setmediastate()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1287"
+      "source_location": "L1296"
     },
     {
       "id": "signaling_roommanager_syncroomstate",
@@ -7557,7 +7348,7 @@
       "file_type": "code",
       "norm_label": ".syncroomstate()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1226"
+      "source_location": "L1235"
     },
     {
       "id": "internal_metrics_metrics",
@@ -7747,105 +7538,6 @@
       "source_location": "L530"
     },
     {
-      "id": "api_authhandler",
-      "label": "AuthHandler",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": "authhandler",
-      "source_file": "internal/api/auth.go",
-      "source_location": "L67"
-    },
-    {
-      "id": "api_authhandler_generateiceservers",
-      "label": ".GenerateICEServers()",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": ".generateiceservers()",
-      "source_file": "internal/api/auth.go",
-      "source_location": "L160"
-    },
-    {
-      "id": "api_authhandler_generateturncredentials",
-      "label": ".GenerateTURNCredentials()",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": ".generateturncredentials()",
-      "source_file": "internal/api/auth.go",
-      "source_location": "L145"
-    },
-    {
-      "id": "api_authhandler_handletokengeneration",
-      "label": ".HandleTokenGeneration()",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": ".handletokengeneration()",
-      "source_file": "internal/api/auth.go",
-      "source_location": "L182"
-    },
-    {
-      "id": "api_iceserverjson",
-      "label": "ICEServerJSON",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": "iceserverjson",
-      "source_file": "internal/api/auth.go",
-      "source_location": "L35"
-    },
-    {
-      "id": "api_tokenrequest",
-      "label": "TokenRequest",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": "tokenrequest",
-      "source_file": "internal/api/auth.go",
-      "source_location": "L42"
-    },
-    {
-      "id": "api_tokenresponse",
-      "label": "TokenResponse",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": "tokenresponse",
-      "source_file": "internal/api/auth.go",
-      "source_location": "L55"
-    },
-    {
-      "id": "api_userclaims",
-      "label": "UserClaims",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": "userclaims",
-      "source_file": "internal/api/auth.go",
-      "source_location": "L22"
-    },
-    {
-      "id": "fiber_ctx",
-      "label": "fiber.Ctx",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": "fiber.ctx",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "go_type_github_com_pion_rtcp_nackpair",
       "label": "github.com/pion/rtcp.NackPair",
       "_origin": "ast",
@@ -7879,6 +7571,17 @@
       "source_location": ""
     },
     {
+      "id": "go_type_sync_mutex",
+      "label": "sync.Mutex",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": "sync.mutex",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
       "id": "go_type_time_duration",
       "label": "time.Duration",
       "_origin": "ast",
@@ -7890,81 +7593,15 @@
       "source_location": ""
     },
     {
-      "id": "internal_api_auth",
-      "label": "api/auth.go",
+      "id": "go_type_time_time",
+      "label": "time.Time",
       "_origin": "ast",
       "community": 27,
       "community_name": "time.Duration",
       "file_type": "code",
-      "norm_label": "api/auth.go",
-      "source_file": "internal/api/auth.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "internal_api_auth_generatetokenwithpermissions",
-      "label": "GenerateTokenWithPermissions()",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": "generatetokenwithpermissions()",
-      "source_file": "internal/api/auth.go",
-      "source_location": "L113"
-    },
-    {
-      "id": "internal_api_auth_generateusertoken",
-      "label": "GenerateUserToken()",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": "generateusertoken()",
-      "source_file": "internal/api/auth.go",
-      "source_location": "L108"
-    },
-    {
-      "id": "internal_api_auth_go_jwt_registeredclaims",
-      "label": "jwt.RegisteredClaims",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": "jwt.registeredclaims",
+      "norm_label": "time.time",
       "source_file": "",
       "source_location": ""
-    },
-    {
-      "id": "internal_api_auth_newauthhandler",
-      "label": "NewAuthHandler()",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": "newauthhandler()",
-      "source_file": "internal/api/auth.go",
-      "source_location": "L76"
-    },
-    {
-      "id": "internal_api_auth_test",
-      "label": "api/auth_test.go",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": "api/auth_test.go",
-      "source_file": "internal/api/auth_test.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "internal_api_auth_test_testauthhandler_tokengeneration",
-      "label": "TestAuthHandler_TokenGeneration()",
-      "_origin": "ast",
-      "community": 27,
-      "community_name": "time.Duration",
-      "file_type": "code",
-      "norm_label": "testauthhandler_tokengeneration()",
-      "source_file": "internal/api/auth_test.go",
-      "source_location": "L15"
     },
     {
       "id": "internal_webrtc_bandwidth_estimator",
@@ -8141,6 +7778,94 @@
       "norm_label": "testevaluatebitratelayer()",
       "source_file": "internal/webrtc/bandwidth_estimator_test.go",
       "source_location": "L172"
+    },
+    {
+      "id": "internal_webrtc_pli_throttler",
+      "label": "pli_throttler.go",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": "pli_throttler.go",
+      "source_file": "internal/webrtc/pli_throttler.go",
+      "source_location": "L1"
+    },
+    {
+      "id": "internal_webrtc_pli_throttler_cansendpli",
+      "label": "CanSendPLI()",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": "cansendpli()",
+      "source_file": "internal/webrtc/pli_throttler.go",
+      "source_location": "L15"
+    },
+    {
+      "id": "internal_webrtc_pli_throttler_forcesendpli",
+      "label": "ForceSendPLI()",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": "forcesendpli()",
+      "source_file": "internal/webrtc/pli_throttler.go",
+      "source_location": "L20"
+    },
+    {
+      "id": "internal_webrtc_pli_throttler_newplithrottler",
+      "label": "NewPLIThrottler()",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": "newplithrottler()",
+      "source_file": "internal/webrtc/pli_throttler.go",
+      "source_location": "L33"
+    },
+    {
+      "id": "internal_webrtc_pli_throttler_test",
+      "label": "pli_throttler_test.go",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": "pli_throttler_test.go",
+      "source_file": "internal/webrtc/pli_throttler_test.go",
+      "source_location": "L1"
+    },
+    {
+      "id": "internal_webrtc_pli_throttler_test_testplithrottler_basicthrottling",
+      "label": "TestPLIThrottler_BasicThrottling()",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": "testplithrottler_basicthrottling()",
+      "source_file": "internal/webrtc/pli_throttler_test.go",
+      "source_location": "L9"
+    },
+    {
+      "id": "internal_webrtc_pli_throttler_test_testplithrottler_concurrentaccess",
+      "label": "TestPLIThrottler_ConcurrentAccess()",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": "testplithrottler_concurrentaccess()",
+      "source_file": "internal/webrtc/pli_throttler_test.go",
+      "source_location": "L63"
+    },
+    {
+      "id": "internal_webrtc_pli_throttler_test_testplithrottler_resetandclear",
+      "label": "TestPLIThrottler_ResetAndClear()",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": "testplithrottler_resetandclear()",
+      "source_file": "internal/webrtc/pli_throttler_test.go",
+      "source_location": "L39"
     },
     {
       "id": "internal_webrtc_viewer_handler",
@@ -8407,6 +8132,83 @@
       "source_location": "L11"
     },
     {
+      "id": "webrtc_plithrottler",
+      "label": "PLIThrottler",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": "plithrottler",
+      "source_file": "internal/webrtc/pli_throttler.go",
+      "source_location": "L26"
+    },
+    {
+      "id": "webrtc_plithrottler_cansendpli",
+      "label": ".CanSendPLI()",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": ".cansendpli()",
+      "source_file": "internal/webrtc/pli_throttler.go",
+      "source_location": "L47"
+    },
+    {
+      "id": "webrtc_plithrottler_clear",
+      "label": ".Clear()",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": ".clear()",
+      "source_file": "internal/webrtc/pli_throttler.go",
+      "source_location": "L88"
+    },
+    {
+      "id": "webrtc_plithrottler_forcesendpli",
+      "label": ".ForceSendPLI()",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": ".forcesendpli()",
+      "source_file": "internal/webrtc/pli_throttler.go",
+      "source_location": "L74"
+    },
+    {
+      "id": "webrtc_plithrottler_lastsenttime",
+      "label": ".LastSentTime()",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": ".lastsenttime()",
+      "source_file": "internal/webrtc/pli_throttler.go",
+      "source_location": "L95"
+    },
+    {
+      "id": "webrtc_plithrottler_reset",
+      "label": ".Reset()",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": ".reset()",
+      "source_file": "internal/webrtc/pli_throttler.go",
+      "source_location": "L81"
+    },
+    {
+      "id": "webrtc_plithrottler_shouldsend",
+      "label": ".ShouldSend()",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "time.Duration",
+      "file_type": "code",
+      "norm_label": ".shouldsend()",
+      "source_file": "internal/webrtc/pli_throttler.go",
+      "source_location": "L68"
+    },
+    {
       "id": "webrtc_roommanager",
       "label": "RoomManager",
       "_origin": "ast",
@@ -8418,88 +8220,88 @@
       "source_location": "L18"
     },
     {
-      "id": "internal_models_message_parsesignalingmessage",
-      "label": "ParseSignalingMessage()",
+      "id": "cmd_main",
+      "label": "main.go",
       "_origin": "ast",
       "community": 28,
-      "community_name": "ParseSignalingMessage",
+      "community_name": "main",
       "file_type": "code",
-      "norm_label": "parsesignalingmessage()",
-      "source_file": "internal/models/message.go",
-      "source_location": "L42"
-    },
-    {
-      "id": "internal_models_message_test",
-      "label": "message_test.go",
-      "_origin": "ast",
-      "community": 28,
-      "community_name": "ParseSignalingMessage",
-      "file_type": "code",
-      "norm_label": "message_test.go",
-      "source_file": "internal/models/message_test.go",
+      "norm_label": "main.go",
+      "source_file": "cmd/main.go",
       "source_location": "L1"
     },
     {
-      "id": "internal_models_message_test_testparsesignalingmessage",
-      "label": "TestParseSignalingMessage()",
+      "id": "cmd_main_getenv",
+      "label": "getEnv()",
       "_origin": "ast",
       "community": 28,
-      "community_name": "ParseSignalingMessage",
+      "community_name": "main",
       "file_type": "code",
-      "norm_label": "testparsesignalingmessage()",
-      "source_file": "internal/models/message_test.go",
-      "source_location": "L8"
+      "norm_label": "getenv()",
+      "source_file": "cmd/main.go",
+      "source_location": "L737"
     },
     {
-      "id": "internal_models_message_test_testsignalingmessageencode",
-      "label": "TestSignalingMessageEncode()",
+      "id": "cmd_main_main",
+      "label": "main()",
       "_origin": "ast",
       "community": 28,
-      "community_name": "ParseSignalingMessage",
+      "community_name": "main",
       "file_type": "code",
-      "norm_label": "testsignalingmessageencode()",
-      "source_file": "internal/models/message_test.go",
-      "source_location": "L35"
+      "norm_label": "main()",
+      "source_file": "cmd/main.go",
+      "source_location": "L39"
     },
     {
       "id": "internal_signaling_hub_newhub",
       "label": "NewHub()",
       "_origin": "ast",
       "community": 28,
-      "community_name": "ParseSignalingMessage",
+      "community_name": "main",
       "file_type": "code",
       "norm_label": "newhub()",
       "source_file": "internal/signaling/hub.go",
       "source_location": "L20"
     },
     {
-      "id": "internal_signaling_ice_restart_test",
-      "label": "ice_restart_test.go",
+      "id": "internal_signaling_pk_manager_newpkmanager",
+      "label": "NewPKManager()",
       "_origin": "ast",
       "community": 28,
-      "community_name": "ParseSignalingMessage",
+      "community_name": "main",
       "file_type": "code",
-      "norm_label": "ice_restart_test.go",
-      "source_file": "internal/signaling/ice_restart_test.go",
+      "norm_label": "newpkmanager()",
+      "source_file": "internal/signaling/pk_manager.go",
+      "source_location": "L23"
+    },
+    {
+      "id": "internal_signaling_pk_manager_test",
+      "label": "pk_manager_test.go",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "main",
+      "file_type": "code",
+      "norm_label": "pk_manager_test.go",
+      "source_file": "internal/signaling/pk_manager_test.go",
       "source_location": "L1"
     },
     {
-      "id": "internal_signaling_ice_restart_test_testicerestart_seamlessrenegotiation",
-      "label": "TestICERestart_SeamlessRenegotiation()",
+      "id": "internal_signaling_pk_manager_test_testpkmanager",
+      "label": "TestPKManager()",
       "_origin": "ast",
       "community": 28,
-      "community_name": "ParseSignalingMessage",
+      "community_name": "main",
       "file_type": "code",
-      "norm_label": "testicerestart_seamlessrenegotiation()",
-      "source_file": "internal/signaling/ice_restart_test.go",
-      "source_location": "L12"
+      "norm_label": "testpkmanager()",
+      "source_file": "internal/signaling/pk_manager_test.go",
+      "source_location": "L7"
     },
     {
       "id": "internal_signaling_pk_native_bridge_test",
       "label": "pk_native_bridge_test.go",
       "_origin": "ast",
       "community": 28,
-      "community_name": "ParseSignalingMessage",
+      "community_name": "main",
       "file_type": "code",
       "norm_label": "pk_native_bridge_test.go",
       "source_file": "internal/signaling/pk_native_bridge_test.go",
@@ -8510,18 +8312,29 @@
       "label": "TestNativePKBridging_CrossTrackAndTargetedGifting()",
       "_origin": "ast",
       "community": 28,
-      "community_name": "ParseSignalingMessage",
+      "community_name": "main",
       "file_type": "code",
       "norm_label": "testnativepkbridging_crosstrackandtargetedgifting()",
       "source_file": "internal/signaling/pk_native_bridge_test.go",
       "source_location": "L12"
     },
     {
+      "id": "internal_signaling_room_manager_test_testpkbattlefulllifecycle",
+      "label": "TestPKBattleFullLifecycle()",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "main",
+      "file_type": "code",
+      "norm_label": "testpkbattlefulllifecycle()",
+      "source_file": "internal/signaling/room_manager_test.go",
+      "source_location": "L408"
+    },
+    {
       "id": "internal_signaling_track_mute_test",
       "label": "track_mute_test.go",
       "_origin": "ast",
       "community": 28,
-      "community_name": "ParseSignalingMessage",
+      "community_name": "main",
       "file_type": "code",
       "norm_label": "track_mute_test.go",
       "source_file": "internal/signaling/track_mute_test.go",
@@ -8532,7 +8345,7 @@
       "label": "TestTrackMuteSignaling()",
       "_origin": "ast",
       "community": 28,
-      "community_name": "ParseSignalingMessage",
+      "community_name": "main",
       "file_type": "code",
       "norm_label": "testtrackmutesignaling()",
       "source_file": "internal/signaling/track_mute_test.go",
@@ -8543,7 +8356,7 @@
       "label": "zombie_gc_test.go",
       "_origin": "ast",
       "community": 28,
-      "community_name": "ParseSignalingMessage",
+      "community_name": "main",
       "file_type": "code",
       "norm_label": "zombie_gc_test.go",
       "source_file": "internal/signaling/zombie_gc_test.go",
@@ -8554,29 +8367,73 @@
       "label": "TestZombiePeerGC()",
       "_origin": "ast",
       "community": 28,
-      "community_name": "ParseSignalingMessage",
+      "community_name": "main",
       "file_type": "code",
       "norm_label": "testzombiepeergc()",
       "source_file": "internal/signaling/zombie_gc_test.go",
       "source_location": "L11"
     },
     {
-      "id": "internal_webrtc_track_switcher_isvp8keyframe",
-      "label": "IsVP8Keyframe()",
+      "id": "go_type_testing_t",
+      "label": "testing.T",
       "_origin": "ast",
       "community": 29,
-      "community_name": "NewTrackSwitcher",
+      "community_name": "testing.T",
       "file_type": "code",
-      "norm_label": "isvp8keyframe()",
-      "source_file": "internal/webrtc/track_switcher.go",
-      "source_location": "L645"
+      "norm_label": "testing.t",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "internal_broker_redis_broker_test",
+      "label": "redis_broker_test.go",
+      "_origin": "ast",
+      "community": 29,
+      "community_name": "testing.T",
+      "file_type": "code",
+      "norm_label": "redis_broker_test.go",
+      "source_file": "internal/broker/redis_broker_test.go",
+      "source_location": "L1"
+    },
+    {
+      "id": "internal_broker_redis_broker_test_testformatviewersignalingchannel",
+      "label": "TestFormatViewerSignalingChannel()",
+      "_origin": "ast",
+      "community": 29,
+      "community_name": "testing.T",
+      "file_type": "code",
+      "norm_label": "testformatviewersignalingchannel()",
+      "source_file": "internal/broker/redis_broker_test.go",
+      "source_location": "L112"
+    },
+    {
+      "id": "internal_broker_redis_broker_test_testnewredisbroker_emptyaddr",
+      "label": "TestNewRedisBroker_EmptyAddr()",
+      "_origin": "ast",
+      "community": 29,
+      "community_name": "testing.T",
+      "file_type": "code",
+      "norm_label": "testnewredisbroker_emptyaddr()",
+      "source_file": "internal/broker/redis_broker_test.go",
+      "source_location": "L8"
+    },
+    {
+      "id": "internal_broker_redis_broker_test_testredisbroker_niloperations",
+      "label": "TestRedisBroker_NilOperations()",
+      "_origin": "ast",
+      "community": 29,
+      "community_name": "testing.T",
+      "file_type": "code",
+      "norm_label": "testredisbroker_niloperations()",
+      "source_file": "internal/broker/redis_broker_test.go",
+      "source_location": "L21"
     },
     {
       "id": "internal_webrtc_track_switcher_newtrackswitcher",
       "label": "NewTrackSwitcher()",
       "_origin": "ast",
       "community": 29,
-      "community_name": "NewTrackSwitcher",
+      "community_name": "testing.T",
       "file_type": "code",
       "norm_label": "newtrackswitcher()",
       "source_file": "internal/webrtc/track_switcher.go",
@@ -8587,7 +8444,7 @@
       "label": "track_switcher_test.go",
       "_origin": "ast",
       "community": 29,
-      "community_name": "NewTrackSwitcher",
+      "community_name": "testing.T",
       "file_type": "code",
       "norm_label": "track_switcher_test.go",
       "source_file": "internal/webrtc/track_switcher_test.go",
@@ -8598,7 +8455,7 @@
       "label": "TestIsKeyframe()",
       "_origin": "ast",
       "community": 29,
-      "community_name": "NewTrackSwitcher",
+      "community_name": "testing.T",
       "file_type": "code",
       "norm_label": "testiskeyframe()",
       "source_file": "internal/webrtc/track_switcher_test.go",
@@ -8609,7 +8466,7 @@
       "label": "TestIsVP8Keyframe()",
       "_origin": "ast",
       "community": 29,
-      "community_name": "NewTrackSwitcher",
+      "community_name": "testing.T",
       "file_type": "code",
       "norm_label": "testisvp8keyframe()",
       "source_file": "internal/webrtc/track_switcher_test.go",
@@ -8620,7 +8477,7 @@
       "label": "TestTrackSwitcher_ContiguousSequenceNumbersOnSVCDrop()",
       "_origin": "ast",
       "community": 29,
-      "community_name": "NewTrackSwitcher",
+      "community_name": "testing.T",
       "file_type": "code",
       "norm_label": "testtrackswitcher_contiguoussequencenumbersonsvcdrop()",
       "source_file": "internal/webrtc/track_switcher_test.go",
@@ -8631,7 +8488,7 @@
       "label": "TestTrackSwitcher_DropHighestSpatialLayerOnCongestion()",
       "_origin": "ast",
       "community": 29,
-      "community_name": "NewTrackSwitcher",
+      "community_name": "testing.T",
       "file_type": "code",
       "norm_label": "testtrackswitcher_drophighestspatiallayeroncongestion()",
       "source_file": "internal/webrtc/track_switcher_test.go",
@@ -8642,7 +8499,7 @@
       "label": "TestTrackSwitcher_PendingSwitchAndTargetTrack()",
       "_origin": "ast",
       "community": 29,
-      "community_name": "NewTrackSwitcher",
+      "community_name": "testing.T",
       "file_type": "code",
       "norm_label": "testtrackswitcher_pendingswitchandtargettrack()",
       "source_file": "internal/webrtc/track_switcher_test.go",
@@ -8653,7 +8510,7 @@
       "label": "TestTrackSwitcher_SequenceAndTimestampContinuity()",
       "_origin": "ast",
       "community": 29,
-      "community_name": "NewTrackSwitcher",
+      "community_name": "testing.T",
       "file_type": "code",
       "norm_label": "testtrackswitcher_sequenceandtimestampcontinuity()",
       "source_file": "internal/webrtc/track_switcher_test.go",
@@ -8664,7 +8521,7 @@
       "label": "TestTrackSwitcher_SimulcastTracks()",
       "_origin": "ast",
       "community": 29,
-      "community_name": "NewTrackSwitcher",
+      "community_name": "testing.T",
       "file_type": "code",
       "norm_label": "testtrackswitcher_simulcasttracks()",
       "source_file": "internal/webrtc/track_switcher_test.go",
@@ -8675,7 +8532,7 @@
       "label": "TestTrackSwitcher_TemporalLayerDropping()",
       "_origin": "ast",
       "community": 29,
-      "community_name": "NewTrackSwitcher",
+      "community_name": "testing.T",
       "file_type": "code",
       "norm_label": "testtrackswitcher_temporallayerdropping()",
       "source_file": "internal/webrtc/track_switcher_test.go",
@@ -8686,7 +8543,7 @@
       "label": "TestTrackSwitcher_VP9SingleTrackSVC()",
       "_origin": "ast",
       "community": 29,
-      "community_name": "NewTrackSwitcher",
+      "community_name": "testing.T",
       "file_type": "code",
       "norm_label": "testtrackswitcher_vp9singletracksvc()",
       "source_file": "internal/webrtc/track_switcher_test.go",
@@ -9089,17 +8946,6 @@
       "source_location": ""
     },
     {
-      "id": "go_type_sync_mutex",
-      "label": "sync.Mutex",
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "RedisBroker",
-      "file_type": "code",
-      "norm_label": "sync.mutex",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "internal_broker_redis_broker",
       "label": "redis_broker.go",
       "_origin": "ast",
@@ -9287,17 +9133,6 @@
       "source_location": "L341"
     },
     {
-      "id": "webrtc_cascademanager_connectandrelay",
-      "label": ".connectAndRelay()",
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "RedisBroker",
-      "file_type": "code",
-      "norm_label": ".connectandrelay()",
-      "source_file": "internal/webrtc/cascading.go",
-      "source_location": "L147"
-    },
-    {
       "id": "webrtc_cascademanager_ensurecascaded",
       "label": ".EnsureCascaded()",
       "_origin": "ast",
@@ -9342,257 +9177,345 @@
       "source_location": "L46"
     },
     {
-      "id": "internal_webrtc_viewport_manager",
-      "label": "viewport_manager.go",
+      "id": "api_authhandler",
+      "label": "AuthHandler",
       "_origin": "ast",
       "community": 30,
-      "community_name": "ViewportManager",
+      "community_name": "api/auth.go",
       "file_type": "code",
-      "norm_label": "viewport_manager.go",
-      "source_file": "internal/webrtc/viewport_manager.go",
+      "norm_label": "authhandler",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L67"
+    },
+    {
+      "id": "api_authhandler_generateiceservers",
+      "label": ".GenerateICEServers()",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": ".generateiceservers()",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L205"
+    },
+    {
+      "id": "api_authhandler_generateturncredentials",
+      "label": ".GenerateTURNCredentials()",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": ".generateturncredentials()",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L190"
+    },
+    {
+      "id": "api_authhandler_handletokengeneration",
+      "label": ".HandleTokenGeneration()",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": ".handletokengeneration()",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L227"
+    },
+    {
+      "id": "api_authhandler_requireapiauth",
+      "label": ".RequireAPIAuth()",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": ".requireapiauth()",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L139"
+    },
+    {
+      "id": "api_authhandler_validateapikeysecret",
+      "label": ".ValidateAPIKeySecret()",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": ".validateapikeysecret()",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L108"
+    },
+    {
+      "id": "api_iceserverjson",
+      "label": "ICEServerJSON",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": "iceserverjson",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L35"
+    },
+    {
+      "id": "api_tokenrequest",
+      "label": "TokenRequest",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": "tokenrequest",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L42"
+    },
+    {
+      "id": "api_tokenresponse",
+      "label": "TokenResponse",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": "tokenresponse",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L55"
+    },
+    {
+      "id": "api_userclaims",
+      "label": "UserClaims",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": "userclaims",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L22"
+    },
+    {
+      "id": "fiber_ctx",
+      "label": "fiber.Ctx",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": "fiber.ctx",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "fiber_handler",
+      "label": "fiber.Handler",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": "fiber.handler",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "internal_api_auth",
+      "label": "api/auth.go",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": "api/auth.go",
+      "source_file": "internal/api/auth.go",
       "source_location": "L1"
     },
     {
-      "id": "internal_webrtc_viewport_manager_newviewportmanager",
-      "label": "NewViewportManager()",
+      "id": "internal_api_auth_generatetokenwithpermissions",
+      "label": "GenerateTokenWithPermissions()",
       "_origin": "ast",
       "community": 30,
-      "community_name": "ViewportManager",
+      "community_name": "api/auth.go",
       "file_type": "code",
-      "norm_label": "newviewportmanager()",
-      "source_file": "internal/webrtc/viewport_manager.go",
-      "source_location": "L20"
+      "norm_label": "generatetokenwithpermissions()",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L158"
     },
     {
-      "id": "internal_webrtc_viewport_manager_test",
-      "label": "viewport_manager_test.go",
+      "id": "internal_api_auth_generateusertoken",
+      "label": "GenerateUserToken()",
       "_origin": "ast",
       "community": 30,
-      "community_name": "ViewportManager",
+      "community_name": "api/auth.go",
       "file_type": "code",
-      "norm_label": "viewport_manager_test.go",
-      "source_file": "internal/webrtc/viewport_manager_test.go",
+      "norm_label": "generateusertoken()",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L153"
+    },
+    {
+      "id": "internal_api_auth_go_jwt_registeredclaims",
+      "label": "jwt.RegisteredClaims",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": "jwt.registeredclaims",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "internal_api_auth_newauthhandler",
+      "label": "NewAuthHandler()",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": "newauthhandler()",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L76"
+    },
+    {
+      "id": "internal_api_auth_test",
+      "label": "api/auth_test.go",
+      "_origin": "ast",
+      "community": 30,
+      "community_name": "api/auth.go",
+      "file_type": "code",
+      "norm_label": "api/auth_test.go",
+      "source_file": "internal/api/auth_test.go",
       "source_location": "L1"
     },
     {
-      "id": "internal_webrtc_viewport_manager_test_testviewportmanager_defaultsandvisibility",
-      "label": "TestViewportManager_DefaultsAndVisibility()",
+      "id": "internal_api_auth_test_testauthhandler_requireapiauth",
+      "label": "TestAuthHandler_RequireAPIAuth()",
       "_origin": "ast",
       "community": 30,
-      "community_name": "ViewportManager",
+      "community_name": "api/auth.go",
       "file_type": "code",
-      "norm_label": "testviewportmanager_defaultsandvisibility()",
-      "source_file": "internal/webrtc/viewport_manager_test.go",
-      "source_location": "L7"
+      "norm_label": "testauthhandler_requireapiauth()",
+      "source_file": "internal/api/auth_test.go",
+      "source_location": "L114"
     },
     {
-      "id": "internal_webrtc_viewport_manager_test_testviewportmanager_resetandremove",
-      "label": "TestViewportManager_ResetAndRemove()",
+      "id": "internal_api_auth_test_testauthhandler_tokengeneration",
+      "label": "TestAuthHandler_TokenGeneration()",
       "_origin": "ast",
       "community": 30,
-      "community_name": "ViewportManager",
+      "community_name": "api/auth.go",
       "file_type": "code",
-      "norm_label": "testviewportmanager_resetandremove()",
-      "source_file": "internal/webrtc/viewport_manager_test.go",
-      "source_location": "L58"
+      "norm_label": "testauthhandler_tokengeneration()",
+      "source_file": "internal/api/auth_test.go",
+      "source_location": "L15"
     },
     {
-      "id": "internal_webrtc_viewport_manager_test_testviewportmanager_setvisibletracks",
-      "label": "TestViewportManager_SetVisibleTracks()",
-      "_origin": "ast",
-      "community": 30,
-      "community_name": "ViewportManager",
-      "file_type": "code",
-      "norm_label": "testviewportmanager_setvisibletracks()",
-      "source_file": "internal/webrtc/viewport_manager_test.go",
-      "source_location": "L27"
-    },
-    {
-      "id": "webrtc_viewportmanager",
-      "label": "ViewportManager",
-      "_origin": "ast",
-      "community": 30,
-      "community_name": "ViewportManager",
-      "file_type": "code",
-      "norm_label": "viewportmanager",
-      "source_file": "internal/webrtc/viewport_manager.go",
-      "source_location": "L13"
-    },
-    {
-      "id": "webrtc_viewportmanager_getactiveviewportcount",
-      "label": ".GetActiveViewportCount()",
-      "_origin": "ast",
-      "community": 30,
-      "community_name": "ViewportManager",
-      "file_type": "code",
-      "norm_label": ".getactiveviewportcount()",
-      "source_file": "internal/webrtc/viewport_manager.go",
-      "source_location": "L106"
-    },
-    {
-      "id": "webrtc_viewportmanager_getvisibletracks",
-      "label": ".GetVisibleTracks()",
-      "_origin": "ast",
-      "community": 30,
-      "community_name": "ViewportManager",
-      "file_type": "code",
-      "norm_label": ".getvisibletracks()",
-      "source_file": "internal/webrtc/viewport_manager.go",
-      "source_location": "L82"
-    },
-    {
-      "id": "webrtc_viewportmanager_istrackvisible",
-      "label": ".IsTrackVisible()",
-      "_origin": "ast",
-      "community": 30,
-      "community_name": "ViewportManager",
-      "file_type": "code",
-      "norm_label": ".istrackvisible()",
-      "source_file": "internal/webrtc/viewport_manager.go",
-      "source_location": "L62"
-    },
-    {
-      "id": "webrtc_viewportmanager_removeviewer",
-      "label": ".RemoveViewer()",
-      "_origin": "ast",
-      "community": 30,
-      "community_name": "ViewportManager",
-      "file_type": "code",
-      "norm_label": ".removeviewer()",
-      "source_file": "internal/webrtc/viewport_manager.go",
-      "source_location": "L99"
-    },
-    {
-      "id": "webrtc_viewportmanager_setvisibletracks",
-      "label": ".SetVisibleTracks()",
-      "_origin": "ast",
-      "community": 30,
-      "community_name": "ViewportManager",
-      "file_type": "code",
-      "norm_label": ".setvisibletracks()",
-      "source_file": "internal/webrtc/viewport_manager.go",
-      "source_location": "L29"
-    },
-    {
-      "id": "webrtc_sequencenumberadjuster",
-      "label": "SequenceNumberAdjuster",
+      "id": "internal_signaling_auth",
+      "label": "signaling/auth.go",
       "_origin": "ast",
       "community": 31,
-      "community_name": "SequenceNumberAdjuster",
+      "community_name": "signaling/auth.go",
       "file_type": "code",
-      "norm_label": "sequencenumberadjuster",
-      "source_file": "internal/webrtc/seq_adjuster.go",
-      "source_location": "L9"
+      "norm_label": "signaling/auth.go",
+      "source_file": "internal/signaling/auth.go",
+      "source_location": "L1"
     },
     {
-      "id": "webrtc_sequencenumberadjuster_adjust",
-      "label": ".Adjust()",
+      "id": "internal_signaling_auth_generatetoken",
+      "label": "GenerateToken()",
       "_origin": "ast",
       "community": 31,
-      "community_name": "SequenceNumberAdjuster",
+      "community_name": "signaling/auth.go",
       "file_type": "code",
-      "norm_label": ".adjust()",
-      "source_file": "internal/webrtc/seq_adjuster.go",
-      "source_location": "L27"
+      "norm_label": "generatetoken()",
+      "source_file": "internal/signaling/auth.go",
+      "source_location": "L102"
     },
     {
-      "id": "webrtc_sequencenumberadjuster_getoffset",
-      "label": ".GetOffset()",
+      "id": "internal_signaling_auth_generateusertoken",
+      "label": "GenerateUserToken()",
       "_origin": "ast",
       "community": 31,
-      "community_name": "SequenceNumberAdjuster",
+      "community_name": "signaling/auth.go",
       "file_type": "code",
-      "norm_label": ".getoffset()",
-      "source_file": "internal/webrtc/seq_adjuster.go",
-      "source_location": "L78"
+      "norm_label": "generateusertoken()",
+      "source_file": "internal/signaling/auth.go",
+      "source_location": "L79"
     },
     {
-      "id": "webrtc_sequencenumberadjuster_isinitialized",
-      "label": ".IsInitialized()",
+      "id": "internal_signaling_auth_getjwtsecret",
+      "label": "GetJWTSecret()",
       "_origin": "ast",
       "community": 31,
-      "community_name": "SequenceNumberAdjuster",
+      "community_name": "signaling/auth.go",
       "file_type": "code",
-      "norm_label": ".isinitialized()",
-      "source_file": "internal/webrtc/seq_adjuster.go",
-      "source_location": "L106"
+      "norm_label": "getjwtsecret()",
+      "source_file": "internal/signaling/auth.go",
+      "source_location": "L70"
     },
     {
-      "id": "webrtc_sequencenumberadjuster_lastinseq",
-      "label": ".LastInSeq()",
+      "id": "internal_signaling_auth_go_jwt_registeredclaims",
+      "label": "jwt.RegisteredClaims",
       "_origin": "ast",
       "community": 31,
-      "community_name": "SequenceNumberAdjuster",
+      "community_name": "signaling/auth.go",
       "file_type": "code",
-      "norm_label": ".lastinseq()",
-      "source_file": "internal/webrtc/seq_adjuster.go",
-      "source_location": "L92"
+      "norm_label": "jwt.registeredclaims",
+      "source_file": "",
+      "source_location": ""
     },
     {
-      "id": "webrtc_sequencenumberadjuster_lastoutseq",
-      "label": ".LastOutSeq()",
+      "id": "internal_signaling_auth_test",
+      "label": "signaling/auth_test.go",
       "_origin": "ast",
       "community": 31,
-      "community_name": "SequenceNumberAdjuster",
+      "community_name": "signaling/auth.go",
       "file_type": "code",
-      "norm_label": ".lastoutseq()",
-      "source_file": "internal/webrtc/seq_adjuster.go",
-      "source_location": "L99"
+      "norm_label": "signaling/auth_test.go",
+      "source_file": "internal/signaling/auth_test.go",
+      "source_location": "L1"
     },
     {
-      "id": "webrtc_sequencenumberadjuster_nextcontiguous",
-      "label": ".NextContiguous()",
+      "id": "internal_signaling_auth_test_testjwtauthentication",
+      "label": "TestJWTAuthentication()",
       "_origin": "ast",
       "community": 31,
-      "community_name": "SequenceNumberAdjuster",
+      "community_name": "signaling/auth.go",
       "file_type": "code",
-      "norm_label": ".nextcontiguous()",
-      "source_file": "internal/webrtc/seq_adjuster.go",
-      "source_location": "L41"
+      "norm_label": "testjwtauthentication()",
+      "source_file": "internal/signaling/auth_test.go",
+      "source_location": "L10"
     },
     {
-      "id": "webrtc_sequencenumberadjuster_reset",
-      "label": ".Reset()",
+      "id": "internal_signaling_auth_validatetoken",
+      "label": "ValidateToken()",
       "_origin": "ast",
       "community": 31,
-      "community_name": "SequenceNumberAdjuster",
+      "community_name": "signaling/auth.go",
       "file_type": "code",
-      "norm_label": ".reset()",
-      "source_file": "internal/webrtc/seq_adjuster.go",
-      "source_location": "L113"
+      "norm_label": "validatetoken()",
+      "source_file": "internal/signaling/auth.go",
+      "source_location": "L124"
     },
     {
-      "id": "webrtc_sequencenumberadjuster_rewrite",
-      "label": ".Rewrite()",
+      "id": "signaling_userclaims",
+      "label": "UserClaims",
       "_origin": "ast",
       "community": 31,
-      "community_name": "SequenceNumberAdjuster",
+      "community_name": "signaling/auth.go",
       "file_type": "code",
-      "norm_label": ".rewrite()",
-      "source_file": "internal/webrtc/seq_adjuster.go",
-      "source_location": "L60"
+      "norm_label": "userclaims",
+      "source_file": "internal/signaling/auth.go",
+      "source_location": "L15"
     },
     {
-      "id": "webrtc_sequencenumberadjuster_setoffset",
-      "label": ".SetOffset()",
+      "id": "signaling_userclaims_allowspublishing",
+      "label": ".AllowsPublishing()",
       "_origin": "ast",
       "community": 31,
-      "community_name": "SequenceNumberAdjuster",
+      "community_name": "signaling/auth.go",
       "file_type": "code",
-      "norm_label": ".setoffset()",
-      "source_file": "internal/webrtc/seq_adjuster.go",
-      "source_location": "L85"
+      "norm_label": ".allowspublishing()",
+      "source_file": "internal/signaling/auth.go",
+      "source_location": "L30"
     },
     {
-      "id": "webrtc_sequencenumberadjuster_switch",
-      "label": ".Switch()",
+      "id": "signaling_userclaims_allowssubscribing",
+      "label": ".AllowsSubscribing()",
       "_origin": "ast",
       "community": 31,
-      "community_name": "SequenceNumberAdjuster",
+      "community_name": "signaling/auth.go",
       "file_type": "code",
-      "norm_label": ".switch()",
-      "source_file": "internal/webrtc/seq_adjuster.go",
-      "source_location": "L68"
+      "norm_label": ".allowssubscribing()",
+      "source_file": "internal/signaling/auth.go",
+      "source_location": "L54"
     },
     {
       "id": "go_type_net_listener",
@@ -9604,6 +9527,17 @@
       "norm_label": "net.listener",
       "source_file": "",
       "source_location": ""
+    },
+    {
+      "id": "internal_signaling_room_manager_test_testnodea_processremoteviewerofferandanswer",
+      "label": "TestNodeA_ProcessRemoteViewerOfferAndAnswer()",
+      "_origin": "ast",
+      "community": 32,
+      "community_name": "InitWebRTC",
+      "file_type": "code",
+      "norm_label": "testnodea_processremoteviewerofferandanswer()",
+      "source_file": "internal/signaling/room_manager_test.go",
+      "source_location": "L572"
     },
     {
       "id": "internal_webrtc_cascading_test",
@@ -9727,28 +9661,6 @@
       "source_location": "L30"
     },
     {
-      "id": "internal_signaling_room_manager_setserverdraining",
-      "label": "SetServerDraining()",
-      "_origin": "ast",
-      "community": 33,
-      "community_name": "room_manager.go",
-      "file_type": "code",
-      "norm_label": "setserverdraining()",
-      "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L35"
-    },
-    {
-      "id": "internal_signaling_room_manager_test_testserverdrainingflag",
-      "label": "TestServerDrainingFlag()",
-      "_origin": "ast",
-      "community": 33,
-      "community_name": "room_manager.go",
-      "file_type": "code",
-      "norm_label": "testserverdrainingflag()",
-      "source_file": "internal/signaling/room_manager_test.go",
-      "source_location": "L664"
-    },
-    {
       "id": "signaling_roominfo",
       "label": "RoomInfo",
       "_origin": "ast",
@@ -9779,7 +9691,7 @@
       "file_type": "code",
       "norm_label": ".getallroomssummary()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1174"
+      "source_location": "L1177"
     },
     {
       "id": "signaling_roommanager_getroomsummary",
@@ -9790,7 +9702,7 @@
       "file_type": "code",
       "norm_label": ".getroomsummary()",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1194"
+      "source_location": "L1200"
     },
     {
       "id": "signaling_roomsummary",
@@ -9881,48 +9793,246 @@
       "source_location": "L65"
     },
     {
-      "id": "internal_broker_redis_broker_test",
-      "label": "redis_broker_test.go",
+      "id": "internal_webrtc_turn_auth",
+      "label": "turn_auth.go",
       "_origin": "ast",
       "community": 35,
-      "community_name": "redis_broker_test.go",
+      "community_name": "turn_auth.go",
       "file_type": "code",
-      "norm_label": "redis_broker_test.go",
-      "source_file": "internal/broker/redis_broker_test.go",
+      "norm_label": "turn_auth.go",
+      "source_file": "internal/webrtc/turn_auth.go",
       "source_location": "L1"
     },
     {
-      "id": "internal_broker_redis_broker_test_testformatviewersignalingchannel",
-      "label": "TestFormatViewerSignalingChannel()",
+      "id": "internal_webrtc_turn_auth_generateturncredentials",
+      "label": "GenerateTURNCredentials()",
       "_origin": "ast",
       "community": 35,
-      "community_name": "redis_broker_test.go",
+      "community_name": "turn_auth.go",
       "file_type": "code",
-      "norm_label": "testformatviewersignalingchannel()",
-      "source_file": "internal/broker/redis_broker_test.go",
-      "source_location": "L112"
+      "norm_label": "generateturncredentials()",
+      "source_file": "internal/webrtc/turn_auth.go",
+      "source_location": "L29"
     },
     {
-      "id": "internal_broker_redis_broker_test_testnewredisbroker_emptyaddr",
-      "label": "TestNewRedisBroker_EmptyAddr()",
+      "id": "internal_webrtc_turn_auth_getdefaulticeservers",
+      "label": "GetDefaultICEServers()",
       "_origin": "ast",
       "community": 35,
-      "community_name": "redis_broker_test.go",
+      "community_name": "turn_auth.go",
       "file_type": "code",
-      "norm_label": "testnewredisbroker_emptyaddr()",
-      "source_file": "internal/broker/redis_broker_test.go",
+      "norm_label": "getdefaulticeservers()",
+      "source_file": "internal/webrtc/turn_auth.go",
+      "source_location": "L54"
+    },
+    {
+      "id": "internal_webrtc_turn_auth_getdefaulticeserversjson",
+      "label": "GetDefaultICEServersJSON()",
+      "_origin": "ast",
+      "community": 35,
+      "community_name": "turn_auth.go",
+      "file_type": "code",
+      "norm_label": "getdefaulticeserversjson()",
+      "source_file": "internal/webrtc/turn_auth.go",
+      "source_location": "L93"
+    },
+    {
+      "id": "internal_webrtc_turn_auth_test",
+      "label": "turn_auth_test.go",
+      "_origin": "ast",
+      "community": 35,
+      "community_name": "turn_auth.go",
+      "file_type": "code",
+      "norm_label": "turn_auth_test.go",
+      "source_file": "internal/webrtc/turn_auth_test.go",
+      "source_location": "L1"
+    },
+    {
+      "id": "internal_webrtc_turn_auth_test_testgenerateturncredentials",
+      "label": "TestGenerateTURNCredentials()",
+      "_origin": "ast",
+      "community": 35,
+      "community_name": "turn_auth.go",
+      "file_type": "code",
+      "norm_label": "testgenerateturncredentials()",
+      "source_file": "internal/webrtc/turn_auth_test.go",
+      "source_location": "L16"
+    },
+    {
+      "id": "internal_webrtc_turn_auth_test_testgetdefaulticeservers",
+      "label": "TestGetDefaultICEServers()",
+      "_origin": "ast",
+      "community": 35,
+      "community_name": "turn_auth.go",
+      "file_type": "code",
+      "norm_label": "testgetdefaulticeservers()",
+      "source_file": "internal/webrtc/turn_auth_test.go",
+      "source_location": "L52"
+    },
+    {
+      "id": "webrtc_iceserver",
+      "label": "webrtc.ICEServer",
+      "_origin": "ast",
+      "community": 35,
+      "community_name": "turn_auth.go",
+      "file_type": "code",
+      "norm_label": "webrtc.iceserver",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "webrtc_iceserverjson",
+      "label": "ICEServerJSON",
+      "_origin": "ast",
+      "community": 35,
+      "community_name": "turn_auth.go",
+      "file_type": "code",
+      "norm_label": "iceserverjson",
+      "source_file": "internal/webrtc/turn_auth.go",
+      "source_location": "L22"
+    },
+    {
+      "id": "internal_webrtc_vp9_parser_newvp9payloadparser",
+      "label": "NewVP9PayloadParser()",
+      "_origin": "ast",
+      "community": 36,
+      "community_name": "NewVP9PayloadParser",
+      "file_type": "code",
+      "norm_label": "newvp9payloadparser()",
+      "source_file": "internal/webrtc/vp9_parser.go",
+      "source_location": "L50"
+    },
+    {
+      "id": "internal_webrtc_vp9_parser_test",
+      "label": "vp9_parser_test.go",
+      "_origin": "ast",
+      "community": 36,
+      "community_name": "NewVP9PayloadParser",
+      "file_type": "code",
+      "norm_label": "vp9_parser_test.go",
+      "source_file": "internal/webrtc/vp9_parser_test.go",
+      "source_location": "L1"
+    },
+    {
+      "id": "internal_webrtc_vp9_parser_test_testvp9payloadparser_interframe",
+      "label": "TestVP9PayloadParser_InterFrame()",
+      "_origin": "ast",
+      "community": 36,
+      "community_name": "NewVP9PayloadParser",
+      "file_type": "code",
+      "norm_label": "testvp9payloadparser_interframe()",
+      "source_file": "internal/webrtc/vp9_parser_test.go",
+      "source_location": "L34"
+    },
+    {
+      "id": "internal_webrtc_vp9_parser_test_testvp9payloadparser_keyframe",
+      "label": "TestVP9PayloadParser_Keyframe()",
+      "_origin": "ast",
+      "community": 36,
+      "community_name": "NewVP9PayloadParser",
+      "file_type": "code",
+      "norm_label": "testvp9payloadparser_keyframe()",
+      "source_file": "internal/webrtc/vp9_parser_test.go",
+      "source_location": "L7"
+    },
+    {
+      "id": "internal_webrtc_vp9_parser_test_testvp9payloadparser_layerindicessvc",
+      "label": "TestVP9PayloadParser_LayerIndicesSVC()",
+      "_origin": "ast",
+      "community": 36,
+      "community_name": "NewVP9PayloadParser",
+      "file_type": "code",
+      "norm_label": "testvp9payloadparser_layerindicessvc()",
+      "source_file": "internal/webrtc/vp9_parser_test.go",
+      "source_location": "L90"
+    },
+    {
+      "id": "internal_webrtc_vp9_parser_test_testvp9payloadparser_pictureid",
+      "label": "TestVP9PayloadParser_PictureID()",
+      "_origin": "ast",
+      "community": 36,
+      "community_name": "NewVP9PayloadParser",
+      "file_type": "code",
+      "norm_label": "testvp9payloadparser_pictureid()",
+      "source_file": "internal/webrtc/vp9_parser_test.go",
+      "source_location": "L55"
+    },
+    {
+      "id": "internal_webrtc_vp9_parser_test_testvp9payloadparser_truncated",
+      "label": "TestVP9PayloadParser_Truncated()",
+      "_origin": "ast",
+      "community": 36,
+      "community_name": "NewVP9PayloadParser",
+      "file_type": "code",
+      "norm_label": "testvp9payloadparser_truncated()",
+      "source_file": "internal/webrtc/vp9_parser_test.go",
+      "source_location": "L136"
+    },
+    {
+      "id": "internal_models_message_parsesignalingmessage",
+      "label": "ParseSignalingMessage()",
+      "_origin": "ast",
+      "community": 37,
+      "community_name": "ParseSignalingMessage",
+      "file_type": "code",
+      "norm_label": "parsesignalingmessage()",
+      "source_file": "internal/models/message.go",
+      "source_location": "L42"
+    },
+    {
+      "id": "internal_models_message_test",
+      "label": "message_test.go",
+      "_origin": "ast",
+      "community": 37,
+      "community_name": "ParseSignalingMessage",
+      "file_type": "code",
+      "norm_label": "message_test.go",
+      "source_file": "internal/models/message_test.go",
+      "source_location": "L1"
+    },
+    {
+      "id": "internal_models_message_test_testparsesignalingmessage",
+      "label": "TestParseSignalingMessage()",
+      "_origin": "ast",
+      "community": 37,
+      "community_name": "ParseSignalingMessage",
+      "file_type": "code",
+      "norm_label": "testparsesignalingmessage()",
+      "source_file": "internal/models/message_test.go",
       "source_location": "L8"
     },
     {
-      "id": "internal_broker_redis_broker_test_testredisbroker_niloperations",
-      "label": "TestRedisBroker_NilOperations()",
+      "id": "internal_models_message_test_testsignalingmessageencode",
+      "label": "TestSignalingMessageEncode()",
       "_origin": "ast",
-      "community": 35,
-      "community_name": "redis_broker_test.go",
+      "community": 37,
+      "community_name": "ParseSignalingMessage",
       "file_type": "code",
-      "norm_label": "testredisbroker_niloperations()",
-      "source_file": "internal/broker/redis_broker_test.go",
-      "source_location": "L21"
+      "norm_label": "testsignalingmessageencode()",
+      "source_file": "internal/models/message_test.go",
+      "source_location": "L35"
+    },
+    {
+      "id": "internal_signaling_ice_restart_test",
+      "label": "ice_restart_test.go",
+      "_origin": "ast",
+      "community": 37,
+      "community_name": "ParseSignalingMessage",
+      "file_type": "code",
+      "norm_label": "ice_restart_test.go",
+      "source_file": "internal/signaling/ice_restart_test.go",
+      "source_location": "L1"
+    },
+    {
+      "id": "internal_signaling_ice_restart_test_testicerestart_seamlessrenegotiation",
+      "label": "TestICERestart_SeamlessRenegotiation()",
+      "_origin": "ast",
+      "community": 37,
+      "community_name": "ParseSignalingMessage",
+      "file_type": "code",
+      "norm_label": "testicerestart_seamlessrenegotiation()",
+      "source_file": "internal/signaling/ice_restart_test.go",
+      "source_location": "L12"
     },
     {
       "id": "public_sdk_core",
@@ -10167,6 +10277,17 @@
       "source_location": "L694"
     },
     {
+      "id": "internal_webrtc_track_switcher_isvp8keyframe",
+      "label": "IsVP8Keyframe()",
+      "_origin": "ast",
+      "community": 7,
+      "community_name": "TrackSwitcher",
+      "file_type": "code",
+      "norm_label": "isvp8keyframe()",
+      "source_file": "internal/webrtc/track_switcher.go",
+      "source_location": "L645"
+    },
+    {
       "id": "internal_webrtc_track_switcher_newsimulcasttrackswitcher",
       "label": "NewSimulcastTrackSwitcher()",
       "_origin": "ast",
@@ -10211,17 +10332,6 @@
       "source_location": "L211"
     },
     {
-      "id": "internal_webrtc_vp9_parser_newvp9payloadparser",
-      "label": "NewVP9PayloadParser()",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "TrackSwitcher",
-      "file_type": "code",
-      "norm_label": "newvp9payloadparser()",
-      "source_file": "internal/webrtc/vp9_parser.go",
-      "source_location": "L50"
-    },
-    {
       "id": "internal_webrtc_vp9_parser_parsevp9descriptor",
       "label": "ParseVP9Descriptor()",
       "_origin": "ast",
@@ -10231,72 +10341,6 @@
       "norm_label": "parsevp9descriptor()",
       "source_file": "internal/webrtc/vp9_parser.go",
       "source_location": "L73"
-    },
-    {
-      "id": "internal_webrtc_vp9_parser_test",
-      "label": "vp9_parser_test.go",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "TrackSwitcher",
-      "file_type": "code",
-      "norm_label": "vp9_parser_test.go",
-      "source_file": "internal/webrtc/vp9_parser_test.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "internal_webrtc_vp9_parser_test_testvp9payloadparser_interframe",
-      "label": "TestVP9PayloadParser_InterFrame()",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "TrackSwitcher",
-      "file_type": "code",
-      "norm_label": "testvp9payloadparser_interframe()",
-      "source_file": "internal/webrtc/vp9_parser_test.go",
-      "source_location": "L34"
-    },
-    {
-      "id": "internal_webrtc_vp9_parser_test_testvp9payloadparser_keyframe",
-      "label": "TestVP9PayloadParser_Keyframe()",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "TrackSwitcher",
-      "file_type": "code",
-      "norm_label": "testvp9payloadparser_keyframe()",
-      "source_file": "internal/webrtc/vp9_parser_test.go",
-      "source_location": "L7"
-    },
-    {
-      "id": "internal_webrtc_vp9_parser_test_testvp9payloadparser_layerindicessvc",
-      "label": "TestVP9PayloadParser_LayerIndicesSVC()",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "TrackSwitcher",
-      "file_type": "code",
-      "norm_label": "testvp9payloadparser_layerindicessvc()",
-      "source_file": "internal/webrtc/vp9_parser_test.go",
-      "source_location": "L90"
-    },
-    {
-      "id": "internal_webrtc_vp9_parser_test_testvp9payloadparser_pictureid",
-      "label": "TestVP9PayloadParser_PictureID()",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "TrackSwitcher",
-      "file_type": "code",
-      "norm_label": "testvp9payloadparser_pictureid()",
-      "source_file": "internal/webrtc/vp9_parser_test.go",
-      "source_location": "L55"
-    },
-    {
-      "id": "internal_webrtc_vp9_parser_test_testvp9payloadparser_truncated",
-      "label": "TestVP9PayloadParser_Truncated()",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "TrackSwitcher",
-      "file_type": "code",
-      "norm_label": "testvp9payloadparser_truncated()",
-      "source_file": "internal/webrtc/vp9_parser_test.go",
-      "source_location": "L136"
     },
     {
       "id": "webrtc_trackremote",
@@ -10760,7 +10804,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/api/auth.go",
-      "source_location": "L161",
+      "source_location": "L206",
       "weight": 1.0
     },
     {
@@ -10772,7 +10816,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/api/auth.go",
-      "source_location": "L215",
+      "source_location": "L260",
       "weight": 1.0
     },
     {
@@ -10784,7 +10828,19 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/api/auth.go",
-      "source_location": "L224",
+      "source_location": "L269",
+      "weight": 1.0
+    },
+    {
+      "source": "api_authhandler_requireapiauth",
+      "target": "api_authhandler_validateapikeysecret",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L141",
       "weight": 1.0
     },
     {
@@ -11348,7 +11404,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "cmd/main.go",
-      "source_location": "L533",
+      "source_location": "L573",
       "weight": 1.0
     },
     {
@@ -11365,18 +11421,6 @@
     },
     {
       "source": "cmd_main_main",
-      "target": "internal_signaling_client_newclientwithclaims",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "cmd/main.go",
-      "source_location": "L620",
-      "weight": 1.0
-    },
-    {
-      "source": "cmd_main_main",
       "target": "internal_signaling_room_manager_newroommanager",
       "relation": "calls",
       "_origin": "ast",
@@ -11389,6 +11433,18 @@
     },
     {
       "source": "cmd_main_main",
+      "target": "internal_signaling_client_newclientwithclaims",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "cmd/main.go",
+      "source_location": "L660",
+      "weight": 1.0
+    },
+    {
+      "source": "cmd_main_main",
       "target": "internal_config_config_printstartupbanner",
       "relation": "calls",
       "_origin": "ast",
@@ -11396,7 +11452,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "cmd/main.go",
-      "source_location": "L640",
+      "source_location": "L680",
       "weight": 1.0
     },
     {
@@ -11408,7 +11464,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "cmd/main.go",
-      "source_location": "L647",
+      "source_location": "L687",
       "weight": 1.0
     },
     {
@@ -11444,7 +11500,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/api/auth.go",
-      "source_location": "L109",
+      "source_location": "L154",
       "weight": 1.0
     },
     {
@@ -11648,7 +11704,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1219",
+      "source_location": "L1228",
       "weight": 1.0
     },
     {
@@ -15308,7 +15364,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1379",
+      "source_location": "L1386",
       "weight": 1.0
     },
     {
@@ -15320,7 +15376,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2178",
+      "source_location": "L2185",
       "weight": 1.0
     },
     {
@@ -15332,7 +15388,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2472",
+      "source_location": "L2479",
       "weight": 1.0
     },
     {
@@ -15344,7 +15400,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L322",
+      "source_location": "L329",
       "weight": 1.0
     },
     {
@@ -15356,7 +15412,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L502",
+      "source_location": "L509",
       "weight": 1.0
     },
     {
@@ -15368,7 +15424,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L503",
+      "source_location": "L510",
       "weight": 1.0
     },
     {
@@ -15380,7 +15436,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L518",
+      "source_location": "L525",
       "weight": 1.0
     },
     {
@@ -15392,7 +15448,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L518",
+      "source_location": "L525",
       "weight": 1.0
     },
     {
@@ -15404,7 +15460,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L554",
+      "source_location": "L561",
       "weight": 1.0
     },
     {
@@ -15416,7 +15472,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L594",
+      "source_location": "L601",
       "weight": 1.0
     },
     {
@@ -15428,7 +15484,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2648",
+      "source_location": "L2655",
       "weight": 1.0
     },
     {
@@ -15440,7 +15496,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1620",
+      "source_location": "L1627",
       "weight": 1.0
     },
     {
@@ -15452,7 +15508,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2694",
+      "source_location": "L2701",
       "weight": 1.0
     },
     {
@@ -15464,7 +15520,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2713",
+      "source_location": "L2720",
       "weight": 1.0
     },
     {
@@ -15476,24 +15532,12 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L217",
+      "source_location": "L223",
       "weight": 1.0
     },
     {
       "source": "signaling_client_handlesignalingmessage",
       "target": "signaling_client_safesend",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "internal/signaling/client.go",
-      "source_location": "L224",
-      "weight": 1.0
-    },
-    {
-      "source": "signaling_client_handlesignalingmessage",
-      "target": "signaling_client_handlepublishoffer",
       "relation": "calls",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -15505,6 +15549,18 @@
     },
     {
       "source": "signaling_client_handlesignalingmessage",
+      "target": "signaling_client_handlepublishoffer",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "internal/signaling/client.go",
+      "source_location": "L238",
+      "weight": 1.0
+    },
+    {
+      "source": "signaling_client_handlesignalingmessage",
       "target": "signaling_client_handleviewerjoinplay",
       "relation": "calls",
       "_origin": "ast",
@@ -15512,7 +15568,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L234",
+      "source_location": "L241",
       "weight": 1.0
     },
     {
@@ -15524,7 +15580,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L237",
+      "source_location": "L244",
       "weight": 1.0
     },
     {
@@ -15536,7 +15592,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L240",
+      "source_location": "L247",
       "weight": 1.0
     },
     {
@@ -15548,7 +15604,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L243",
+      "source_location": "L250",
       "weight": 1.0
     },
     {
@@ -15560,7 +15616,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L246",
+      "source_location": "L253",
       "weight": 1.0
     },
     {
@@ -15572,7 +15628,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L249",
+      "source_location": "L256",
       "weight": 1.0
     },
     {
@@ -15584,7 +15640,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L252",
+      "source_location": "L259",
       "weight": 1.0
     },
     {
@@ -15596,7 +15652,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L255",
+      "source_location": "L262",
       "weight": 1.0
     },
     {
@@ -15608,7 +15664,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L258",
+      "source_location": "L265",
       "weight": 1.0
     },
     {
@@ -15620,7 +15676,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L261",
+      "source_location": "L268",
       "weight": 1.0
     },
     {
@@ -15632,7 +15688,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L264",
+      "source_location": "L271",
       "weight": 1.0
     },
     {
@@ -15644,7 +15700,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L267",
+      "source_location": "L274",
       "weight": 1.0
     },
     {
@@ -15656,7 +15712,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L270",
+      "source_location": "L277",
       "weight": 1.0
     },
     {
@@ -15668,7 +15724,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L273",
+      "source_location": "L280",
       "weight": 1.0
     },
     {
@@ -15680,7 +15736,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L276",
+      "source_location": "L283",
       "weight": 1.0
     },
     {
@@ -15692,7 +15748,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L279",
+      "source_location": "L286",
       "weight": 1.0
     },
     {
@@ -15704,7 +15760,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L282",
+      "source_location": "L289",
       "weight": 1.0
     },
     {
@@ -15716,7 +15772,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L285",
+      "source_location": "L292",
       "weight": 1.0
     },
     {
@@ -15728,7 +15784,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L288",
+      "source_location": "L295",
       "weight": 1.0
     },
     {
@@ -15740,7 +15796,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L291",
+      "source_location": "L298",
       "weight": 1.0
     },
     {
@@ -15752,7 +15808,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1903",
+      "source_location": "L1910",
       "weight": 1.0
     },
     {
@@ -15764,7 +15820,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1903",
+      "source_location": "L1910",
       "weight": 1.0
     },
     {
@@ -15776,7 +15832,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1921",
+      "source_location": "L1928",
       "weight": 1.0
     },
     {
@@ -15788,7 +15844,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1922",
+      "source_location": "L1929",
       "weight": 1.0
     },
     {
@@ -15800,7 +15856,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L721",
+      "source_location": "L728",
       "weight": 1.0
     },
     {
@@ -15812,7 +15868,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L804",
+      "source_location": "L811",
       "weight": 1.0
     },
     {
@@ -15824,7 +15880,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L901",
+      "source_location": "L908",
       "weight": 1.0
     },
     {
@@ -15836,7 +15892,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L901",
+      "source_location": "L908",
       "weight": 1.0
     },
     {
@@ -15848,7 +15904,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L953",
+      "source_location": "L960",
       "weight": 1.0
     },
     {
@@ -15860,7 +15916,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L184",
+      "source_location": "L185",
       "weight": 1.0
     },
     {
@@ -15872,7 +15928,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L203",
+      "source_location": "L204",
       "weight": 1.0
     },
     {
@@ -15884,7 +15940,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L209",
+      "source_location": "L210",
       "weight": 1.0
     },
     {
@@ -15896,7 +15952,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2166",
+      "source_location": "L2173",
       "weight": 1.0
     },
     {
@@ -15908,7 +15964,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2269",
+      "source_location": "L2276",
       "weight": 1.0
     },
     {
@@ -16424,7 +16480,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1294",
+      "source_location": "L1303",
       "weight": 1.0
     },
     {
@@ -16460,7 +16516,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1233",
+      "source_location": "L1242",
       "weight": 1.0
     },
     {
@@ -17372,7 +17428,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L57",
+      "source_location": "L58",
       "weight": 1.0
     },
     {
@@ -17384,7 +17440,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L58",
+      "source_location": "L59",
       "weight": 1.0
     },
     {
@@ -17396,7 +17452,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L59",
+      "source_location": "L60",
       "weight": 1.0
     },
     {
@@ -17408,7 +17464,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L60",
+      "source_location": "L61",
       "weight": 1.0
     },
     {
@@ -17420,7 +17476,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L61",
+      "source_location": "L62",
       "weight": 1.0
     },
     {
@@ -17432,7 +17488,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L62",
+      "source_location": "L63",
       "weight": 1.0
     },
     {
@@ -17444,7 +17500,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L64",
+      "source_location": "L65",
       "weight": 1.0
     },
     {
@@ -17456,7 +17512,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L67",
+      "source_location": "L68",
       "weight": 1.0
     },
     {
@@ -18440,7 +18496,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/api/auth.go",
-      "source_location": "L145",
+      "source_location": "L190",
       "weight": 1.0
     },
     {
@@ -18452,7 +18508,19 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/api/auth.go",
-      "source_location": "L182",
+      "source_location": "L227",
+      "weight": 1.0
+    },
+    {
+      "source": "api_authhandler_validateapikeysecret",
+      "target": "fiber_ctx",
+      "relation": "references",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "parameter_type",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L108",
       "weight": 1.0
     },
     {
@@ -18824,7 +18892,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/api/auth.go",
-      "source_location": "L113",
+      "source_location": "L158",
       "weight": 1.0
     },
     {
@@ -18836,7 +18904,19 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/api/auth.go",
-      "source_location": "L108",
+      "source_location": "L153",
+      "weight": 1.0
+    },
+    {
+      "source": "internal_api_auth_test_testauthhandler_requireapiauth",
+      "target": "go_type_testing_t",
+      "relation": "references",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "parameter_type",
+      "source_file": "internal/api/auth_test.go",
+      "source_location": "L114",
       "weight": 1.0
     },
     {
@@ -19088,7 +19168,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L81",
+      "source_location": "L82",
       "weight": 1.0
     },
     {
@@ -19100,7 +19180,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L81",
+      "source_location": "L82",
       "weight": 1.0
     },
     {
@@ -19112,7 +19192,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L81",
+      "source_location": "L82",
       "weight": 1.0
     },
     {
@@ -19124,7 +19204,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L81",
+      "source_location": "L82",
       "weight": 1.0
     },
     {
@@ -19136,7 +19216,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L95",
+      "source_location": "L96",
       "weight": 1.0
     },
     {
@@ -19148,7 +19228,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L95",
+      "source_location": "L96",
       "weight": 1.0
     },
     {
@@ -19160,7 +19240,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L95",
+      "source_location": "L96",
       "weight": 1.0
     },
     {
@@ -19172,7 +19252,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L95",
+      "source_location": "L96",
       "weight": 1.0
     },
     {
@@ -19184,7 +19264,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L95",
+      "source_location": "L96",
       "weight": 1.0
     },
     {
@@ -19340,7 +19420,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1215",
+      "source_location": "L1224",
       "weight": 1.0
     },
     {
@@ -19352,7 +19432,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1215",
+      "source_location": "L1224",
       "weight": 1.0
     },
     {
@@ -21200,7 +21280,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1150",
+      "source_location": "L1157",
       "weight": 1.0
     },
     {
@@ -21212,7 +21292,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2532",
+      "source_location": "L2539",
       "weight": 1.0
     },
     {
@@ -21224,7 +21304,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1182",
+      "source_location": "L1189",
       "weight": 1.0
     },
     {
@@ -21236,7 +21316,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1378",
+      "source_location": "L1385",
       "weight": 1.0
     },
     {
@@ -21248,7 +21328,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2004",
+      "source_location": "L2011",
       "weight": 1.0
     },
     {
@@ -21260,7 +21340,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2172",
+      "source_location": "L2179",
       "weight": 1.0
     },
     {
@@ -21272,7 +21352,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2431",
+      "source_location": "L2438",
       "weight": 1.0
     },
     {
@@ -21284,7 +21364,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1769",
+      "source_location": "L1776",
       "weight": 1.0
     },
     {
@@ -21296,7 +21376,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1708",
+      "source_location": "L1715",
       "weight": 1.0
     },
     {
@@ -21308,7 +21388,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1408",
+      "source_location": "L1415",
       "weight": 1.0
     },
     {
@@ -21320,7 +21400,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2376",
+      "source_location": "L2383",
       "weight": 1.0
     },
     {
@@ -21332,7 +21412,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2320",
+      "source_location": "L2327",
       "weight": 1.0
     },
     {
@@ -21344,7 +21424,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2416",
+      "source_location": "L2423",
       "weight": 1.0
     },
     {
@@ -21356,7 +21436,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L299",
+      "source_location": "L306",
       "weight": 1.0
     },
     {
@@ -21368,7 +21448,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2596",
+      "source_location": "L2603",
       "weight": 1.0
     },
     {
@@ -21380,7 +21460,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1383",
+      "source_location": "L1390",
       "weight": 1.0
     },
     {
@@ -21392,7 +21472,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2077",
+      "source_location": "L2084",
       "weight": 1.0
     },
     {
@@ -21404,7 +21484,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1580",
+      "source_location": "L1587",
       "weight": 1.0
     },
     {
@@ -21416,7 +21496,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1507",
+      "source_location": "L1514",
       "weight": 1.0
     },
     {
@@ -21428,7 +21508,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1094",
+      "source_location": "L1101",
       "weight": 1.0
     },
     {
@@ -21440,7 +21520,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2655",
+      "source_location": "L2662",
       "weight": 1.0
     },
     {
@@ -21452,7 +21532,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L214",
+      "source_location": "L215",
       "weight": 1.0
     },
     {
@@ -21464,7 +21544,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1858",
+      "source_location": "L1865",
       "weight": 1.0
     },
     {
@@ -21476,7 +21556,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L698",
+      "source_location": "L705",
       "weight": 1.0
     },
     {
@@ -21632,7 +21712,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1287",
+      "source_location": "L1296",
       "weight": 1.0
     },
     {
@@ -21992,7 +22072,19 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "internal/api/auth.go",
-      "source_location": "L160",
+      "source_location": "L205",
+      "weight": 1.0
+    },
+    {
+      "source": "api_authhandler_requireapiauth",
+      "target": "fiber_handler",
+      "relation": "references",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "return_type",
+      "source_file": "internal/api/auth.go",
+      "source_location": "L139",
       "weight": 1.0
     },
     {
@@ -22196,7 +22288,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L81",
+      "source_location": "L82",
       "weight": 1.0
     },
     {
@@ -22208,7 +22300,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L95",
+      "source_location": "L96",
       "weight": 1.0
     },
     {
@@ -22940,7 +23032,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L145",
+      "source_location": "L146",
       "weight": 1.0
     },
     {
@@ -23024,7 +23116,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1174",
+      "source_location": "L1177",
       "weight": 1.0
     },
     {
@@ -23084,7 +23176,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1238",
+      "source_location": "L1247",
       "weight": 1.0
     },
     {
@@ -23096,7 +23188,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1194",
+      "source_location": "L1200",
       "weight": 1.0
     },
     {
@@ -23322,7 +23414,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "cmd/main.go",
-      "source_location": "L697",
+      "source_location": "L737",
       "weight": 1.0
     },
     {
@@ -23344,7 +23436,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/api/auth.go",
-      "source_location": "L108",
+      "source_location": "L153",
       "weight": 1.0
     },
     {
@@ -23355,7 +23447,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/api/auth.go",
-      "source_location": "L113",
+      "source_location": "L158",
       "weight": 1.0
     },
     {
@@ -23422,6 +23514,17 @@
       "confidence_score": 1.0,
       "source_file": "internal/api/auth.go",
       "source_location": "L76",
+      "weight": 1.0
+    },
+    {
+      "source": "internal_api_auth_test",
+      "target": "internal_api_auth_test_testauthhandler_requireapiauth",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/api/auth_test.go",
+      "source_location": "L114",
       "weight": 1.0
     },
     {
@@ -24180,7 +24283,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L50",
+      "source_location": "L51",
       "weight": 1.0
     },
     {
@@ -24191,7 +24294,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L81",
+      "source_location": "L82",
       "weight": 1.0
     },
     {
@@ -24202,7 +24305,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L95",
+      "source_location": "L96",
       "weight": 1.0
     },
     {
@@ -24356,7 +24459,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1215",
+      "source_location": "L1224",
       "weight": 1.0
     },
     {
@@ -26979,13 +27082,35 @@
     },
     {
       "source": "api_authhandler",
+      "target": "api_authhandler_validateapikeysecret",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/api/auth.go",
+      "source_location": "L108",
+      "weight": 1.0
+    },
+    {
+      "source": "api_authhandler",
+      "target": "api_authhandler_requireapiauth",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/api/auth.go",
+      "source_location": "L139",
+      "weight": 1.0
+    },
+    {
+      "source": "api_authhandler",
       "target": "api_authhandler_generateturncredentials",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/api/auth.go",
-      "source_location": "L145",
+      "source_location": "L190",
       "weight": 1.0
     },
     {
@@ -26996,7 +27121,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/api/auth.go",
-      "source_location": "L160",
+      "source_location": "L205",
       "weight": 1.0
     },
     {
@@ -27007,7 +27132,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/api/auth.go",
-      "source_location": "L182",
+      "source_location": "L227",
       "weight": 1.0
     },
     {
@@ -29790,7 +29915,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1094",
+      "source_location": "L1101",
       "weight": 1.0
     },
     {
@@ -29801,7 +29926,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1150",
+      "source_location": "L1157",
       "weight": 1.0
     },
     {
@@ -29812,7 +29937,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1182",
+      "source_location": "L1189",
       "weight": 1.0
     },
     {
@@ -29823,7 +29948,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1378",
+      "source_location": "L1385",
       "weight": 1.0
     },
     {
@@ -29834,7 +29959,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1383",
+      "source_location": "L1390",
       "weight": 1.0
     },
     {
@@ -29845,7 +29970,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1408",
+      "source_location": "L1415",
       "weight": 1.0
     },
     {
@@ -29856,7 +29981,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L145",
+      "source_location": "L146",
       "weight": 1.0
     },
     {
@@ -29867,7 +29992,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1507",
+      "source_location": "L1514",
       "weight": 1.0
     },
     {
@@ -29878,7 +30003,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1580",
+      "source_location": "L1587",
       "weight": 1.0
     },
     {
@@ -29889,7 +30014,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1708",
+      "source_location": "L1715",
       "weight": 1.0
     },
     {
@@ -29900,7 +30025,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L171",
+      "source_location": "L172",
       "weight": 1.0
     },
     {
@@ -29911,7 +30036,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1769",
+      "source_location": "L1776",
       "weight": 1.0
     },
     {
@@ -29922,7 +30047,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L1858",
+      "source_location": "L1865",
       "weight": 1.0
     },
     {
@@ -29933,7 +30058,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2004",
+      "source_location": "L2011",
       "weight": 1.0
     },
     {
@@ -29944,7 +30069,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2077",
+      "source_location": "L2084",
       "weight": 1.0
     },
     {
@@ -29955,7 +30080,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2117",
+      "source_location": "L2124",
       "weight": 1.0
     },
     {
@@ -29966,7 +30091,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L214",
+      "source_location": "L215",
       "weight": 1.0
     },
     {
@@ -29977,7 +30102,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2172",
+      "source_location": "L2179",
       "weight": 1.0
     },
     {
@@ -29988,7 +30113,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2182",
+      "source_location": "L2189",
       "weight": 1.0
     },
     {
@@ -29999,7 +30124,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2208",
+      "source_location": "L2215",
       "weight": 1.0
     },
     {
@@ -30010,7 +30135,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2224",
+      "source_location": "L2231",
       "weight": 1.0
     },
     {
@@ -30021,7 +30146,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2235",
+      "source_location": "L2242",
       "weight": 1.0
     },
     {
@@ -30032,7 +30157,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2247",
+      "source_location": "L2254",
       "weight": 1.0
     },
     {
@@ -30043,7 +30168,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2320",
+      "source_location": "L2327",
       "weight": 1.0
     },
     {
@@ -30054,7 +30179,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2376",
+      "source_location": "L2383",
       "weight": 1.0
     },
     {
@@ -30065,7 +30190,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2416",
+      "source_location": "L2423",
       "weight": 1.0
     },
     {
@@ -30076,7 +30201,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2431",
+      "source_location": "L2438",
       "weight": 1.0
     },
     {
@@ -30087,7 +30212,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2532",
+      "source_location": "L2539",
       "weight": 1.0
     },
     {
@@ -30098,7 +30223,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2596",
+      "source_location": "L2603",
       "weight": 1.0
     },
     {
@@ -30109,7 +30234,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L2655",
+      "source_location": "L2662",
       "weight": 1.0
     },
     {
@@ -30120,7 +30245,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L299",
+      "source_location": "L306",
       "weight": 1.0
     },
     {
@@ -30131,7 +30256,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L698",
+      "source_location": "L705",
       "weight": 1.0
     },
     {
@@ -30142,7 +30267,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L71",
+      "source_location": "L72",
       "weight": 1.0
     },
     {
@@ -30153,7 +30278,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/client.go",
-      "source_location": "L76",
+      "source_location": "L77",
       "weight": 1.0
     },
     {
@@ -30384,7 +30509,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1174",
+      "source_location": "L1177",
       "weight": 1.0
     },
     {
@@ -30395,7 +30520,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1194",
+      "source_location": "L1200",
       "weight": 1.0
     },
     {
@@ -30406,7 +30531,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1226",
+      "source_location": "L1235",
       "weight": 1.0
     },
     {
@@ -30417,7 +30542,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1238",
+      "source_location": "L1247",
       "weight": 1.0
     },
     {
@@ -30428,18 +30553,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1260",
-      "weight": 1.0
-    },
-    {
-      "source": "signaling_roommanager",
-      "target": "signaling_roommanager_setmediastate",
-      "relation": "method",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1287",
+      "source_location": "L1269",
       "weight": 1.0
     },
     {
@@ -30455,13 +30569,24 @@
     },
     {
       "source": "signaling_roommanager",
+      "target": "signaling_roommanager_setmediastate",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/signaling/room_manager.go",
+      "source_location": "L1296",
+      "weight": 1.0
+    },
+    {
+      "source": "signaling_roommanager",
       "target": "signaling_roommanager_activeroomscount",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "internal/signaling/room_manager.go",
-      "source_location": "L1299",
+      "source_location": "L1308",
       "weight": 1.0
     },
     {
@@ -32288,6 +32413,18 @@
       "confidence_score": 1.0,
       "source_file": "internal/webrtc/vp9_parser.go",
       "source_location": "L61",
+      "weight": 1.0
+    },
+    {
+      "source": "internal_api_auth_test_testauthhandler_requireapiauth",
+      "target": "internal_api_auth_newauthhandler",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "context": "call",
+      "source_file": "internal/api/auth_test.go",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -34219,7 +34356,7 @@
       "confidence_score": 0.85,
       "context": "call",
       "source_file": "internal/signaling/client.go",
-      "source_location": "L389",
+      "source_location": "L396",
       "weight": 1.0
     },
     {
@@ -34272,5 +34409,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "28820f047699f094b9c210606a61918f75383142"
+  "built_at_commit": "982c2e72c6f356e98693072b6b832028251b6761"
 }

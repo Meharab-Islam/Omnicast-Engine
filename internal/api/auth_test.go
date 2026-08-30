@@ -110,3 +110,47 @@ func TestAuthHandler_TokenGeneration(t *testing.T) {
 		t.Fatalf("Expected status 400 Bad Request, got %d", resp.StatusCode)
 	}
 }
+
+func TestAuthHandler_RequireAPIAuth(t *testing.T) {
+	_ = os.Setenv("API_KEY", "test_key_123")
+	_ = os.Setenv("API_SECRET", "test_secret_456")
+
+	handler := NewAuthHandler()
+
+	app := fiber.New()
+	app.Get("/api/rooms", handler.RequireAPIAuth(), func(c *fiber.Ctx) error {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{"status": "ok"})
+	})
+
+	// 1. Missing Headers -> 401 Unauthorized
+	req := httptest.NewRequest(http.MethodGet, "/api/rooms", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("Failed request: %v", err)
+	}
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("Expected 401, got %d", resp.StatusCode)
+	}
+
+	// 2. Valid X-API-KEY and X-API-SECRET Headers -> 200 OK
+	req = httptest.NewRequest(http.MethodGet, "/api/rooms", nil)
+	req.Header.Set("X-API-KEY", "test_key_123")
+	req.Header.Set("X-API-SECRET", "test_secret_456")
+	resp, err = app.Test(req)
+	if err != nil {
+		t.Fatalf("Failed request: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", resp.StatusCode)
+	}
+
+	// 3. Valid via Query Params -> 200 OK
+	req = httptest.NewRequest(http.MethodGet, "/api/rooms?api_key=test_key_123&api_secret=test_secret_456", nil)
+	resp, err = app.Test(req)
+	if err != nil {
+		t.Fatalf("Failed request: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 OK via query params, got %d", resp.StatusCode)
+	}
+}

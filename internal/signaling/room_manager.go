@@ -1164,10 +1164,13 @@ type RoomSummary struct {
 	RoomID       string `json:"room_id"`
 	RoomName     string `json:"room_name"`
 	HostID       string `json:"host_id"`
+	HostName     string `json:"host_name,omitempty"`
 	MainSeatID   string `json:"main_seat_id"`
 	HostScore    int    `json:"host_score"`
 	CreatedAt    string `json:"created_at"`
 	ViewersCount int    `json:"viewers_count"`
+	ViewerCount  int    `json:"viewer_count"`
+	IsActive     bool   `json:"is_active"`
 }
 
 // GetAllRoomsSummary returns summary list of all active rooms (thread-safe)
@@ -1181,10 +1184,13 @@ func (rm *RoomManager) GetAllRoomsSummary() []RoomSummary {
 			RoomID:       room.RoomID,
 			RoomName:     room.GetRoomName(),
 			HostID:       room.HostID,
+			HostName:     room.HostID,
 			MainSeatID:   room.GetMainSeatID(),
 			HostScore:    room.GetHostScore(),
 			CreatedAt:    room.CreatedAt.Format(time.RFC3339),
 			ViewersCount: room.ViewersCount(),
+			ViewerCount:  room.ViewersCount(),
+			IsActive:     true,
 		})
 	}
 	return summaries
@@ -1204,10 +1210,13 @@ func (rm *RoomManager) GetRoomSummary(roomID string) (*RoomSummary, bool) {
 		RoomID:       room.RoomID,
 		RoomName:     room.GetRoomName(),
 		HostID:       room.HostID,
+		HostName:     room.HostID,
 		MainSeatID:   room.GetMainSeatID(),
 		HostScore:    room.GetHostScore(),
 		CreatedAt:    room.CreatedAt.Format(time.RFC3339),
 		ViewersCount: room.ViewersCount(),
+		ViewerCount:  room.ViewersCount(),
+		IsActive:     true,
 	}, true
 }
 

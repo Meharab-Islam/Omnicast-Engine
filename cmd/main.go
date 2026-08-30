@@ -353,10 +353,50 @@ func main() {
 		})
 	})
 
-	// GET /rooms - Return list of all currently active rooms with room_id, room_name, host_id, and viewer_count
+	// GET /rooms - Return list of all currently active rooms with room_id, room_name, host_id, and viewer_count (public fallback)
 	app.Get("/rooms", func(c *fiber.Ctx) error {
 		rooms := roomManager.GetAllRooms()
 		return c.Status(fiber.StatusOK).JSON(rooms)
+	})
+
+	// GET /api/rooms & GET /api/room - Client REST API to fetch list of active live rooms
+	// Protected by X-API-KEY and X-API-SECRET
+	handleGetRoomsAPI := func(c *fiber.Ctx) error {
+		if !authHandler.ValidateAPIKeySecret(c) {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"status":  "error",
+				"success": false,
+				"error":   "Unauthorized: valid X-API-KEY and X-API-SECRET headers required",
+			})
+		}
+
+		rooms := roomManager.GetAllRoomsSummary()
+		return c.Status(fiber.StatusOK).JSON(rooms)
+	}
+
+	app.Get("/api/rooms", handleGetRoomsAPI)
+	app.Get("/api/room", handleGetRoomsAPI)
+
+	// GET /api/rooms/:id - Fetch single room summary details
+	app.Get("/api/rooms/:id", func(c *fiber.Ctx) error {
+		if !authHandler.ValidateAPIKeySecret(c) {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"status":  "error",
+				"success": false,
+				"error":   "Unauthorized: valid X-API-KEY and X-API-SECRET headers required",
+			})
+		}
+
+		roomID := c.Params("id")
+		summary, exists := roomManager.GetRoomSummary(roomID)
+		if !exists || summary == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"status":  "error",
+				"success": false,
+				"error":   "Room not found: " + roomID,
+			})
+		}
+		return c.Status(fiber.StatusOK).JSON(summary)
 	})
 
 	// GET /api/admin/rooms - Secured Admin Endpoint to fetch server-wide stats, active room details, user counts, and session uptimes

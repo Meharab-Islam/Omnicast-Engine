@@ -1,8 +1,8 @@
 {
   "cmd/main.go": {
-    "mtime": 1788018396.2016633,
-    "seen": 1788018447.3412778,
-    "ast_hash": "3be66bf38b38ab63fead5148419ab46c",
+    "mtime": 1788087933.2207606,
+    "seen": 1788087959.4760199,
+    "ast_hash": "286f9491dc6faf570652c2a3dc65e843",
     "semantic_hash": ""
   },
   "go.mod": {
@@ -30,9 +30,9 @@
     "semantic_hash": "753ef9d80b4dc0c5b0894e33d7bbb01c"
   },
   "internal/signaling/client.go": {
-    "mtime": 1788018357.6033387,
-    "seen": 1788018447.341294,
-    "ast_hash": "4e6b0f817453b1996dc431c7de102164",
+    "mtime": 1788089484.5268633,
+    "seen": 1788089502.84899,
+    "ast_hash": "8f249729ccec07edc3b49ca247bd63d8",
     "semantic_hash": ""
   },
   "internal/signaling/hub.go": {
@@ -54,9 +54,9 @@
     "semantic_hash": ""
   },
   "internal/signaling/room_manager.go": {
-    "mtime": 1788018287.9279428,
-    "seen": 1788018447.3412979,
-    "ast_hash": "c6dfbffd9beecd690def47ae621cfc9c",
+    "mtime": 1788087916.6937997,
+    "seen": 1788087959.476039,
+    "ast_hash": "98146cad5b942a1c57e7af55cc4cfdcf",
     "semantic_hash": ""
   },
   "internal/webrtc/engine.go": {
@@ -198,15 +198,15 @@
     "semantic_hash": ""
   },
   "internal/api/auth.go": {
-    "mtime": 1787979958.1974635,
-    "seen": 1787979993.676685,
-    "ast_hash": "519999d090e6679b97fd004f26023575",
+    "mtime": 1788087925.0536933,
+    "seen": 1788087959.476023,
+    "ast_hash": "bd7369397dc4a988622fed27141be9a8",
     "semantic_hash": ""
   },
   "internal/api/auth_test.go": {
-    "mtime": 1787808288.0474312,
-    "seen": 1787808355.330931,
-    "ast_hash": "25f247dbfa45cbc69d239350092a7f69",
+    "mtime": 1788087941.698011,
+    "seen": 1788087959.4760242,
+    "ast_hash": "4a58f416b8d173147e305069951fa2fd",
     "semantic_hash": ""
   },
   "internal/signaling/worker_pool.go": {

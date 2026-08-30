@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -212,12 +213,18 @@ func (c *Client) ReadPump() {
 
 // handleSignalingMessage routes WebRTC signaling events (publish/offer, play/join_room, chat, ice candidate, etc.)
 func (c *Client) handleSignalingMessage(msg *models.SignalingMessage) {
-	switch msg.Event {
-	case "ping":
+	evt := strings.ToLower(strings.TrimSpace(msg.Event))
+	if evt == "" {
+		evt = strings.ToLower(strings.TrimSpace(msg.Action))
+	}
+
+	switch evt {
+	case "ping", "heartbeat":
 		c.UpdateLastPong()
 		pongPayload, _ := json.Marshal(map[string]any{"timestamp": time.Now().Unix()})
 		if enc, err := (&models.SignalingMessage{
 			Event:   "pong",
+			Action:  "pong",
 			RoomID:  msg.RoomID,
 			Payload: pongPayload,
 		}).Encode(); err == nil {

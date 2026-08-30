@@ -104,6 +104,51 @@ func NewAuthHandler() *AuthHandler {
 	}
 }
 
+// ValidateAPIKeySecret verifies that the request contains valid API Key & Secret headers or query params
+func (h *AuthHandler) ValidateAPIKeySecret(c *fiber.Ctx) bool {
+	apiKey := c.Get("X-API-KEY")
+	if apiKey == "" {
+		apiKey = c.Get("X-API-Key")
+	}
+	if apiKey == "" {
+		apiKey = c.Get("x-api-key")
+	}
+	if apiKey == "" {
+		apiKey = c.Query("api_key")
+	}
+
+	apiSecret := c.Get("X-API-SECRET")
+	if apiSecret == "" {
+		apiSecret = c.Get("X-API-Secret")
+	}
+	if apiSecret == "" {
+		apiSecret = c.Get("x-api-secret")
+	}
+	if apiSecret == "" {
+		apiSecret = c.Query("api_secret")
+	}
+
+	if apiKey == "" || apiSecret == "" {
+		return false
+	}
+
+	return apiKey == h.apiKey && apiSecret == h.apiSecret
+}
+
+// RequireAPIAuth middleware enforcing valid X-API-KEY and X-API-SECRET
+func (h *AuthHandler) RequireAPIAuth() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if !h.ValidateAPIKeySecret(c) {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"status":  "error",
+				"success": false,
+				"error":   "Unauthorized: valid X-API-KEY and X-API-SECRET headers required",
+			})
+		}
+		return c.Next()
+	}
+}
+
 // GenerateUserToken generates a signed JWT token containing user profile details
 func GenerateUserToken(userID, userName, avatarURL, secret string, duration time.Duration) (string, error) {
 	return GenerateTokenWithPermissions(userID, userName, avatarURL, "user", "", nil, nil, secret, duration)

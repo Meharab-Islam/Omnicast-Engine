@@ -1,0 +1,415 @@
+{
+  "communities": {
+    "0": [
+      "internal_models_room",
+      "internal_models_room_go_models_room",
+      "internal_models_room_go_webrtc_peerconnection",
+      "internal_models_room_go_webrtc_tracklocalstaticrtp",
+      "internal_models_room_newroom",
+      "internal_models_room_newroomwithname",
+      "models_cohostmedia",
+      "models_room_addhostscore",
+      "models_room_addviewer",
+      "models_room_getactivecohostids",
+      "models_room_getallcohosttracks",
+      "models_room_getcohostmedia",
+      "models_room_getcohosttrack",
+      "models_room_gethostclient",
+      "models_room_gethostpeerconnection",
+      "models_room_gethostscore",
+      "models_room_gethostvideossrc",
+      "models_room_getmainseatid",
+      "models_room_getroomname",
+      "models_room_getviewer",
+      "models_room_getviewerscopy",
+      "models_room_lock",
+      "models_room_removecohosttrack",
+      "models_room_removeviewer",
+      "models_room_rlock",
+      "models_room_runlock",
+      "models_room_setaudiotrack",
+      "models_room_setcohostaudiotrack",
+      "models_room_setcohostmedia",
+      "models_room_setcohosttrack",
+      "models_room_sethostclient",
+      "models_room_sethostpeerconnection",
+      "models_room_sethostvideossrc",
+      "models_room_setmainseatid",
+      "models_room_setroomname",
+      "models_room_settracks",
+      "models_room_setvideotrack",
+      "models_room_unlock",
+      "models_room_viewerscount",
+      "signaling_roommanager_createroom"
+    ],
+    "1": [
+      "go_type_encoding_json_rawmessage",
+      "go_type_github_com_gofiber_contrib_websocket_conn",
+      "go_type_sync_mutex",
+      "hub",
+      "internal_models_message_go_models_signalingmessage",
+      "internal_signaling_client",
+      "internal_signaling_client_newclient",
+      "internal_signaling_client_newclientwithclaims",
+      "internal_webrtc_viewer_handler",
+      "internal_webrtc_viewer_handler_handleviewerconnection",
+      "internal_webrtc_viewer_handler_handleviewerconnectionforroom",
+      "models_signalingmessage_encode",
+      "signaling_client",
+      "signaling_client_handlechatmessage",
+      "signaling_client_handlegiftmessage",
+      "signaling_client_handleicecandidate",
+      "signaling_client_handlepublishoffer",
+      "signaling_client_handleseataccept",
+      "signaling_client_handleseatrequest",
+      "signaling_client_handlesetmainseat",
+      "signaling_client_handlesignalingmessage",
+      "signaling_client_handlesubscribecohost",
+      "signaling_client_handleviewerjoinplay",
+      "signaling_client_readpump",
+      "signaling_client_writepump",
+      "userclaims",
+      "webrtc_api",
+      "webrtc_configuration",
+      "webrtc_peerconnection",
+      "webrtc_roommanager"
+    ],
+    "2": [
+      "cmd_main",
+      "cmd_main_main",
+      "go_type_testing_t",
+      "go_type_time_duration",
+      "internal_models_message",
+      "internal_models_message_parsesignalingmessage",
+      "internal_models_message_test",
+      "internal_models_message_test_testparsesignalingmessage",
+      "internal_models_message_test_testsignalingmessageencode",
+      "internal_models_room_test",
+      "internal_models_room_test_testroomcohosttracks",
+      "internal_signaling_auth",
+      "internal_signaling_auth_generatetoken",
+      "internal_signaling_auth_getjwtsecret",
+      "internal_signaling_auth_test",
+      "internal_signaling_auth_test_testjwtauthentication",
+      "internal_signaling_auth_validatetoken",
+      "internal_signaling_pk_manager_test",
+      "internal_signaling_pk_manager_test_testpkmanager",
+      "internal_signaling_room_manager_newroommanager",
+      "internal_signaling_room_manager_test",
+      "internal_signaling_room_manager_test_testgetallrooms",
+      "internal_signaling_room_manager_test_testroommanager",
+      "internal_webrtc_engine",
+      "internal_webrtc_engine_initwebrtc",
+      "internal_webrtc_engine_test",
+      "internal_webrtc_engine_test_testinitwebrtc",
+      "jwt_registeredclaims",
+      "signaling_userclaims"
+    ],
+    "3": [
+      "client",
+      "go_type_sync_rwmutex",
+      "internal_signaling_hub",
+      "internal_signaling_hub_go_client",
+      "internal_signaling_hub_newhub",
+      "internal_signaling_room_manager",
+      "internal_signaling_room_manager_broadcasttoroominternal",
+      "signaling_hub",
+      "signaling_hub_clientscount",
+      "signaling_hub_register",
+      "signaling_hub_run",
+      "signaling_hub_setroommanager",
+      "signaling_hub_unregister",
+      "signaling_roominfo",
+      "signaling_roommanager",
+      "signaling_roommanager_activeroomscount",
+      "signaling_roommanager_broadcasttoroom",
+      "signaling_roommanager_getallrooms",
+      "signaling_roommanager_getallroomssummary",
+      "signaling_roommanager_getroom",
+      "signaling_roommanager_getroomsummary",
+      "signaling_roommanager_handleclientdisconnect",
+      "signaling_roommanager_joinviewer",
+      "signaling_roommanager_removeroom",
+      "signaling_roomsummary"
+    ],
+    "4": [
+      "public_sdk_core",
+      "public_sdk_core_eventemitter",
+      "public_sdk_core_eventemitter_constructor",
+      "public_sdk_core_eventemitter_emit",
+      "public_sdk_core_eventemitter_off",
+      "public_sdk_core_eventemitter_on",
+      "public_sdk_core_eventemitter_once",
+      "public_sdk_core_eventemitter_removealllisteners",
+      "public_sdk_core_livemediacore",
+      "public_sdk_core_livemediacore_acceptseat",
+      "public_sdk_core_livemediacore_connect",
+      "public_sdk_core_livemediacore_constructor",
+      "public_sdk_core_livemediacore_disconnect",
+      "public_sdk_core_livemediacore_dispose",
+      "public_sdk_core_livemediacore_handlesignalingrawmessage",
+      "public_sdk_core_livemediacore_initpeerconnection",
+      "public_sdk_core_livemediacore_joinasviewer",
+      "public_sdk_core_livemediacore_publishstream",
+      "public_sdk_core_livemediacore_requestseat",
+      "public_sdk_core_livemediacore_sendchatmessage",
+      "public_sdk_core_livemediacore_sendgift",
+      "public_sdk_core_livemediacore_sendsignalingmessage",
+      "public_sdk_core_livemediacore_setmainseat",
+      "public_sdk_core_livemediacore_stopmedia",
+      "public_sdk_core_livemediacore_subscribecohost"
+    ],
+    "5": [
+      "api_webhookdispatcher_dispatch",
+      "api_webhookdispatcher_sendwebhook",
+      "api_webhookdispatcher_start",
+      "api_webhookdispatcher_stop",
+      "api_webhookdispatcher_worker",
+      "api_webhookevent",
+      "api_webhookeventtype",
+      "go_type_net_http_client",
+      "go_type_sync_waitgroup",
+      "internal_api_webhook",
+      "internal_api_webhook_generatesignature",
+      "internal_api_webhook_go_api_webhookdispatcher",
+      "internal_api_webhook_newwebhookdispatcher",
+      "internal_api_webhook_test",
+      "internal_api_webhook_test_testwebhookdispatcher",
+      "internal_api_webhook_verifysignature",
+      "signaling_roommanager_getwebhookdispatcher",
+      "signaling_roommanager_setwebhookdispatcher"
+    ],
+    "6": [
+      "go_type_time_time",
+      "internal_signaling_pk_manager",
+      "internal_signaling_pk_manager_addtrackstopeer",
+      "internal_signaling_pk_manager_newpkmanager",
+      "roommanager",
+      "signaling_pkmanager",
+      "signaling_pkmanager_broadcasttoroom",
+      "signaling_pkmanager_getpksession",
+      "signaling_pkmanager_startpk",
+      "signaling_pkmanager_stoppk",
+      "signaling_pksession",
+      "webrtc_tracklocalstaticrtp"
+    ],
+    "7": [
+      "internal_webrtc_host_handler",
+      "internal_webrtc_host_handler_go_webrtc_api",
+      "internal_webrtc_host_handler_go_webrtc_configuration",
+      "internal_webrtc_host_handler_go_webrtc_peerconnection",
+      "internal_webrtc_host_handler_go_webrtc_tracklocalstaticrtp",
+      "internal_webrtc_host_handler_handlecohostconnection",
+      "internal_webrtc_host_handler_handlehostconnection"
+    ],
+    "8": [
+      "internal_signaling_signaling",
+      "internal_signaling_signaling_newsignalingservice",
+      "signaling_signalingservice"
+    ],
+    "9": [
+      "internal_webrtc_webrtc",
+      "internal_webrtc_webrtc_newwebrtcmanager",
+      "webrtc_webrtcmanager"
+    ],
+    "10": [
+      "internal_models_models",
+      "models_participant"
+    ],
+    "11": [
+      "go_type_github_com_gorilla_websocket_conn"
+    ],
+    "12": [
+      "internal_signaling_client_go_webrtc_api"
+    ],
+    "13": [
+      "internal_signaling_client_go_webrtc_peerconnection"
+    ],
+    "14": [
+      "internal_signaling_room_manager_go_client"
+    ],
+    "15": [
+      "internal_webrtc_viewer_handler_go_webrtc_api"
+    ],
+    "16": [
+      "internal_webrtc_viewer_handler_go_webrtc_configuration"
+    ],
+    "17": [
+      "internal_webrtc_viewer_handler_go_webrtc_peerconnection"
+    ],
+    "18": [
+      "pkg_live_media_server"
+    ],
+    "19": [
+      "websocket_conn"
+    ]
+  },
+  "cohesion": {
+    "0": 0.1423076923076923,
+    "1": 0.14942528735632185,
+    "2": 0.09852216748768473,
+    "3": 0.12333333333333334,
+    "4": 0.15333333333333332,
+    "5": 0.17647058823529413,
+    "6": 0.2727272727272727,
+    "7": 0.42857142857142855,
+    "8": 1.0,
+    "9": 1.0,
+    "10": 1.0,
+    "11": 1.0,
+    "12": 1.0,
+    "13": 1.0,
+    "14": 1.0,
+    "15": 1.0,
+    "16": 1.0,
+    "17": 1.0,
+    "18": 1.0,
+    "19": 1.0
+  },
+  "gods": [
+    {
+      "id": "internal_models_room_go_models_room",
+      "label": "Room",
+      "degree": 47
+    },
+    {
+      "id": "signaling_client",
+      "label": "Client",
+      "degree": 22
+    },
+    {
+      "id": "signaling_roommanager",
+      "label": "RoomManager",
+      "degree": 20
+    },
+    {
+      "id": "public_sdk_core_livemediacore",
+      "label": "LiveMediaCore",
+      "degree": 17
+    },
+    {
+      "id": "internal_models_message_go_models_signalingmessage",
+      "label": "SignalingMessage",
+      "degree": 16
+    },
+    {
+      "id": "internal_api_webhook_go_api_webhookdispatcher",
+      "label": "WebhookDispatcher",
+      "degree": 14
+    },
+    {
+      "id": "signaling_hub",
+      "label": "Hub",
+      "degree": 10
+    },
+    {
+      "id": "cmd_main_main",
+      "label": "main()",
+      "degree": 9
+    },
+    {
+      "id": "signaling_pkmanager",
+      "label": "PKManager",
+      "degree": 9
+    },
+    {
+      "id": "internal_signaling_client_newclientwithclaims",
+      "label": "NewClientWithClaims()",
+      "degree": 8
+    }
+  ],
+  "surprises": [
+    {
+      "source": "main()",
+      "target": "NewClientWithClaims()",
+      "source_files": [
+        "cmd/main.go",
+        "internal/signaling/client.go"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "main()",
+      "target": "NewWebhookDispatcher()",
+      "source_files": [
+        "cmd/main.go",
+        "internal/api/webhook.go"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "main()",
+      "target": "NewHub()",
+      "source_files": [
+        "cmd/main.go",
+        "internal/signaling/hub.go"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "main()",
+      "target": "NewPKManager()",
+      "source_files": [
+        "cmd/main.go",
+        "internal/signaling/pk_manager.go"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "TestRoomCoHostTracks()",
+      "target": "NewRoom()",
+      "source_files": [
+        "internal/models/room_test.go",
+        "internal/models/room.go"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `Room` connect `Room` to `Client`, `RoomManager`, `PKManager`, `HandleCoHostConnection`?",
+      "why": "High betweenness centrality (0.307) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `RoomManager` connect `RoomManager` to `Room`, `main`, `WebhookDispatcher`?",
+      "why": "High betweenness centrality (0.186) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `main()` connect `main` to `Client`, `RoomManager`, `WebhookDispatcher`, `PKManager`?",
+      "why": "High betweenness centrality (0.094) - this node is a cross-community bridge."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `Participant`, `live-media-server` to the rest of the system?",
+      "why": "2 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Room` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.1423076923076923 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Client` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.14942528735632185 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `main` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.09852216748768473 - nodes in this community are weakly interconnected."
+    }
+  ]
+}
