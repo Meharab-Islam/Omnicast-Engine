@@ -522,32 +522,42 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 	}
 
 	// Filter by Simulcast Layer RID:
-	// If the current target layer doesn't match the incoming RID, check if we should forward from the available layer
 	if !isVP9 && rid != "" && rid != "default" {
-		hasMultiLayer := (ts.trackF != nil && ts.trackH != nil) || (ts.trackF != nil && ts.trackQ != nil)
-		if !hasMultiLayer {
-			// Single track publisher (e.g. mobile or single camera) -> Always forward incoming RID!
-			ts.currentLayer = rid
-			ts.targetLayer = rid
-			ts.pendingSwitch = false
-			ts.waitingKeyframe = false
-		} else if ts.pendingSwitch || ts.waitingKeyframe {
-			if rid != ts.currentLayer && rid != ts.targetLayer {
-				// Fallback to active incoming layer
-				ts.currentLayer = rid
-				ts.targetLayer = rid
-				ts.pendingSwitch = false
-				ts.waitingKeyframe = false
+		if ts.pendingSwitch || ts.waitingKeyframe {
+			if rid == ts.targetLayer || (ts.targetTrack != nil && rid == ts.targetTrack.RID()) {
+				isKey := IsKeyframe(codecMime, packet.Payload)
+				if isKey {
+					ts.currentLayer = ts.targetLayer
+					if ts.targetTrack != nil {
+						ts.activeTrack = ts.targetTrack
+						ts.targetTrack = nil
+					}
+					ts.pendingSwitch = false
+					ts.waitingKeyframe = false
+
+					ts.seqAdjuster.Switch(packet.SequenceNumber)
+					ts.seqOffset = ts.seqAdjuster.GetOffset()
+
+					ts.tsAdjuster.Switch(packet.Timestamp, DefaultFrameDuration90kHz)
+					ts.tsOffset = ts.tsAdjuster.GetOffset()
+				} else {
+					return nil
+				}
+			} else if rid != ts.currentLayer {
+				return nil
 			}
 		} else {
 			if rid != ts.currentLayer {
-				ts.currentLayer = rid
+				if ts.currentLayer == "" {
+					ts.currentLayer = rid
+				} else {
+					return nil
+				}
 			}
 		}
 	}
 
-
-	// 1. Initial keyframe gating with auto-pass to guarantee viewer video stream starts immediately
+	// 1. Initial keyframe gating: wait for first keyframe to guarantee cleanly decodable stream
 	if !ts.hasReceivedKeyframe {
 		isKey := false
 		if isVP9 {
@@ -556,7 +566,10 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 			isKey = IsKeyframe(codecMime, packet.Payload)
 		}
 
-		// Initial Keyframe or initial stream start! Start forwarding cleanly
+		if !isKey {
+			return nil
+		}
+
 		ts.hasReceivedKeyframe = true
 		ts.started = true
 		ts.waitingKeyframe = false
@@ -578,9 +591,9 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 		case ts.queue <- &outPkt:
 		default:
 		}
-		_ = isKey
 		return nil
 	}
+
 
 
 	if vp9Desc != nil {
@@ -691,12 +704,9 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 		ts.lastOutTS = outPkt.Header.Timestamp
 	}
 
-	if ts.outTrack != nil && ts.outTrack.Codec().PayloadType != 0 {
-		outPkt.Header.PayloadType = uint8(ts.outTrack.Codec().PayloadType)
-	}
+
 
 	// Enqueue the rewritten packet for the background worker to call outTrack.WriteRTP()
-
 	select {
 	case ts.queue <- &outPkt:
 	default:
@@ -705,6 +715,7 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 
 	return nil
 }
+
 
 // GetOutputTrack returns the underlying egress TrackLocalStaticRTP
 func (ts *TrackSwitcher) GetOutputTrack() *webrtc.TrackLocalStaticRTP {
