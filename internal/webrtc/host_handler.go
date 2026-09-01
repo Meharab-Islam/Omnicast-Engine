@@ -273,13 +273,15 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 					_ = attrs // Suppress unused variable warning
 				}
 
-				// 2. Forward RTP packet to the room's localTrack
-				if _, writeErr := localTrack.Write(buf[:n]); writeErr != nil {
-					if !errors.Is(writeErr, io.ErrClosedPipe) {
-						log.Printf("Error writing RTP packet to room local track: %v\n", writeErr)
+				// 2. Forward RTP packet to the room's localTrack (non-fatal if unattached)
+				if localTrack != nil {
+					if _, writeErr := localTrack.Write(buf[:n]); writeErr != nil {
+						if !errors.Is(writeErr, io.ErrClosedPipe) {
+							// Log warning but continue running the packet read/fan-out loop
+						}
 					}
-					return
 				}
+
 
 				// 3. Fan out to active viewer TrackSwitchers with matching Simulcast RID ('q', 'h', 'f')
 				if parsedPkt != nil {
