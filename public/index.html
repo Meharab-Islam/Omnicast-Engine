@@ -1636,7 +1636,7 @@
 
         // 1. ontrack event listener (supports Dynamic Multi-Guest Split Screen)
         peerConnection.ontrack = (event) => {
-          console.log('[Viewer] Received remote track:', event.track.kind, 'ID:', event.track.id);
+          console.log('[Viewer] Received remote track:', event.track.kind, 'ID:', event.track.id, 'Streams:', event.streams);
           addLog(`Received remote track: ${event.track.kind} (${event.track.id.substring(0, 8)})`, 'info');
 
           // Ensure reconnecting overlay is hidden when live track arrives
@@ -1646,61 +1646,50 @@
           let videoElement = document.getElementById('mainVideo') || document.getElementById('remote-video');
 
           if (event.track.kind === 'video') {
-            const mainVideoHasTrack = remoteStream && remoteStream.getVideoTracks().length > 0;
+            if (videoElement) {
+              const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+              videoElement.srcObject = stream;
+              videoElement.autoplay = true;
+              videoElement.playsInline = true;
+              videoElement.setAttribute('playsinline', 'true');
+              videoElement.setAttribute('webkit-playsinline', 'true');
 
-            if (!mainVideoHasTrack) {
-              remoteStream.addTrack(event.track);
+              event.track.onunmute = () => {
+                console.log('[Viewer] Video track onunmute fired, triggering play()');
+                videoElement.play().catch(e => console.warn('play error:', e));
+              };
 
-              if (videoElement) {
-                videoElement.srcObject = remoteStream;
-                videoElement.autoplay = true;
-                videoElement.playsInline = true;
-                videoElement.setAttribute('playsinline', 'true');
-                videoElement.setAttribute('webkit-playsinline', 'true');
-
-                // Try unmuted playback first; if browser blocks, fallback to muted + unmute button
+              // Try unmuted playback first; if browser blocks, fallback to muted + unmute button
+              videoElement.play().then(() => {
+                console.log('[Viewer] Remote video playing!');
+                addLog('Live video playing with sound.', 'success');
+                hideUnmuteBanner();
+              }).catch(() => {
+                console.log('[Viewer] Autoplay unmuted blocked by browser policy, starting muted with Unmute button');
+                videoElement.muted = true;
                 videoElement.play().then(() => {
-                  console.log('[Viewer] Remote media playing with audio!');
-                  addLog('Live video playing with sound.', 'success');
-                  hideUnmuteBanner();
-                }).catch(() => {
-                  console.log('[Viewer] Autoplay unmuted blocked by browser policy, starting muted with Unmute button');
-                  videoElement.muted = true;
-                  videoElement.play().then(() => {
-                    addLog('Live video playing (Click Sound to listen).', 'success');
-                    showUnmuteBanner();
-                  }).catch(e => console.error('Play retry error:', e));
-                });
-              }
-            } else {
-              // Secondary / Co-Host Video Track -> Render in Dynamic Split Screen Grid
-              console.log('[Viewer Multi-Guest] Rendering Co-Host video in split-screen grid:', event.track.id);
-              const coHostKey = event.track.id.substring(0, 8);
-              createCoHostCard(coHostKey);
-
-              const coHostVideo = document.getElementById(`video-cohost-${coHostKey}`);
-              if (coHostVideo) {
-                const coHostStream = new MediaStream([event.track]);
-                coHostVideo.srcObject = coHostStream;
-                coHostVideo.autoplay = true;
-                coHostVideo.playsInline = true;
-                coHostVideo.muted = false;
-                coHostVideo.play().catch(e => {
-                  coHostVideo.muted = true;
-                  coHostVideo.play().catch(() => {});
-                });
-                addLog(`Co-host split-screen live: ${coHostKey}`, 'success');
-              }
+                  addLog('Live video playing (Click Sound to listen).', 'success');
+                  showUnmuteBanner();
+                }).catch(e => console.error('Play retry error:', e));
+              });
             }
           } else if (event.track.kind === 'audio') {
-            if (!remoteStream.getAudioTracks().includes(event.track)) {
-              remoteStream.addTrack(event.track);
+            // Dedicated audio sink element for reliable audio output
+            let audioElem = document.getElementById('remote-audio-sink');
+            if (!audioElem) {
+              audioElem = document.createElement('audio');
+              audioElem.id = 'remote-audio-sink';
+              audioElem.autoplay = true;
+              document.body.appendChild(audioElem);
             }
-            if (videoElement) {
-              videoElement.srcObject = remoteStream;
-            }
+            const audioStream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+            audioElem.srcObject = audioStream;
+            audioElem.play().catch(err => {
+              console.warn('[Viewer] Audio sink autoplay waiting for user interaction:', err);
+            });
           }
         };
+
 
 
 
@@ -1784,19 +1773,28 @@
       const video = document.getElementById('remote-video') || document.getElementById('mainVideo');
       if (video) {
         video.muted = false;
-        video.play().then(() => {
-          hideUnmuteBanner();
-          addLog('Audio unmuted.', 'success');
-        }).catch(e => console.error('Unmute error:', e));
+        video.volume = 1.0;
+        video.play().catch(e => console.error('Unmute error:', e));
       }
+      const audioSink = document.getElementById('remote-audio-sink');
+      if (audioSink) {
+        audioSink.muted = false;
+        audioSink.volume = 1.0;
+        audioSink.play().catch(e => console.error('Audio sink error:', e));
+      }
+      hideUnmuteBanner();
+      addLog('Audio unmuted.', 'success');
     }
 
     function toggleAudioMute() {
       const video = document.getElementById('remote-video') || document.getElementById('mainVideo');
+      const audioSink = document.getElementById('remote-audio-sink');
       const btn = document.getElementById('btnUnmuteMain');
       if (!video) return;
 
       video.muted = !video.muted;
+      if (audioSink) audioSink.muted = video.muted;
+
       if (video.muted) {
         if (btn) btn.innerText = '🔇 Tap to Unmute';
         showUnmuteBanner();
@@ -1804,9 +1802,11 @@
         if (btn) btn.innerText = '🔊 Sound On';
         hideUnmuteBanner();
         video.play().catch(e => console.warn(e));
+        if (audioSink) audioSink.play().catch(e => console.warn(e));
       }
       addLog(`Audio output is now ${video.muted ? 'Muted' : 'Unmuted'}.`, 'info');
     }
+
 
     let isPublishingCoHost = false;
 
