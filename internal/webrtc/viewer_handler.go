@@ -460,16 +460,21 @@ func ReadRTCP(sender *webrtc.RTPSender, room *models.Room, viewerID string, swit
 							if len(missingSeqs) > 0 && room.HostPC != nil && room.HostPC.ConnectionState() != webrtc.PeerConnectionStateClosed {
 								nackPairs := BuildNackPairs(missingSeqs)
 								if len(nackPairs) > 0 {
+									hostSSRC := room.GetHostVideoSSRC()
+									if hostSSRC == 0 {
+										hostSSRC = p.MediaSSRC
+									}
 									hostNack := &rtcp.TransportLayerNack{
 										SenderSSRC: p.SenderSSRC,
-										MediaSSRC:  p.MediaSSRC,
+										MediaSSRC:  hostSSRC,
 										Nacks:      nackPairs,
 									}
 									_ = room.HostPC.WriteRTCP([]rtcp.Packet{hostNack})
 									log.Printf("[NACK Forwarded to Host] Room %s: Forwarded NACK for %d unrecovered packet(s) to Host (MediaSSRC %d, Seqs: %v)\n",
-										room.RoomID, len(missingSeqs), p.MediaSSRC, missingSeqs)
+										room.RoomID, len(missingSeqs), hostSSRC, missingSeqs)
 								}
 							}
+
 						}
 
 						if switcher != nil {
@@ -501,49 +506,14 @@ func ReadRTCP(sender *webrtc.RTPSender, room *models.Room, viewerID string, swit
 							log.Printf("[PLI Forwarded] Room %s: Allowed PLI for track %s (MediaSSRC %d) from Viewer %s\n",
 								room.RoomID, trackID, p.MediaSSRC, viewerID)
 
-							// Construct a new rtcp.PictureLossIndication packet
-							mediaSSRC := p.MediaSSRC
-							if mediaSSRC == 0 && room != nil {
-								mediaSSRC = room.GetHostVideoSSRC()
-							}
-							pliPacket := &rtcp.PictureLossIndication{
-								SenderSSRC: p.SenderSSRC,
-								MediaSSRC:  mediaSSRC,
-							}
-
-							// Write this new PLI packet directly to the Publisher's RTCPeerConnection using WriteRTCP()
 							if room != nil {
-								var targetPublisherPC *webrtc.PeerConnection
-
-								// Check if MediaSSRC belongs to a specific Co-Host publisher
-								for coHostID, coHostMedia := range room.GetAllCoHostTracks() {
-									if coHostMedia != nil && coHostMedia.VideoSSRC != 0 && coHostMedia.VideoSSRC == mediaSSRC {
-										if coHostPC := room.GetCoHostPeerConnection(coHostID); coHostPC != nil {
-											targetPublisherPC = coHostPC
-											break
-										}
-									}
-								}
-
-								// Fallback to Main Host publisher PeerConnection
-								if targetPublisherPC == nil && room.HostPC != nil {
-									targetPublisherPC = room.HostPC
-								}
-
-								if targetPublisherPC != nil && targetPublisherPC.ConnectionState() != webrtc.PeerConnectionStateClosed {
-									if err := targetPublisherPC.WriteRTCP([]rtcp.Packet{pliPacket}); err != nil {
-										log.Printf("[PLI Write Error] Room %s: Failed to write PLI to Publisher RTCPeerConnection: %v\n", room.RoomID, err)
-									} else {
-										log.Printf("[PLI Written] Room %s: Wrote PLI packet directly to Publisher RTCPeerConnection (MediaSSRC %d)\n", room.RoomID, mediaSSRC)
-									}
-								} else {
-									room.SendPLIImmediate()
-								}
+								room.SendPLIImmediate()
 							}
 						} else {
 							log.Printf("[PLI Throttled] Room %s: Suppressed redundant PLI from Viewer %s for track %s (MediaSSRC %d)\n",
 								room.RoomID, viewerID, trackID, p.MediaSSRC)
 						}
+
 					case *rtcp.FullIntraRequest:
 						// Intercept FIR from Viewer and enforce rate-limiting via CanSendPLI
 						trackID := fmt.Sprintf("%s:%d", room.RoomID, p.MediaSSRC)
