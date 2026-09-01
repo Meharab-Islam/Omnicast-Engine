@@ -1,7 +1,7 @@
 # Graph Report - go_media_server  (2026-09-01)
 
 ## Corpus Check
-- 97 files · ~98,052 words
+- 97 files · ~98,063 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary

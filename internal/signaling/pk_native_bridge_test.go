@@ -162,6 +162,7 @@ func TestNativePKBridging_CrossTrackAndTargetedGifting(t *testing.T) {
 
 	// Verify pk_gift_overlay received in BOTH Room A and Room B
 	foundOverlayA := false
+loopA:
 	for i := 0; i < 3; i++ {
 		select {
 		case msgBytes := <-viewerA.Send:
@@ -183,13 +184,9 @@ func TestNativePKBridging_CrossTrackAndTargetedGifting(t *testing.T) {
 				if overlay.HostBPoints != 500 {
 					t.Errorf("Expected host_b_points 500, got %d", overlay.HostBPoints)
 				}
-				break
+				break loopA
 			}
 		case <-time.After(1 * time.Second):
-			break
-		}
-		if foundOverlayA {
-			break
 		}
 	}
 	if !foundOverlayA {
@@ -197,19 +194,16 @@ func TestNativePKBridging_CrossTrackAndTargetedGifting(t *testing.T) {
 	}
 
 	foundOverlayB := false
+loopB:
 	for i := 0; i < 3; i++ {
 		select {
 		case msgBytes := <-viewerB.Send:
 			sigMsg, _ := models.ParseSignalingMessage(msgBytes)
 			if sigMsg.Event == "pk_gift_overlay" || sigMsg.Action == "pk_gift_overlay" {
 				foundOverlayB = true
-				break
+				break loopB
 			}
 		case <-time.After(1 * time.Second):
-			break
-		}
-		if foundOverlayB {
-			break
 		}
 	}
 	if !foundOverlayB {

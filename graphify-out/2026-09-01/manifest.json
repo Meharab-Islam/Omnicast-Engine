@@ -66,9 +66,9 @@
     "semantic_hash": ""
   },
   "internal/webrtc/host_handler.go": {
-    "mtime": 1788243102.08828,
-    "seen": 1788243170.0512419,
-    "ast_hash": "0f88e38581903393f9dd43bcbceadb09",
+    "mtime": 1788243056.0375106,
+    "seen": 1788243063.248127,
+    "ast_hash": "279f810cf69853c5d675516bf9ef7773",
     "semantic_hash": ""
   },
   "internal/models/message_test.go": {
@@ -528,9 +528,9 @@
     "semantic_hash": ""
   },
   "internal/signaling/pk_native_bridge_test.go": {
-    "mtime": 1788243145.9162838,
-    "seen": 1788243170.05123,
-    "ast_hash": "5528927101a417af2f3d288c94a2792e",
+    "mtime": 1788018430.4676614,
+    "seen": 1788018447.3412979,
+    "ast_hash": "f7223d953eb6aa139ffc4d61dffaa649",
     "semantic_hash": ""
   },
   "internal/webrtc/pacer.go": {

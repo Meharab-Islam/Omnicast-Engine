@@ -190,16 +190,13 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 				ticker := time.NewTicker(2 * time.Second)
 				defer ticker.Stop()
 
-				for {
-					select {
-					case <-ticker.C:
-						if peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
-							return
-						}
-						_ = peerConnection.WriteRTCP([]rtcp.Packet{
-							&rtcp.PictureLossIndication{MediaSSRC: trackSSRC},
-						})
+				for range ticker.C {
+					if peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
+						return
 					}
+					_ = peerConnection.WriteRTCP([]rtcp.Packet{
+						&rtcp.PictureLossIndication{MediaSSRC: trackSSRC},
+					})
 				}
 			}(uint32(remoteTrack.SSRC()))
 
@@ -401,16 +398,13 @@ func HandleCoHostConnection(api *webrtc.API, room *models.Room, coHostID string,
 				ticker := time.NewTicker(2 * time.Second)
 				defer ticker.Stop()
 
-				for {
-					select {
-					case <-ticker.C:
-						if peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
-							return
-						}
-						_ = peerConnection.WriteRTCP([]rtcp.Packet{
-							&rtcp.PictureLossIndication{MediaSSRC: trackSSRC},
-						})
+				for range ticker.C {
+					if peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
+						return
 					}
+					_ = peerConnection.WriteRTCP([]rtcp.Packet{
+						&rtcp.PictureLossIndication{MediaSSRC: trackSSRC},
+					})
 				}
 			}(uint32(remoteTrack.SSRC()))
 		} else if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio {
