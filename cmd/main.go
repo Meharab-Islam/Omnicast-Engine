@@ -120,9 +120,6 @@ func main() {
 		AllowCredentials: false,
 	}))
 
-	// Read environment variables for STUN/TURN configuration
-	turnURL := getEnv("TURN_URL", "turn:127.0.0.1:3478")
-
 	// Create a standard UDP listener on port 3478 using net.ListenPacket for TURN/STUN NAT traversal
 	var embeddedTURNServer *turn.Server
 	turnUDPListener, turnErr := net.ListenPacket("udp4", "0.0.0.0:3478")
@@ -138,7 +135,7 @@ func main() {
 			RelayAddress: net.ParseIP(publicIP),
 			Address:      "0.0.0.0",
 			MinPort:      50000,
-			MaxPort:      50200,
+			MaxPort:      50050,
 		}
 
 		listenerConfigs := []turn.ListenerConfig{}
@@ -178,7 +175,18 @@ func main() {
 	// GET /api/ice-servers - Returns STUN and TURN server configuration with temporary time-limited credentials
 	app.Get("/api/ice-servers", func(c *fiber.Ctx) error {
 		userID := c.Query("user_id", "user-"+time.Now().Format("150405"))
-		authSecret := getEnv("TURN_SECRET", "omnicast_secret_turn_key")
+		authSecret := getEnv("TURN_SECRET", cfg.TurnSecret)
+		if authSecret == "" {
+			authSecret = "omnicast_secret_turn_key"
+		}
+		publicIP := cfg.PublicIP
+		if publicIP == "" {
+			publicIP = getEnv("PUBLIC_IP", "127.0.0.1")
+		}
+		hostDomain := cfg.DomainName
+		if hostDomain == "" {
+			hostDomain = publicIP
+		}
 
 		// Generate temporary time-limited credentials (valid for 24 hours) using HMAC-SHA1 shared secret
 		expiry := time.Now().Add(24 * time.Hour).Unix()
@@ -191,10 +199,20 @@ func main() {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"iceServers": []fiber.Map{
 				{
-					"urls": "stun:stun.l.google.com:19302",
+					"urls": []string{
+						"stun:stun.l.google.com:19302",
+						fmt.Sprintf("stun:%s:3478", hostDomain),
+						fmt.Sprintf("stun:%s:3478", publicIP),
+					},
 				},
 				{
-					"urls":       turnURL,
+					"urls": []string{
+						fmt.Sprintf("turn:%s:3478?transport=udp", hostDomain),
+						fmt.Sprintf("turn:%s:3478?transport=tcp", hostDomain),
+						fmt.Sprintf("turn:%s:443?transport=tcp", hostDomain),
+						fmt.Sprintf("turn:%s:3478?transport=udp", publicIP),
+						fmt.Sprintf("turn:%s:3478?transport=tcp", publicIP),
+					},
 					"username":   ephemeralUsername,
 					"credential": ephemeralPassword,
 				},
@@ -216,8 +234,17 @@ func main() {
 			userID = "user-" + time.Now().Format("150405")
 		}
 
-		authSecret := getEnv("TURN_SECRET", "omnicast_secret_turn_key")
-		publicDomain := getEnv("TURN_DOMAIN", getEnv("PUBLIC_IP", "127.0.0.1"))
+		authSecret := getEnv("TURN_SECRET", cfg.TurnSecret)
+		if authSecret == "" {
+			authSecret = "omnicast_secret_turn_key"
+		}
+		publicDomain := getEnv("TURN_DOMAIN", cfg.DomainName)
+		if publicDomain == "" {
+			publicDomain = getEnv("PUBLIC_IP", cfg.PublicIP)
+		}
+		if publicDomain == "" {
+			publicDomain = "127.0.0.1"
+		}
 		turnPort := getEnv("TURN_PORT", "3478")
 
 		// Generate temporary time-limited credentials (valid for 24 hours) using HMAC-SHA1
@@ -230,7 +257,8 @@ func main() {
 		ephemeralPassword := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
 		turnURIs := []string{
-			fmt.Sprintf("turn:%s:%s", publicDomain, turnPort),
+			fmt.Sprintf("turn:%s:%s?transport=udp", publicDomain, turnPort),
+			fmt.Sprintf("turn:%s:%s?transport=tcp", publicDomain, turnPort),
 			fmt.Sprintf("turn:%s:443?transport=tcp", publicDomain),
 		}
 

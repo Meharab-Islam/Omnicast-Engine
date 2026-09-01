@@ -91,7 +91,7 @@ func NewEmbeddedTURNServer(cfg EmbeddedTURNConfig) (*EmbeddedTURNServer, error) 
 		RelayAddress: net.ParseIP(cfg.PublicIP),
 		Address:      "0.0.0.0",
 		MinPort:      50000,
-		MaxPort:      50200,
+		MaxPort:      50050,
 	}
 
 	listenerConfigs := []turn.ListenerConfig{}

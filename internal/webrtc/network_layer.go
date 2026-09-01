@@ -56,7 +56,7 @@ func InitOmnicastNetworkLayer(cfg NetworkConfig) (*OmnicastNetworkStack, error) 
 		cfg.RelayMinPort = 50000
 	}
 	if cfg.RelayMaxPort == 0 {
-		cfg.RelayMaxPort = 50200
+		cfg.RelayMaxPort = 50050
 	}
 
 	stack := &OmnicastNetworkStack{

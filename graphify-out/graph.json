@@ -5313,7 +5313,7 @@
       "file_type": "code",
       "norm_label": "getenv()",
       "source_file": "cmd/main.go",
-      "source_location": "L739"
+      "source_location": "L767"
     },
     {
       "id": "cmd_main_main",
@@ -12367,7 +12367,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "cmd/main.go",
-      "source_location": "L156",
+      "source_location": "L153",
       "weight": 1.0
     },
     {
@@ -12379,7 +12379,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "cmd/main.go",
-      "source_location": "L253",
+      "source_location": "L281",
       "weight": 1.0
     },
     {
@@ -12391,7 +12391,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "cmd/main.go",
-      "source_location": "L280",
+      "source_location": "L308",
       "weight": 1.0
     },
     {
@@ -12403,7 +12403,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "cmd/main.go",
-      "source_location": "L341",
+      "source_location": "L369",
       "weight": 1.0
     },
     {
@@ -12432,18 +12432,6 @@
     },
     {
       "source": "cmd_main_main",
-      "target": "internal_signaling_auth_validatetoken",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "cmd/main.go",
-      "source_location": "L575",
-      "weight": 1.0
-    },
-    {
-      "source": "cmd_main_main",
       "target": "internal_api_webhook_newwebhookdispatcher",
       "relation": "calls",
       "_origin": "ast",
@@ -12452,6 +12440,18 @@
       "context": "call",
       "source_file": "cmd/main.go",
       "source_location": "L59",
+      "weight": 1.0
+    },
+    {
+      "source": "cmd_main_main",
+      "target": "internal_signaling_auth_validatetoken",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "cmd/main.go",
+      "source_location": "L603",
       "weight": 1.0
     },
     {
@@ -12475,7 +12475,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "cmd/main.go",
-      "source_location": "L662",
+      "source_location": "L690",
       "weight": 1.0
     },
     {
@@ -12487,7 +12487,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "cmd/main.go",
-      "source_location": "L682",
+      "source_location": "L710",
       "weight": 1.0
     },
     {
@@ -12499,7 +12499,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "cmd/main.go",
-      "source_location": "L689",
+      "source_location": "L717",
       "weight": 1.0
     },
     {
@@ -25325,7 +25325,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "cmd/main.go",
-      "source_location": "L739",
+      "source_location": "L767",
       "weight": 1.0
     },
     {
@@ -37224,5 +37224,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "d36b66fe89f1b1917c32ccc066b286db3ac8c655"
+  "built_at_commit": "3e9eff2908688e232f06bdb28f1f62340119867f"
 }
