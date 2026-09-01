@@ -521,28 +521,28 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 	// Filter by Simulcast Layer RID:
 	// If the current target layer doesn't match the incoming RID, check if we should forward from the available layer
 	if !isVP9 && rid != "" && rid != "default" {
-		if ts.pendingSwitch || ts.waitingKeyframe {
+		hasMultiLayer := (ts.trackF != nil && ts.trackH != nil) || (ts.trackF != nil && ts.trackQ != nil)
+		if !hasMultiLayer {
+			// Single track publisher (e.g. mobile or single camera) -> Always forward incoming RID!
+			ts.currentLayer = rid
+			ts.targetLayer = rid
+			ts.pendingSwitch = false
+			ts.waitingKeyframe = false
+		} else if ts.pendingSwitch || ts.waitingKeyframe {
 			if rid != ts.currentLayer && rid != ts.targetLayer {
-				// If neither layer matches, fallback to active incoming layer
-				if ts.currentLayer == LayerLow && rid == LayerMedium {
-					ts.currentLayer = LayerMedium
-				} else if ts.currentLayer == LayerLow && rid == LayerHigh {
-					ts.currentLayer = LayerHigh
-				} else {
-					return nil
-				}
+				// Fallback to active incoming layer
+				ts.currentLayer = rid
+				ts.targetLayer = rid
+				ts.pendingSwitch = false
+				ts.waitingKeyframe = false
 			}
 		} else {
 			if rid != ts.currentLayer {
-				// If currentLayer is set to a layer that isn't broadcasting (e.g. low 'q' when host only sends 'f'/'h'), auto-fallback
-				if (ts.currentLayer == LayerLow || ts.currentLayer == "") && (rid == LayerMedium || rid == LayerHigh) {
-					ts.currentLayer = rid
-				} else {
-					return nil
-				}
+				ts.currentLayer = rid
 			}
 		}
 	}
+
 
 	// 1. Initial keyframe gating with auto-pass to guarantee viewer video stream starts immediately
 	if !ts.hasReceivedKeyframe {
@@ -645,7 +645,12 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 		}
 
 		if rid != ts.currentLayer && rid != "" && rid != "default" {
-			return nil
+			hasMultiLayer := (ts.trackF != nil && ts.trackH != nil) || (ts.trackF != nil && ts.trackQ != nil)
+			if !hasMultiLayer {
+				ts.currentLayer = rid
+			} else {
+				return nil
+			}
 		}
 	}
 
