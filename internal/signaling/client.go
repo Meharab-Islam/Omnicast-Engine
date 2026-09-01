@@ -2283,34 +2283,25 @@ func (c *Client) WritePump() {
 				return
 			}
 
-			w, err := c.Conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				c.writeMu.Unlock()
-				return
-			}
-			if _, err := w.Write(message); err != nil {
+			if err := c.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
 				c.writeMu.Unlock()
 				return
 			}
 
-			// Add queued messages to the current websocket frame
+			// Flush any other queued messages individually as standalone WebSocket frames
 			n := len(c.Send)
 			for i := 0; i < n; i++ {
-				if _, err := w.Write([]byte{'\n'}); err != nil {
+				nextMsg, ok := <-c.Send
+				if !ok {
+					break
+				}
+				if err := c.Conn.WriteMessage(websocket.TextMessage, nextMsg); err != nil {
 					c.writeMu.Unlock()
 					return
 				}
-				if _, err := w.Write(<-c.Send); err != nil {
-					c.writeMu.Unlock()
-					return
-				}
-			}
-
-			if err := w.Close(); err != nil {
-				c.writeMu.Unlock()
-				return
 			}
 			c.writeMu.Unlock()
+
 
 		case <-ticker.C:
 			c.writeMu.Lock()
