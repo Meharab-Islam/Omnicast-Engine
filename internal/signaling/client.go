@@ -294,8 +294,12 @@ func (c *Client) handleSignalingMessage(msg *models.SignalingMessage) {
 	case "request_layer", "select_layer", "set_layer", "switch_layer":
 		c.handleRequestLayer(msg)
 
+	case "set_main_seat", "main_seat", "change_main_seat":
+		c.handleSetMainSeat(msg)
+
 	case "set_viewport", "update_viewport", "viewport":
 		c.handleSetViewport(msg)
+
 
 	default:
 		log.Printf("Unhandled signaling event '%s' from client %s\n", msg.Event, c.ID)
