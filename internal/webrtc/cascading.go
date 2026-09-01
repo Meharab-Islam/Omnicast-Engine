@@ -97,10 +97,11 @@ func (cm *CascadeManager) EnsureCascaded(room *models.Room) error {
 		return errors.New("room is nil")
 	}
 
-	// 1. If local room already has active video tracks, no need to cascade
-	if room.GetVideoTrack() != nil || room.GetDefaultViewerVideoTrack() != nil {
+	// 1. If local room is on origin or already has active host/video tracks, no need to cascade
+	if room.HostID != "" || room.GetVideoTrack() != nil || room.GetDefaultViewerVideoTrack() != nil {
 		return nil
 	}
+
 
 	cm.mu.Lock()
 	if _, exists := cm.sessions[room.RoomID]; exists {

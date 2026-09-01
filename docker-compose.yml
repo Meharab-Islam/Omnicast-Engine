@@ -3,10 +3,7 @@ services:
     image: caddy:alpine
     container_name: omnicast_caddy
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp" # HTTP/3 QUIC
+    network_mode: host
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
@@ -20,9 +17,7 @@ services:
   omnicast-engine:
     build: .
     container_name: omnicast_engine
-    # Port 8080 is internal only (proxied by Caddy). Only WebRTC UDP media ports exposed directly.
-    ports:
-      - "50000-50050:50000-50050/udp" # WebRTC Media Ports
+    network_mode: host
     volumes:
       - ./config:/app/config
       - ./data:/app/data
@@ -31,7 +26,7 @@ services:
         required: false
     environment:
       - PORT=8080
-      - REDIS_ADDR=${REDIS_ADDR:-omnicast-redis:6379}
+      - REDIS_ADDR=${REDIS_ADDR:-127.0.0.1:6379}
     depends_on:
       - omnicast-redis
       - omnicast-coturn
@@ -40,8 +35,7 @@ services:
   omnicast-redis:
     image: redis:7-alpine
     container_name: omnicast_redis
-    ports:
-      - "6379:6379"
+    network_mode: host
     volumes:
       - redis-data:/data
     restart: unless-stopped
@@ -49,10 +43,7 @@ services:
   omnicast-coturn:
     image: coturn/coturn
     container_name: omnicast_coturn
-    ports:
-      - "3478:3478"
-      - "3478:3478/udp"
-      - "49152-49250:49152-49250/udp"
+    network_mode: host
     env_file:
       - path: .env
         required: false
@@ -60,6 +51,7 @@ services:
       - turnserver
       - --log-file=stdout
       - --external-ip=${PUBLIC_IP:-127.0.0.1}
+      - --listening-port=3478
       - --use-auth-secret
       - --static-auth-secret=${TURN_SECRET:-turn_default_secret_999}
       - --realm=${TURN_REALM:-live.myvps.com}

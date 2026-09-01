@@ -5,12 +5,13 @@
 {$DOMAIN_NAME:localhost} {
     # Reverse proxy to OmniCast Engine internal Go container
     # Note: Caddy automatically manages WebSocket upgrade headers (Upgrade, Connection) by default.
-    reverse_proxy omnicast_engine:8080 {
+    reverse_proxy 127.0.0.1:8080 {
         header_up Host {host}
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
     }
+
 
     # Enable Gzip and Zstandard compression for static assets
     encode gzip zstd
