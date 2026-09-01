@@ -373,11 +373,18 @@ func LoadOrGenerateConfig() *Config {
 	_ = os.Setenv("TURN_REALM", turnRealm)
 	cfg.TurnRealm = turnRealm
 
-	cfg.RedisAddr = getVal("REDIS_ADDR", "")
+	cfg.RedisAddr = getVal("REDIS_ADDR", "127.0.0.1:6379")
+	if strings.Contains(cfg.RedisAddr, "omnicast-redis") {
+		cfg.RedisAddr = strings.ReplaceAll(cfg.RedisAddr, "omnicast-redis", "127.0.0.1")
+	}
+	if cfg.RedisAddr == "" {
+		cfg.RedisAddr = "127.0.0.1:6379"
+	}
 	cfg.RedisPass = getVal("REDIS_PASSWORD", "")
 	cfg.ServerRole = getVal("SERVER_ROLE", "origin")
 	cfg.ServerID = getVal("SERVER_ID", "server-node-1")
 	cfg.WebhookURL = getVal("WEBHOOK_TARGET_URL", "")
+
 
 	// 6. Save auto-generated secrets to .env
 	if generatedAny || len(envMap) == 0 {

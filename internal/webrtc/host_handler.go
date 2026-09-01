@@ -104,15 +104,15 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 		// Intercept incoming RTCP Sender Reports from the publisher to update NTP-to-RTP wall-clock mapping
 		if receiver != nil {
 			go func(r *webrtc.RTPReceiver, kind webrtc.RTPCodecType) {
-				rtcpBuf := make([]byte, 1500)
+				defer func() {
+					if rec := recover(); rec != nil {
+						// Gracefully recover on receiver closure
+					}
+				}()
 				for {
-					n, _, rtcpErr := r.Read(rtcpBuf)
+					pkts, _, rtcpErr := r.ReadRTCP()
 					if rtcpErr != nil {
 						return
-					}
-					pkts, unmarshalErr := rtcp.Unmarshal(rtcpBuf[:n])
-					if unmarshalErr != nil {
-						continue
 					}
 					for _, p := range pkts {
 						if sr, ok := p.(*rtcp.SenderReport); ok && sr != nil {
@@ -122,6 +122,7 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 				}
 			}(receiver, remoteTrack.Kind())
 		}
+
 
 		// Get or create dedicated PacketBuffer for the host's video stream (non-simulcast single high-quality track)
 		var pktBuffer *PacketBuffer
