@@ -702,10 +702,15 @@ func IsVP8Keyframe(payload []byte) bool {
 		return false
 	}
 
-	payloadIndex := 0
-	// First byte: VP8 Payload Descriptor
+	// First byte: VP8 Payload Descriptor (RFC 7741 Section 4.2)
+	// Must have S bit (bit 4 / 0x10) set to 1 (Start of partition)
+	// and PID (bits 0..2 / 0x07) must be 0 (Partition 0 contains the uncompressed frame header)
+	if (payload[0]&0x10) == 0 || (payload[0]&0x07) != 0 {
+		return false
+	}
+
+	payloadIndex := 1
 	xBit := (payload[0] & 0x80) != 0
-	payloadIndex++
 
 	// If X bit is set, process optional extension bytes
 	if xBit {
@@ -748,11 +753,17 @@ func IsVP8Keyframe(payload []byte) bool {
 
 	if payloadIndex < len(payload) {
 		// Bit 0 of VP8 uncompressed frame header (P bit): 0 indicates Keyframe (I-frame), 1 indicates Inter-frame (P-frame)
-		return (payload[payloadIndex] & 0x01) == 0
+		isKeyframeBit := (payload[payloadIndex] & 0x01) == 0
+		if isKeyframeBit && payloadIndex+5 < len(payload) {
+			// RFC 6386 Section 9.1: bytes 3, 4, 5 of frame header must be 0x9D 0x01 0x2A for keyframes
+			return payload[payloadIndex+3] == 0x9D && payload[payloadIndex+4] == 0x01 && payload[payloadIndex+5] == 0x2A
+		}
+		return isKeyframeBit
 	}
 
 	return false
 }
+
 
 
 // IsKeyframe parses the RTP payload and determines whether it contains a video Keyframe (I-frame / IDR)
