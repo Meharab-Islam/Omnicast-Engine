@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// DefaultPLIInterval defines the minimum cooldown between consecutive PLI requests for a single track (1 second)
-const DefaultPLIInterval = 1 * time.Second
+// DefaultPLIInterval defines the minimum cooldown between consecutive PLI requests for a single track (300ms)
+const DefaultPLIInterval = 300 * time.Millisecond
 
 // GlobalPLIThrottler is the shared PLIThrottler instance for all WebRTC tracks across all rooms
 var GlobalPLIThrottler = NewPLIThrottler(DefaultPLIInterval)

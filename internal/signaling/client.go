@@ -276,7 +276,7 @@ func (c *Client) handleSignalingMessage(msg *models.SignalingMessage) {
 	case "subscribe_cohost", "subscribe_co_host", "play_cohost":
 		c.handleSubscribeCoHost(msg)
 
-	case "media_state", "media_state_change", "set_media_state", "track_muted", "track_unmuted", "mute_track", "mute":
+	case "media_state_changed", "media_state", "media_state_change", "set_media_state", "track_muted", "track_unmuted", "mute_track", "mute":
 		c.handleMediaStateChange(msg)
 
 	case "sync_state", "room_info", "room_state":
@@ -1484,21 +1484,22 @@ func (c *Client) handleMediaStateChange(msg *models.SignalingMessage) {
 	}
 
 	payload, _ := json.Marshal(map[string]any{
-		"type":         "track_muted",
-		"event":        "track_muted",
+		"type":         trackKind,
+		"kind":         trackKind,
+		"event":        "media_state_changed",
+		"action":       "media_state_changed",
 		"track_id":     trackID,
 		"muted":        isMuted,
-		"kind":         trackKind,
 		"user_id":      c.ID,
 		"muted_audio":  currentState.MutedAudio,
 		"muted_video":  currentState.MutedVideo,
 		"media_states": mediaStates,
 	})
 
-	// 1. Broadcast to all Viewers via WebSocket
+	// 1. Broadcast to all Viewers via WebSocket with media_state_changed event
 	_ = c.RoomManager.BroadcastToRoom(roomID, &models.SignalingMessage{
-		Action:  "track_muted",
-		Event:   "track_muted",
+		Action:  "media_state_changed",
+		Event:   "media_state_changed",
 		RoomID:  roomID,
 		UserID:  c.ID,
 		Payload: payload,

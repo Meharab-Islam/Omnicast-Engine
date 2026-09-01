@@ -437,6 +437,36 @@ func (rm *RoomManager) CreateRoom(roomID, hostID string) (*models.Room, error) {
 	// Synchronize initial RoomState to Redis without re-locking rm.mu
 	syncRoomStateInternal(room, rm.broker)
 
+	// Broadcast room_created to all clients connected to global_lobby
+	if roomID != "global_lobby" {
+		if lobbyRoom, ok := rm.activeRooms["global_lobby"]; ok && lobbyRoom != nil {
+			roomSummary := RoomSummary{
+				RoomID:       room.RoomID,
+				RoomName:     room.GetRoomName(),
+				HostID:       room.HostID,
+				HostName:     room.HostID,
+				MainSeatID:   room.GetMainSeatID(),
+				HostScore:    room.GetHostScore(),
+				CreatedAt:    room.CreatedAt.Format(time.RFC3339),
+				ViewersCount: room.ViewersCount(),
+				ViewerCount:  room.ViewersCount(),
+				IsActive:     true,
+			}
+			payload, _ := json.Marshal(map[string]any{
+				"event":   "room_created",
+				"action":  "room_created",
+				"room":    roomSummary,
+				"room_id": roomID,
+			})
+			_ = broadcastToRoomInternal(lobbyRoom, &models.SignalingMessage{
+				Event:   "room_created",
+				Action:  "room_created",
+				RoomID:  "global_lobby",
+				Payload: payload,
+			})
+		}
+	}
+
 	// Prometheus Metrics: increment active rooms and participants
 	metrics.IncActiveRooms()
 	metrics.IncActiveParticipants()
@@ -1125,6 +1155,24 @@ func (rm *RoomManager) CloseRoomAndNotifyWithReason(roomID, hostID, reason strin
 	delete(rm.activeRooms, roomID)
 	if rm.activeRoomsWG != nil {
 		rm.activeRoomsWG.Done()
+	}
+
+	// Broadcast room_closed event to all clients connected to global_lobby
+	if roomID != "global_lobby" {
+		if lobbyRoom, ok := rm.activeRooms["global_lobby"]; ok && lobbyRoom != nil {
+			closedPayload, _ := json.Marshal(map[string]any{
+				"event":   "room_closed",
+				"action":  "room_closed",
+				"room_id": roomID,
+				"reason":  reason,
+			})
+			_ = broadcastToRoomInternal(lobbyRoom, &models.SignalingMessage{
+				Event:   "room_closed",
+				Action:  "room_closed",
+				RoomID:  "global_lobby",
+				Payload: closedPayload,
+			})
+		}
 	}
 
 	// Prometheus Metrics: decrement active rooms and participants (for host)

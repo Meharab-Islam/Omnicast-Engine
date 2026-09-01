@@ -469,14 +469,14 @@ func ReadRTCP(sender *webrtc.RTPSender, room *models.Room, viewerID string, swit
 									room.RoomID, viewerID)
 								switcher.DropHighestSpatialLayer()
 								if room != nil {
-									room.SendPLIThrottled(1 * time.Second)
+									room.SendPLIImmediate()
 								}
 							} else if switcher.GetCurrentLayer() == LayerHigh {
 								log.Printf("[ABR Packet Loss] Room %s: Viewer %s NACK detected, downgrading layer '%s' -> '%s'\n",
 									room.RoomID, viewerID, LayerHigh, LayerMedium)
 								switcher.SwitchLayer(LayerMedium)
 								if room != nil {
-									room.SendPLIThrottled(1 * time.Second)
+									room.SendPLIImmediate()
 								}
 							}
 						}

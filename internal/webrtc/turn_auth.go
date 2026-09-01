@@ -128,8 +128,10 @@ func GetDefaultICEServersJSON(userID string) []ICEServerJSON {
 }
 
 // GetDynamicRTCConfiguration returns a webrtc.Configuration pre-populated with dynamic TURN credentials
+// and explicitly sets ICETransportPolicyAll to allow gathering Host, Server Reflexive (srflx), and Relay candidates.
 func GetDynamicRTCConfiguration(userID string) webrtc.Configuration {
 	return webrtc.Configuration{
-		ICEServers: GetDefaultICEServers(userID),
+		ICEServers:         GetDefaultICEServers(userID),
+		ICETransportPolicy: webrtc.ICETransportPolicyAll,
 	}
 }

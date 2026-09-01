@@ -43,16 +43,24 @@ func GenerateAuthKeyWithSecret(username, realm, secret string) []byte {
 
 // ValidateAndGenerateAuthKey validates that temporary credentials have not expired and returns the key
 func ValidateAndGenerateAuthKey(username, realm, secret string) ([]byte, bool) {
+	if username == "" || secret == "" {
+		return nil, false
+	}
+
 	// Parse timestamp from format: "<unix_timestamp>:<user_id>"
 	parts := strings.SplitN(username, ":", 2)
-	if len(parts) == 2 {
-		expiry, err := strconv.ParseInt(parts[0], 10, 64)
-		if err == nil {
-			if time.Now().Unix() > expiry {
-				log.Printf("[TURN Auth] Expired temporary credential rejected for user: %s (expired at: %d)\n", username, expiry)
-				return nil, false // Expired credential rejected
-			}
-		}
+	if len(parts) != 2 {
+		return nil, false // Malformed username without timestamp rejected
+	}
+
+	expiry, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return nil, false // Invalid timestamp integer rejected
+	}
+
+	if time.Now().Unix() > expiry {
+		log.Printf("[TURN Auth] Expired temporary credential rejected for user: %s (expired at: %d)\n", username, expiry)
+		return nil, false // Expired credential rejected
 	}
 
 	key := GenerateAuthKeyWithSecret(username, realm, secret)

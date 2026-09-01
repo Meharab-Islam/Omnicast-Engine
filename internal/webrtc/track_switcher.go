@@ -58,11 +58,12 @@ type TrackSwitcher struct {
 	// Dedicated TimestampAdjuster to rewrite RTP timestamps across layer switches
 	tsAdjuster *TimestampAdjuster
 
-	started   bool
-	queue     chan *rtp.Packet
-	closed    chan struct{}
-	closeOnce sync.Once
-	mu        sync.RWMutex
+	started             bool
+	hasReceivedKeyframe bool
+	queue               chan *rtp.Packet
+	closed              chan struct{}
+	closeOnce           sync.Once
+	mu                  sync.RWMutex
 }
 
 // NewTrackSwitcher creates and initializes a new TrackSwitcher with a default layer (e.g., 'h' or 'f')
@@ -88,6 +89,8 @@ func NewTrackSwitcher(outTrack *webrtc.TrackLocalStaticRTP, initialLayer string)
 		targetSpatialLayer:   initialSpatial,
 		currentTemporalLayer: 2, // Full 30fps
 		targetTemporalLayer:  2,
+		waitingKeyframe:      true,
+		hasReceivedKeyframe:  false,
 		vp9Parser:            NewVP9PayloadParser(),
 		seqAdjuster:          NewSequenceNumberAdjuster(),
 		tsAdjuster:           NewTimestampAdjuster(),
@@ -515,11 +518,51 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 		vp9Desc, _ = ParseVP9Descriptor(packet.Payload)
 	}
 
+	// 1. Strict Initial Keyframe Gating for newly subscribed viewers
+	// Discard/drop ALL incoming packets until a verified Keyframe (I-frame) arrives
+	if !ts.hasReceivedKeyframe {
+		isKey := false
+		if isVP9 {
+			isKey = (vp9Desc != nil && vp9Desc.IsKeyframe())
+		} else {
+			isKey = IsKeyframe(codecMime, packet.Payload)
+		}
+
+		if !isKey {
+			// Discard delta frame (P-frame) for new viewer to prevent blocky square artifacts
+			return nil
+		}
+
+		// Initial Keyframe arrived! Start forwarding cleanly from this keyframe
+		ts.hasReceivedKeyframe = true
+		ts.started = true
+		ts.waitingKeyframe = false
+		ts.pendingSwitch = false
+		ts.lastInSeq = packet.SequenceNumber
+		ts.lastInTS = packet.Timestamp
+		ts.lastOutSeq = packet.SequenceNumber
+		ts.lastOutTS = packet.Timestamp
+		ts.seqOffset = 0
+		ts.tsOffset = 0
+		ts.seqAdjuster.NextContiguous(packet.SequenceNumber)
+		ts.tsAdjuster.AdjustContinuous(packet.Timestamp, DefaultFrameDuration90kHz)
+
+		outPkt := *packet
+		outPkt.Header.SequenceNumber = ts.lastOutSeq
+		outPkt.Header.Timestamp = ts.lastOutTS
+
+		select {
+		case ts.queue <- &outPkt:
+		default:
+		}
+		return nil
+	}
+
 	if vp9Desc != nil {
 		// Single VP9 Track with SVC (Scalable Video Coding) L3T3
 		if ts.pendingSwitch || ts.waitingKeyframe {
 			// Check if packet allows switching (Keyframe / Intra-frame or Up-switch point U=1)
-			if vp9Desc.IsKeyframe() || vp9Desc.SwitchingUp || !ts.started {
+			if vp9Desc.IsKeyframe() || vp9Desc.SwitchingUp {
 				ts.currentSpatialLayer = ts.targetSpatialLayer
 				ts.currentTemporalLayer = ts.targetTemporalLayer
 				ts.currentLayer = ts.targetLayer
@@ -527,13 +570,11 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 				ts.waitingKeyframe = false
 
 				// Calculate offsets to maintain continuous sequence numbers & timestamps
-				if ts.started {
-					ts.seqAdjuster.Switch(packet.SequenceNumber)
-					ts.seqOffset = ts.seqAdjuster.GetOffset()
+				ts.seqAdjuster.Switch(packet.SequenceNumber)
+				ts.seqOffset = ts.seqAdjuster.GetOffset()
 
-					ts.tsAdjuster.Switch(packet.Timestamp, DefaultFrameDuration90kHz)
-					ts.tsOffset = ts.tsAdjuster.GetOffset()
-				}
+				ts.tsAdjuster.Switch(packet.Timestamp, DefaultFrameDuration90kHz)
+				ts.tsOffset = ts.tsAdjuster.GetOffset()
 			} else if vp9Desc.S > ts.currentSpatialLayer {
 				// While waiting for Keyframe/Up-switch point, drop higher spatial layer packets
 				return nil
@@ -547,11 +588,11 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 			}
 		}
 	} else {
-		// Fallback for multi-track simulcast (e.g. VP8 / H.264 legacy streams)
+		// Multi-track simulcast (e.g. VP8 / H.264 streams)
 		if ts.pendingSwitch || ts.waitingKeyframe {
 			if rid == ts.targetLayer || (ts.targetTrack != nil && rid == ts.targetTrack.RID()) {
 				isKey := IsKeyframe(codecMime, packet.Payload)
-				if isKey || !ts.started {
+				if isKey {
 					ts.currentLayer = ts.targetLayer
 					if ts.targetTrack == nil {
 						switch ts.targetLayer {
@@ -570,13 +611,11 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 					ts.pendingSwitch = false
 					ts.waitingKeyframe = false
 
-					if ts.started {
-						ts.seqAdjuster.Switch(packet.SequenceNumber)
-						ts.seqOffset = ts.seqAdjuster.GetOffset()
+					ts.seqAdjuster.Switch(packet.SequenceNumber)
+					ts.seqOffset = ts.seqAdjuster.GetOffset()
 
-						ts.tsAdjuster.Switch(packet.Timestamp, DefaultFrameDuration90kHz)
-						ts.tsOffset = ts.tsAdjuster.GetOffset()
-					}
+					ts.tsAdjuster.Switch(packet.Timestamp, DefaultFrameDuration90kHz)
+					ts.tsOffset = ts.tsAdjuster.GetOffset()
 				} else {
 					return nil
 				}
@@ -690,7 +729,7 @@ func IsVP8Keyframe(payload []byte) bool {
 }
 
 // IsKeyframe parses the RTP payload and determines whether it contains a video Keyframe (I-frame / IDR)
-// supporting both VP8 (RFC 7741) and H.264 (RFC 6184) codecs.
+// supporting both VP8 (RFC 7741), H.264 (RFC 6184), and VP9 codecs.
 func IsKeyframe(mimeType string, payload []byte) bool {
 	if len(payload) == 0 {
 		return false
@@ -709,11 +748,24 @@ func IsKeyframe(mimeType string, payload []byte) bool {
 		switch nalType {
 		case 5, 7, 8: // IDR Slice (5), SPS (7), PPS (8)
 			return true
+		case 24: // STAP-A (Single-Time Aggregation Packet)
+			offset := 1
+			for offset+2 < len(payload) {
+				naluSize := int(payload[offset])<<8 | int(payload[offset+1])
+				offset += 2
+				if offset < len(payload) {
+					subNalType := payload[offset] & 0x1F
+					if subNalType == 5 || subNalType == 7 || subNalType == 8 {
+						return true
+					}
+				}
+				offset += naluSize
+			}
 		case 28: // FU-A (Fragmentation Unit)
 			if len(payload) > 1 {
 				isStart := (payload[1] & 0x80) != 0
 				fuNalType := payload[1] & 0x1F
-				if isStart && (fuNalType == 5 || fuNalType == 7) {
+				if isStart && (fuNalType == 5 || fuNalType == 7 || fuNalType == 8) {
 					return true
 				}
 			}

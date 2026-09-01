@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
@@ -140,11 +141,15 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 		}
 
 		trackID := remoteTrack.ID()
+		layerRID := rid
+		if layerRID == "" {
+			layerRID = "f"
+		}
 
 		var localTrack *webrtc.TrackLocalStaticRTP
 		var trackErr error
 
-		// Register track into the room without standard simulcast (RID 'q', 'h', 'f')
+		// Register track into the room with standard simulcast (RID 'q', 'h', 'f')
 		switch remoteTrack.Kind() {
 		case webrtc.RTPCodecTypeVideo:
 			// Strict Security Check: Drop and ignore video tracks in audio-only rooms
@@ -154,25 +159,49 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 				return
 			}
 
-			// Single high-quality video track for the Publisher (Non-simulcast direct stream)
-			if existing := room.GetVideoTrack(); existing != nil {
-				localTrack = existing
-				log.Printf("Re-bound existing primary VideoTrack on Host reconnect for Room: %s\n", room.RoomID)
-			} else {
-				localTrack, trackErr = webrtc.NewTrackLocalStaticRTP(
-					remoteTrack.Codec().RTPCodecCapability,
-					trackID,
-					remoteTrack.StreamID(),
-				)
-				if trackErr != nil {
-					log.Printf("Failed to create TrackLocalStaticRTP for host track: %v\n", trackErr)
-					return
-				}
-				room.SetVideoTrack(localTrack)
-				log.Printf("Primary video track registered for Room: %s (SSRC: %d, Non-simulcast)\n", room.RoomID, remoteTrack.SSRC())
+			localTrack, trackErr = webrtc.NewTrackLocalStaticRTP(
+				remoteTrack.Codec().RTPCodecCapability,
+				trackID,
+				remoteTrack.StreamID(),
+			)
+			if trackErr != nil {
+				log.Printf("Failed to create TrackLocalStaticRTP for host track (RID '%s'): %v\n", layerRID, trackErr)
+				return
 			}
-			room.SetVideoTrackSSRC("default", uint32(remoteTrack.SSRC()))
-			room.SetHostVideoSSRC(uint32(remoteTrack.SSRC()))
+
+			room.SetVideoTrackRID(layerRID, localTrack)
+			room.SetVideoTrackSSRC(layerRID, uint32(remoteTrack.SSRC()))
+			if layerRID == "f" || room.GetVideoTrack() == nil {
+				room.SetVideoTrack(localTrack)
+				room.SetHostVideoSSRC(uint32(remoteTrack.SSRC()))
+			}
+			log.Printf("Simulcast video layer registered for Room: %s (RID: '%s', SSRC: %d)\n", room.RoomID, layerRID, remoteTrack.SSRC())
+
+			// Register incoming track with all active viewer TrackSwitchers
+			for _, s := range room.GetAllTrackSwitchers() {
+				if ts, ok := s.(*TrackSwitcher); ok && ts != nil {
+					ts.SetIncomingTrack(layerRID, remoteTrack)
+				}
+			}
+
+			// Periodic Keyframe (PLI) Routine: Periodically request a Keyframe every 2 seconds
+			// to force the broadcaster to emit an I-frame, instantly recovering packet loss artifacts
+			go func(trackSSRC uint32) {
+				ticker := time.NewTicker(2 * time.Second)
+				defer ticker.Stop()
+
+				for {
+					select {
+					case <-ticker.C:
+						if peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
+							return
+						}
+						_ = peerConnection.WriteRTCP([]rtcp.Packet{
+							&rtcp.PictureLossIndication{MediaSSRC: trackSSRC},
+						})
+					}
+				}
+			}(uint32(remoteTrack.SSRC()))
 
 		case webrtc.RTPCodecTypeAudio:
 			if existing := room.GetAudioTrack(); existing != nil {
@@ -254,13 +283,13 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 					return
 				}
 
-				// 3. Fan out to active viewer TrackSwitchers for direct high-quality playback
+				// 3. Fan out to active viewer TrackSwitchers with matching Simulcast RID ('q', 'h', 'f')
 				if parsedPkt != nil {
 					switchers := room.GetAllTrackSwitchers()
 					if len(switchers) > 0 {
 						for _, s := range switchers {
 							if ts, ok := s.(*TrackSwitcher); ok && ts != nil {
-								_ = ts.WriteRTP(ts.GetCurrentLayer(), parsedPkt)
+								_ = ts.WriteRTP(layerRID, parsedPkt)
 							}
 						}
 					}
@@ -366,6 +395,24 @@ func HandleCoHostConnection(api *webrtc.API, room *models.Room, coHostID string,
 			room.SetCoHostTrack(coHostID, localTrack)
 			room.SetCoHostVideoSSRC(coHostID, uint32(remoteTrack.SSRC()))
 			log.Printf("CoHost %s video track registered in Room %s (SSRC: %d)\n", coHostID, room.RoomID, remoteTrack.SSRC())
+
+			// Periodic Keyframe (PLI) Routine for Co-Host
+			go func(trackSSRC uint32) {
+				ticker := time.NewTicker(2 * time.Second)
+				defer ticker.Stop()
+
+				for {
+					select {
+					case <-ticker.C:
+						if peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
+							return
+						}
+						_ = peerConnection.WriteRTCP([]rtcp.Packet{
+							&rtcp.PictureLossIndication{MediaSSRC: trackSSRC},
+						})
+					}
+				}
+			}(uint32(remoteTrack.SSRC()))
 		} else if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio {
 			room.SetCoHostAudioTrack(coHostID, localTrack)
 			log.Printf("CoHost %s audio track registered in Room %s\n", coHostID, room.RoomID)

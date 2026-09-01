@@ -276,9 +276,11 @@ func main() {
 	// Prometheus Metrics Endpoint for monitoring and scraping
 	app.Get("/metrics", adaptor.HTTPHandler(promhttp.Handler()))
 
-	// Initialize REST Auth Handler for API Key / Secret validation and JWT generation
+	// Initialize REST Auth Handler for API Key / Secret validation and LiveKit JWT generation
 	authHandler := api.NewAuthHandler()
 	app.Post("/api/auth/token", authHandler.HandleTokenGeneration)
+	app.Post("/api/livekit/token", authHandler.HandleLiveKitToken)
+	app.Post("/api/token", authHandler.HandleLiveKitToken)
 
 	// POST /api/gift - Targeted Gifting REST API
 	app.Post("/api/gift", func(c *fiber.Ctx) error {

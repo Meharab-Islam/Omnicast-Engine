@@ -22,14 +22,14 @@ func TestTrackSwitcher_SequenceAndTimestampContinuity(t *testing.T) {
 		t.Fatalf("Expected initial layer 'q', got '%s'", switcher.GetCurrentLayer())
 	}
 
-	// 1. Send packets on layer 'q'
+	// 1. Send packets on layer 'q' (pkt1 is initial Keyframe)
 	pkt1 := &rtp.Packet{
 		Header: rtp.Header{
 			SequenceNumber: 100,
 			Timestamp:      1000,
 			SSRC:           11111,
 		},
-		Payload: []byte{0x90, 0x80, 0x01},
+		Payload: []byte{0x10, 0x00, 0x00}, // VP8 Keyframe
 	}
 	_ = switcher.WriteRTP("q", pkt1)
 
@@ -39,7 +39,7 @@ func TestTrackSwitcher_SequenceAndTimestampContinuity(t *testing.T) {
 			Timestamp:      4000,
 			SSRC:           11111,
 		},
-		Payload: []byte{0x90, 0x80, 0x02},
+		Payload: []byte{0x10, 0x01, 0x02},
 	}
 	_ = switcher.WriteRTP("q", pkt2)
 
@@ -462,6 +462,56 @@ func TestTrackSwitcher_ContiguousSequenceNumbersOnSVCDrop(t *testing.T) {
 		t.Fatalf("expected lastOutSeq to be strictly contiguous 102, got %d", switcher.lastOutSeq)
 	}
 }
+
+func TestTrackSwitcher_DropDeltaFramesUntilKeyframeOnSubscribe(t *testing.T) {
+	outTrack, _ := webrtc.NewTrackLocalStaticRTP(
+		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264, ClockRate: 90000},
+		"video",
+		"stream",
+	)
+
+	switcher := NewTrackSwitcher(outTrack, "f")
+
+	// 1. Send 5 Delta frames (H.264 Non-IDR Slice NAL type 1 = 0x01) on subscribe
+	// Switcher MUST drop all of them and not start forwarding!
+	for i := uint16(100); i < 105; i++ {
+		deltaPkt := &rtp.Packet{
+			Header: rtp.Header{
+				SequenceNumber: i,
+				Timestamp:      uint32(i) * 3000,
+				SSRC:           9999,
+			},
+			Payload: []byte{0x01, 0x88, 0x00}, // H264 P-frame (NAL 1)
+		}
+		_ = switcher.WriteRTP("f", deltaPkt)
+	}
+
+	if switcher.hasReceivedKeyframe {
+		t.Fatalf("Expected hasReceivedKeyframe to remain false after receiving delta frames")
+	}
+	if switcher.started {
+		t.Fatalf("Expected switcher not to start forwarding on delta frames")
+	}
+
+	// 2. Send H.264 IDR Keyframe (NAL type 5 = 0x05)
+	keyPkt := &rtp.Packet{
+		Header: rtp.Header{
+			SequenceNumber: 105,
+			Timestamp:      105 * 3000,
+			SSRC:           9999,
+		},
+		Payload: []byte{0x05, 0x88, 0x00}, // H264 IDR Keyframe (NAL 5)
+	}
+	_ = switcher.WriteRTP("f", keyPkt)
+
+	if !switcher.hasReceivedKeyframe {
+		t.Fatalf("Expected hasReceivedKeyframe to become true after receiving IDR keyframe")
+	}
+	if !switcher.started {
+		t.Fatalf("Expected switcher to start forwarding cleanly on keyframe")
+	}
+}
+
 
 
 

@@ -5,7 +5,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/pion/dtls/v2"
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/nack"
 	"github.com/pion/interceptor/pkg/twcc"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/webrtc/v3"
@@ -70,6 +72,7 @@ func InitWebRTC() (*webrtc.API, error) {
 					{Type: "ccm", Parameter: "fir"},
 					{Type: "nack", Parameter: ""},
 					{Type: "nack", Parameter: "pli"},
+					{Type: "transport-cc", Parameter: ""},
 				},
 			},
 			PayloadType: 96,
@@ -92,6 +95,7 @@ func InitWebRTC() (*webrtc.API, error) {
 					{Type: "ccm", Parameter: "fir"},
 					{Type: "nack", Parameter: ""},
 					{Type: "nack", Parameter: "pli"},
+					{Type: "transport-cc", Parameter: ""},
 				},
 			},
 			PayloadType: 97,
@@ -149,6 +153,7 @@ func InitWebRTC() (*webrtc.API, error) {
 					{Type: "ccm", Parameter: "fir"},
 					{Type: "nack", Parameter: ""},
 					{Type: "nack", Parameter: "pli"},
+					{Type: "transport-cc", Parameter: ""},
 				},
 			},
 			PayloadType: 100,
@@ -208,8 +213,25 @@ func InitWebRTC() (*webrtc.API, error) {
 		}
 	}
 
-	// 2. Register Interceptors (NACK, RTCP reports, TWCC/REMB Congestion Control / Bandwidth Estimation)
+	// 2. Register Interceptors (Aggressive NACK, RTCP reports, TWCC/REMB Congestion Control / Bandwidth Estimation)
 	interceptorRegistry := &interceptor.Registry{}
+
+	// Aggressive NACK Generator: 20ms check interval, max 3 NACKs per packet
+	if generatorFactory, err := nack.NewGeneratorInterceptor(
+		nack.GeneratorSize(2048),
+		nack.GeneratorInterval(20*time.Millisecond),
+		nack.GeneratorMaxNacksPerPacket(3),
+		nack.GeneratorSkipLastN(0),
+	); err == nil && generatorFactory != nil {
+		interceptorRegistry.Add(generatorFactory)
+	}
+
+	// Aggressive NACK Responder with 4096-packet retransmission buffer
+	if responderFactory, err := nack.NewResponderInterceptor(
+		nack.ResponderSize(4096),
+	); err == nil && responderFactory != nil {
+		interceptorRegistry.Add(responderFactory)
+	}
 
 	// Instantiate a new twcc.SenderInterceptorFactory() and add it to the engine's interceptor.Registry
 	if senderInterceptorFactory, err := twcc.NewSenderInterceptor(); err == nil && senderInterceptorFactory != nil {
@@ -226,22 +248,33 @@ func InitWebRTC() (*webrtc.API, error) {
 		return nil, err
 	}
 
-	// Register Default Interceptors (NACK Generator & Responder, RTCP Reports, TWCC Responder)
+	// Register Default Interceptors (RTCP Reports, TWCC Responder)
 	if err := webrtc.RegisterDefaultInterceptors(mediaEngine, interceptorRegistry); err != nil {
 		return nil, err
 	}
 
-	// 3. Configure SettingEngine to restrict WebRTC UDP port range (50000 - 52000) and advertise NAT 1:1 Public IP
+	// 3. Configure SettingEngine with Enterprise Infrastructure Optimizations
 	settingEngine := webrtc.SettingEngine{}
+
+	// Hardware AES-NI SRTP Encryption Prioritization (AES-256-GCM & AES-128-GCM)
+	settingEngine.SetSRTPProtectionProfiles(
+		dtls.SRTP_AEAD_AES_256_GCM,
+		dtls.SRTP_AEAD_AES_128_GCM,
+		dtls.SRTP_AES128_CM_HMAC_SHA1_80,
+	)
+
+	// High-Throughput OS UDP Socket Buffer Optimization (MTU 1500)
+	settingEngine.SetReceiveMTU(1500)
+
+	// Restrict WebRTC UDP port range (50000 - 52000) and advertise NAT 1:1 Public IP
 	if err := settingEngine.SetEphemeralUDPPortRange(50000, 52000); err != nil {
 		return nil, err
 	}
 
+	// Strictly disable ICE TCP fallback and force UDP to eliminate head-of-line blocking and jitter delay
 	settingEngine.SetNetworkTypes([]webrtc.NetworkType{
 		webrtc.NetworkTypeUDP4,
 		webrtc.NetworkTypeUDP6,
-		webrtc.NetworkTypeTCP4,
-		webrtc.NetworkTypeTCP6,
 	})
 
 	publicIP := os.Getenv("PUBLIC_IP")
@@ -338,6 +371,17 @@ func InitWebRTCWithTCPListener(tcpListener net.Listener) (*webrtc.API, error) {
 	}
 
 	settingEngine := webrtc.SettingEngine{}
+
+	// Hardware AES-NI SRTP Encryption Prioritization (AES-256-GCM & AES-128-GCM)
+	settingEngine.SetSRTPProtectionProfiles(
+		dtls.SRTP_AEAD_AES_256_GCM,
+		dtls.SRTP_AEAD_AES_128_GCM,
+		dtls.SRTP_AES128_CM_HMAC_SHA1_80,
+	)
+
+	// High-Throughput OS UDP Socket Buffer Optimization (MTU 1500)
+	settingEngine.SetReceiveMTU(1500)
+
 	if err := settingEngine.SetEphemeralUDPPortRange(50000, 52000); err != nil {
 		return nil, err
 	}
