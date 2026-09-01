@@ -1635,6 +1635,12 @@
           console.log('[Viewer] Received remote track:', event.track.kind, 'ID:', event.track.id);
           addLog(`Received remote track: ${event.track.kind} (${event.track.id.substring(0, 8)})`, 'info');
 
+          // Ensure reconnecting overlay is hidden when live track arrives
+          const overlay = document.getElementById('hostReconnectingOverlay');
+          if (overlay) overlay.style.display = 'none';
+
+          let videoElement = document.getElementById('mainVideo') || document.getElementById('remote-video');
+
           if (event.track.kind === 'video') {
             const mainVideoHasTrack = remoteStream && remoteStream.getVideoTracks().length > 0;
 
@@ -1642,36 +1648,24 @@
               // Primary Track -> Render in Main Stage
               remoteStream.addTrack(event.track);
 
-              let videoElement = document.getElementById('mainVideo') || document.getElementById('remote-video');
-              if (!videoElement) {
-                videoElement = document.createElement('video');
-                videoElement.id = 'mainVideo';
+              if (videoElement) {
+                if (event.streams && event.streams[0]) {
+                  videoElement.srcObject = event.streams[0];
+                } else {
+                  videoElement.srcObject = remoteStream;
+                }
                 videoElement.autoplay = true;
                 videoElement.playsInline = true;
-                videoElement.muted = false;
+                videoElement.muted = true; // Auto-mute initially to guarantee instant playback on all browsers
 
-                const targetContainer = document.getElementById('mainVideoWrapper') || document.getElementById('main-stage');
-                if (targetContainer) {
-                  targetContainer.appendChild(videoElement);
-                }
-              }
-
-              videoElement.autoplay = true;
-              videoElement.playsInline = true;
-              videoElement.srcObject = remoteStream;
-
-              // Attempt unmuted playback with fallback handling
-              videoElement.play().then(() => {
-                console.log('[Viewer] Remote media (Audio + Video) playing successfully!');
-                addLog('Live video & audio playing successfully.', 'success');
-                hideUnmuteBanner();
-              }).catch(err => {
-                console.warn('[Viewer] Unmuted autoplay prevented by browser policy:', err);
-                videoElement.muted = true;
                 videoElement.play().then(() => {
+                  console.log('[Viewer] Remote video playing successfully!');
+                  addLog('Live video playing.', 'success');
                   showUnmuteBanner();
-                }).catch(e => console.error('Play retry error:', e));
-              });
+                }).catch(err => {
+                  console.warn('[Viewer] Autoplay error:', err);
+                });
+              }
             } else {
               // Secondary / Co-Host Video Track -> Render in Dynamic Split Screen Grid
               console.log('[Viewer Multi-Guest] Rendering Co-Host video in split-screen grid:', event.track.id);
@@ -1680,7 +1674,7 @@
 
               const coHostVideo = document.getElementById(`video-cohost-${coHostKey}`);
               if (coHostVideo) {
-                const coHostStream = new MediaStream([event.track]);
+                const coHostStream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
                 coHostVideo.srcObject = coHostStream;
                 coHostVideo.autoplay = true;
                 coHostVideo.playsInline = true;
@@ -1693,22 +1687,17 @@
               }
             }
           } else if (event.track.kind === 'audio') {
-            if (remoteStream.getAudioTracks().length === 0) {
-              remoteStream.addTrack(event.track);
-              const mainVid = document.getElementById('mainVideo') || document.getElementById('remote-video');
-              if (mainVid) {
-                mainVid.srcObject = remoteStream;
-                mainVid.play().catch(() => {});
+            remoteStream.addTrack(event.track);
+            if (videoElement && videoElement.srcObject) {
+              if (videoElement.srcObject instanceof MediaStream) {
+                if (!videoElement.srcObject.getAudioTracks().includes(event.track)) {
+                  videoElement.srcObject.addTrack(event.track);
+                }
               }
-            } else {
-              const audioElem = new Audio();
-              audioElem.srcObject = new MediaStream([event.track]);
-              audioElem.autoplay = true;
-              audioElem.play().catch(e => console.warn('CoHost audio play error:', e));
             }
           }
-
         };
+
 
         // 2. addTransceiver ensure recvonly & force VP8
         console.log('[Viewer Step 2] Calling addTransceiver for video and audio (direction: recvonly)...');
