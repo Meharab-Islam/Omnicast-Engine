@@ -1394,9 +1394,21 @@
                 vBadgeSync.innerText = `👥 ${vCount} Viewers`;
               }
             }
+            if (info.host_id) {
+              const mainCard = document.getElementById('card-main-stream');
+              if (mainCard) {
+                mainCard.setAttribute('data-user-id', info.host_id);
+              }
+              const mainLbl = document.getElementById('mainLabel');
+              if (mainLbl) {
+                mainLbl.innerText = `Host (${info.host_id})`;
+              }
+            }
             if (info.main_seat_id) {
               document.getElementById('mainSeatText').innerText = info.main_seat_id;
-              swapToMainStage(info.main_seat_id);
+              if (info.main_seat_id !== info.host_id) {
+                swapToMainStage(info.main_seat_id);
+              }
             }
             if (info.active_seats) {
               Object.entries(info.active_seats).forEach(([seatIdx, uId]) => {
@@ -1406,12 +1418,17 @@
               });
             }
             if (info.active_cohosts) {
-              info.active_cohosts.forEach(id => createCoHostCard(id));
+              info.active_cohosts.forEach(id => {
+                if (id && id !== info.host_id) {
+                  createCoHostCard(id);
+                }
+              });
             }
             if (info.created_at) {
               appendSystemMessage(`ℹ️ Room state synced. Live since ${new Date(info.created_at).toLocaleTimeString()}`);
             }
           }
+
           break;
 
         case 'main_seat_changed':
@@ -1922,21 +1939,30 @@
       if (!targetID) return;
       const mainStage = document.getElementById('main-stage');
       const cohostGrid = document.getElementById('cohost-grid');
+      const mainCard = document.getElementById('card-main-stream');
 
-      const currentMainCard = mainStage.firstElementChild;
-      let targetCard = document.querySelector(`[data-user-id="${targetID}"]`);
-
-      if (!targetCard) {
-        targetCard = createCoHostCard(targetID);
+      if (mainCard && (!mainCard.getAttribute('data-user-id') || mainCard.getAttribute('data-user-id') === targetID)) {
+        mainCard.setAttribute('data-user-id', targetID);
+        if (mainStage && mainStage.firstElementChild !== mainCard) {
+          mainStage.prepend(mainCard);
+        }
+        return;
       }
 
+      let targetCard = document.querySelector(`[data-user-id="${targetID}"]`);
+      if (!targetCard) return;
+
+      const currentMainCard = mainStage ? mainStage.firstElementChild : null;
       if (currentMainCard === targetCard) return;
 
-      mainStage.appendChild(targetCard);
-      if (currentMainCard) {
+      if (mainStage) {
+        mainStage.appendChild(targetCard);
+      }
+      if (currentMainCard && cohostGrid && currentMainCard !== targetCard) {
         cohostGrid.appendChild(currentMainCard);
       }
     }
+
 
     function createCoHostCard(coHostID) {
       let card = document.querySelector(`[data-user-id="${coHostID}"]`);
