@@ -1635,7 +1635,6 @@
               videoElement.autoplay = true;
               videoElement.playsInline = true;
               videoElement.srcObject = remoteStream;
-              videoElement.muted = false;
 
               // Attempt unmuted playback with fallback handling
               videoElement.play().then(() => {
@@ -1672,6 +1671,11 @@
           } else if (event.track.kind === 'audio') {
             if (remoteStream.getAudioTracks().length === 0) {
               remoteStream.addTrack(event.track);
+              const mainVid = document.getElementById('mainVideo') || document.getElementById('remote-video');
+              if (mainVid) {
+                mainVid.srcObject = remoteStream;
+                mainVid.play().catch(() => {});
+              }
             } else {
               const audioElem = new Audio();
               audioElem.srcObject = new MediaStream([event.track]);
@@ -1679,6 +1683,7 @@
               audioElem.play().catch(e => console.warn('CoHost audio play error:', e));
             }
           }
+
         };
 
         // 2. addTransceiver ensure recvonly & force VP8

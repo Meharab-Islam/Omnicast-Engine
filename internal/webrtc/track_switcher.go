@@ -518,6 +518,21 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 		vp9Desc, _ = ParseVP9Descriptor(packet.Payload)
 	}
 
+	// Filter by Simulcast Layer RID:
+	// In multi-track Simulcast, strictly filter out packets from layers other than the active current layer (or target layer when switching)
+	if !isVP9 && rid != "" && rid != "default" {
+		if ts.pendingSwitch || ts.waitingKeyframe {
+			if rid != ts.currentLayer && rid != ts.targetLayer {
+				return nil
+			}
+		} else {
+			if rid != ts.currentLayer {
+				return nil
+			}
+		}
+	}
+
+
 	// 1. Strict Initial Keyframe Gating for newly subscribed viewers
 	// Discard/drop ALL incoming packets until a verified Keyframe (I-frame) arrives
 	if !ts.hasReceivedKeyframe {
@@ -532,6 +547,7 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 			// Discard delta frame (P-frame) for new viewer to prevent blocky square artifacts
 			return nil
 		}
+
 
 		// Initial Keyframe arrived! Start forwarding cleanly from this keyframe
 		ts.hasReceivedKeyframe = true
