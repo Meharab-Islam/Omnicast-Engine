@@ -1851,28 +1851,19 @@
           };
         }
 
-        // Check existing senders before adding tracks to prevent duplicate senders
-        const senders = peerConnection.getSenders();
+        // Reuse existing transceivers and upgrade direction to sendrecv for full-duplex streaming
+        const transceivers = peerConnection.getTransceivers();
         for (const track of localStream.getTracks()) {
-          const existingSender = senders.find(s => s.track && s.track.kind === track.kind);
-          if (existingSender) {
-            console.log('[Co-Host Seamless] Replacing existing sender track for kind:', track.kind);
-            await existingSender.replaceTrack(track).catch(err => console.warn('replaceTrack warning:', err));
+          const t = transceivers.find(tr => (tr.receiver && tr.receiver.track && tr.receiver.track.kind === track.kind) || (tr.sender && tr.sender.track && tr.sender.track.kind === track.kind));
+          if (t && t.sender) {
+            console.log(`[Co-Host] Reusing ${track.kind} transceiver and setting direction to sendrecv`);
+            await t.sender.replaceTrack(track).catch(err => console.warn('replaceTrack error:', err));
+            t.direction = 'sendrecv';
           } else {
-            console.log('[Co-Host Seamless] Adding new track to PeerConnection:', track.kind, track.id);
+            console.log(`[Co-Host] Adding new ${track.kind} track`);
             peerConnection.addTrack(track, localStream);
           }
         }
-
-        // Ensure remote transceivers retain receiving capability without interruption & set VP8 preference
-        peerConnection.getTransceivers().forEach(transceiver => {
-          forceVP8Codec(transceiver);
-          if (transceiver.receiver && transceiver.receiver.track) {
-            if (transceiver.direction === 'recvonly' && transceiver.sender && transceiver.sender.track) {
-              transceiver.direction = 'sendrecv';
-            }
-          }
-        });
 
         // Create standard SDP offer without manual SDP munging
         const offer = await peerConnection.createOffer();
