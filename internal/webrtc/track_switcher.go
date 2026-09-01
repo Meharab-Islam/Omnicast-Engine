@@ -519,22 +519,32 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 	}
 
 	// Filter by Simulcast Layer RID:
-	// In multi-track Simulcast, strictly filter out packets from layers other than the active current layer (or target layer when switching)
+	// If the current target layer doesn't match the incoming RID, check if we should forward from the available layer
 	if !isVP9 && rid != "" && rid != "default" {
 		if ts.pendingSwitch || ts.waitingKeyframe {
 			if rid != ts.currentLayer && rid != ts.targetLayer {
-				return nil
+				// If neither layer matches, fallback to active incoming layer
+				if ts.currentLayer == LayerLow && rid == LayerMedium {
+					ts.currentLayer = LayerMedium
+				} else if ts.currentLayer == LayerLow && rid == LayerHigh {
+					ts.currentLayer = LayerHigh
+				} else {
+					return nil
+				}
 			}
 		} else {
 			if rid != ts.currentLayer {
-				return nil
+				// If currentLayer is set to a layer that isn't broadcasting (e.g. low 'q' when host only sends 'f'/'h'), auto-fallback
+				if (ts.currentLayer == LayerLow || ts.currentLayer == "") && (rid == LayerMedium || rid == LayerHigh) {
+					ts.currentLayer = rid
+				} else {
+					return nil
+				}
 			}
 		}
 	}
 
-
-	// 1. Strict Initial Keyframe Gating for newly subscribed viewers
-	// Discard/drop ALL incoming packets until a verified Keyframe (I-frame) arrives
+	// 1. Initial keyframe gating with auto-pass to guarantee viewer video stream starts immediately
 	if !ts.hasReceivedKeyframe {
 		isKey := false
 		if isVP9 {
@@ -543,13 +553,7 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 			isKey = IsKeyframe(codecMime, packet.Payload)
 		}
 
-		if !isKey {
-			// Discard delta frame (P-frame) for new viewer to prevent blocky square artifacts
-			return nil
-		}
-
-
-		// Initial Keyframe arrived! Start forwarding cleanly from this keyframe
+		// Initial Keyframe or initial stream start! Start forwarding cleanly
 		ts.hasReceivedKeyframe = true
 		ts.started = true
 		ts.waitingKeyframe = false
@@ -571,8 +575,10 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 		case ts.queue <- &outPkt:
 		default:
 		}
+		_ = isKey
 		return nil
 	}
+
 
 	if vp9Desc != nil {
 		// Single VP9 Track with SVC (Scalable Video Coding) L3T3
@@ -753,16 +759,12 @@ func IsVP8Keyframe(payload []byte) bool {
 
 	if payloadIndex < len(payload) {
 		// Bit 0 of VP8 uncompressed frame header (P bit): 0 indicates Keyframe (I-frame), 1 indicates Inter-frame (P-frame)
-		isKeyframeBit := (payload[payloadIndex] & 0x01) == 0
-		if isKeyframeBit && payloadIndex+5 < len(payload) {
-			// RFC 6386 Section 9.1: bytes 3, 4, 5 of frame header must be 0x9D 0x01 0x2A for keyframes
-			return payload[payloadIndex+3] == 0x9D && payload[payloadIndex+4] == 0x01 && payload[payloadIndex+5] == 0x2A
-		}
-		return isKeyframeBit
+		return (payload[payloadIndex] & 0x01) == 0
 	}
 
 	return false
 }
+
 
 
 
