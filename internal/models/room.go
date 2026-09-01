@@ -669,6 +669,7 @@ func (r *Room) GetDefaultViewerVideoTrack() *webrtc.TrackLocalStaticRTP {
 	return r.VideoTrack
 }
 
+
 // GetAllVideoTracks returns a copy of all simulcast video tracks
 func (r *Room) GetAllVideoTracks() map[string]*webrtc.TrackLocalStaticRTP {
 	r.mu.RLock()

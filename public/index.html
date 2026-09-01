@@ -1098,21 +1098,7 @@
     };
 
     function forceVP8Codec(transceiver) {
-      if (transceiver && 'setCodecPreferences' in transceiver && typeof RTCRtpReceiver !== 'undefined' && RTCRtpReceiver.getCapabilities) {
-        try {
-          const capabilities = RTCRtpReceiver.getCapabilities('video');
-          if (capabilities && capabilities.codecs) {
-            const vp8Codecs = capabilities.codecs.filter(c => c.mimeType.toLowerCase() === 'video/vp8');
-            const otherCodecs = capabilities.codecs.filter(c => c.mimeType.toLowerCase() !== 'video/vp8' && c.mimeType.toLowerCase() !== 'video/h264');
-            if (vp8Codecs.length > 0) {
-              transceiver.setCodecPreferences([...vp8Codecs, ...otherCodecs]);
-              console.log('[WebRTC Codec] Forced VP8 codec preference on transceiver');
-            }
-          }
-        } catch (e) {
-          console.warn('[WebRTC Codec] setCodecPreferences warning:', e);
-        }
-      }
+      // Auto-negotiate codecs naturally between VP8 and H264 across mobile and desktop
     }
 
     // Host: Start Live from Lobby
@@ -1157,22 +1143,8 @@
         // Step 5: Attach local media tracks
         addLog('4. Attaching local media tracks to RTCPeerConnection...', 'info');
         localStream.getTracks().forEach(track => {
-          if (track.kind === 'video') {
-            const videoTransceiver = peerConnection.addTransceiver(track, {
-              direction: 'sendonly',
-              streams: [localStream],
-              sendEncodings: [
-                { rid: 'f', active: true, maxBitrate: 800000 },
-                { rid: 'h', active: true, maxBitrate: 350000, scaleResolutionDownBy: 2 },
-                { rid: 'q', active: true, maxBitrate: 120000, scaleResolutionDownBy: 4 }
-              ]
-            });
-            forceVP8Codec(videoTransceiver);
-            console.log('[Host] Attached video track via Transceiver with Simulcast encodings');
-          } else {
-            peerConnection.addTrack(track, localStream);
-            console.log('[Host] Attached audio track via pc.addTrack');
-          }
+          peerConnection.addTrack(track, localStream);
+          console.log(`[Host] Attached ${track.kind} track via pc.addTrack`);
         });
 
         // Step 6: Generate SDP Offer and publish

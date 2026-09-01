@@ -172,7 +172,7 @@ func HandleHostConnection(api *webrtc.API, room *models.Room, config webrtc.Conf
 
 			room.SetVideoTrackRID(layerRID, localTrack)
 			room.SetVideoTrackSSRC(layerRID, uint32(remoteTrack.SSRC()))
-			if layerRID == "f" || room.GetVideoTrack() == nil {
+			if room.GetVideoTrack() == nil || layerRID == "f" {
 				room.SetVideoTrack(localTrack)
 				room.SetHostVideoSSRC(uint32(remoteTrack.SSRC()))
 			}
