@@ -40,20 +40,12 @@ func main() {
 	// Zero-Config Boot: Auto-generate secure credentials, resolve public IP, and persist to .env
 	cfg := config.LoadOrGenerateConfig()
 
-	// To handle strict firewalls that block UDP entirely, create a TCP listener on port 443 using net.Listen("tcp", ":443")
-	turnTCPListener, turnTCPErr := net.Listen("tcp", ":443")
-	if turnTCPErr != nil {
-		log.Printf("[TURN Info] TCP port :443 status: %v (requires elevated permissions or reverse proxy for strict firewall bypass)\n", turnTCPErr)
-	} else {
-		defer turnTCPListener.Close()
-		log.Println("[TURN] TCP listener active on port 443 (:443) for strict firewall bypass")
-	}
-
-	// Initialize Pion WebRTC API with VP8, H264, VP9, Opus codecs and apply SetICETCPMux()
-	webrtcAPI, err := webrtc.InitWebRTCWithTCPListener(turnTCPListener)
+	// Initialize Pion WebRTC API with VP8, H264, VP9, Opus codecs and direct UDP host candidates
+	webrtcAPI, err := webrtc.InitWebRTC()
 	if err != nil {
 		log.Fatalf("Failed to initialize WebRTC API: %v\n", err)
 	}
+
 
 	// Initialize Webhook Dispatcher
 	webhookDispatcher := api.NewWebhookDispatcher()
@@ -142,12 +134,7 @@ func main() {
 		}
 
 		listenerConfigs := []turn.ListenerConfig{}
-		if turnTCPListener != nil {
-			listenerConfigs = append(listenerConfigs, turn.ListenerConfig{
-				Listener:              turnTCPListener,
-				RelayAddressGenerator: relayGen,
-			})
-		}
+
 
 		server, err := turn.NewServer(turn.ServerConfig{
 			Realm: realm,
@@ -231,8 +218,9 @@ func main() {
 
 		turnURIs := []string{
 			fmt.Sprintf("turn:%s:%s", publicDomain, turnPort),
-			fmt.Sprintf("turn:%s:443?transport=tcp", publicDomain),
+			fmt.Sprintf("turn:%s:%s?transport=tcp", publicDomain, turnPort),
 		}
+
 
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"uris":     turnURIs,

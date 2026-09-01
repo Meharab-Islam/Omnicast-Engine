@@ -49,13 +49,22 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 
 	// Select optimal video track for viewer (Medium 'h', then Low 'q', then Full 'f', then room.VideoTrack)
 	videoTrack := room.GetDefaultViewerVideoTrack()
-	audioTrack := room.AudioTrack
+	audioTrack := room.GetAudioTrack()
 	coHosts := room.GetAllCoHostTracks()
 
-	// If host media has not published yet, return error gracefully
+	// If host media has not published yet, wait briefly for host track initialization (up to 2s)
 	if videoTrack == nil && audioTrack == nil && len(coHosts) == 0 {
-		return nil, fmt.Errorf("host media not ready")
+		for i := 0; i < 20; i++ {
+			time.Sleep(100 * time.Millisecond)
+			videoTrack = room.GetDefaultViewerVideoTrack()
+			audioTrack = room.GetAudioTrack()
+			coHosts = room.GetAllCoHostTracks()
+			if videoTrack != nil || audioTrack != nil || len(coHosts) > 0 {
+				break
+			}
+		}
 	}
+
 
 	// Create a new PeerConnection for the viewer
 	peerConnection, err := api.NewPeerConnection(config)
