@@ -1139,7 +1139,10 @@
         mainVideo.srcObject = localStream;
         mainVideo.classList.add('mirrored-video');
         mainVideo.muted = true;
+        mainVideo.defaultMuted = true;
+        mainVideo.volume = 0;
         await mainVideo.play().catch(e => console.warn('Video autoplay:', e));
+
 
         document.getElementById('mainLabel').innerText = `Host (${myUserID})`;
         document.getElementById('mainSeatText').innerText = myUserID;
@@ -1646,25 +1649,27 @@
             const mainVideoHasTrack = remoteStream && remoteStream.getVideoTracks().length > 0;
 
             if (!mainVideoHasTrack) {
-              // Primary Track -> Render in Main Stage
               remoteStream.addTrack(event.track);
 
               if (videoElement) {
-                if (event.streams && event.streams[0]) {
-                  videoElement.srcObject = event.streams[0];
-                } else {
-                  videoElement.srcObject = remoteStream;
-                }
+                videoElement.srcObject = remoteStream;
                 videoElement.autoplay = true;
                 videoElement.playsInline = true;
-                videoElement.muted = true; // Auto-mute initially to guarantee instant playback on all browsers
+                videoElement.setAttribute('playsinline', 'true');
+                videoElement.setAttribute('webkit-playsinline', 'true');
 
+                // Try unmuted playback first; if browser blocks, fallback to muted + unmute button
                 videoElement.play().then(() => {
-                  console.log('[Viewer] Remote video playing successfully!');
-                  addLog('Live video playing.', 'success');
-                  showUnmuteBanner();
-                }).catch(err => {
-                  console.warn('[Viewer] Autoplay error:', err);
+                  console.log('[Viewer] Remote media playing with audio!');
+                  addLog('Live video playing with sound.', 'success');
+                  hideUnmuteBanner();
+                }).catch(() => {
+                  console.log('[Viewer] Autoplay unmuted blocked by browser policy, starting muted with Unmute button');
+                  videoElement.muted = true;
+                  videoElement.play().then(() => {
+                    addLog('Live video playing (Click Sound to listen).', 'success');
+                    showUnmuteBanner();
+                  }).catch(e => console.error('Play retry error:', e));
                 });
               }
             } else {
@@ -1675,7 +1680,7 @@
 
               const coHostVideo = document.getElementById(`video-cohost-${coHostKey}`);
               if (coHostVideo) {
-                const coHostStream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+                const coHostStream = new MediaStream([event.track]);
                 coHostVideo.srcObject = coHostStream;
                 coHostVideo.autoplay = true;
                 coHostVideo.playsInline = true;
@@ -1688,16 +1693,15 @@
               }
             }
           } else if (event.track.kind === 'audio') {
-            remoteStream.addTrack(event.track);
-            if (videoElement && videoElement.srcObject) {
-              if (videoElement.srcObject instanceof MediaStream) {
-                if (!videoElement.srcObject.getAudioTracks().includes(event.track)) {
-                  videoElement.srcObject.addTrack(event.track);
-                }
-              }
+            if (!remoteStream.getAudioTracks().includes(event.track)) {
+              remoteStream.addTrack(event.track);
+            }
+            if (videoElement) {
+              videoElement.srcObject = remoteStream;
             }
           }
         };
+
 
 
         // 2. addTransceiver ensure recvonly & force VP8
