@@ -201,11 +201,12 @@ func NewSFUEngine(cfg SFUEngineConfig) (*SFUEngine, error) {
 			log.Printf("[Pion ICE] Single-port UDP Multiplexer active on 0.0.0.0:%d\n", cfg.SingleUDPPort)
 		} else {
 			log.Printf("[Pion ICE] Single UDP port %d status: %v (falling back to port range)\n", cfg.SingleUDPPort, err)
-			_ = settingEngine.SetEphemeralUDPPortRange(50000, 52000)
+			_ = settingEngine.SetEphemeralUDPPortRange(50000, 50050)
 		}
 	} else {
-		_ = settingEngine.SetEphemeralUDPPortRange(50000, 52000)
+		_ = settingEngine.SetEphemeralUDPPortRange(50000, 50050)
 	}
+
 
 	// Strictly force UDP
 	settingEngine.SetNetworkTypes([]webrtc.NetworkType{

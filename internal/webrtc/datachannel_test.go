@@ -14,7 +14,8 @@ func TestDataChannel_UltraLowLatencyBroadcast(t *testing.T) {
 
 	// 1. Initialize pion API
 	settingEngine := webrtc.SettingEngine{}
-	_ = settingEngine.SetEphemeralUDPPortRange(50000, 52000)
+	_ = settingEngine.SetEphemeralUDPPortRange(50000, 50050)
+
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))
 
 	// 2. Setup Host PeerConnection

@@ -696,10 +696,11 @@ func IsVP8Keyframe(payload []byte) bool {
 		if payloadIndex >= len(payload) {
 			return false
 		}
-		iBit := (payload[1] & 0x80) != 0
-		lBit := (payload[1] & 0x40) != 0
-		tBit := (payload[1] & 0x20) != 0
-		kBit := (payload[1] & 0x10) != 0
+		ext := payload[payloadIndex]
+		iBit := (ext & 0x80) != 0
+		lBit := (ext & 0x40) != 0
+		tBit := (ext & 0x20) != 0
+		kBit := (ext & 0x10) != 0
 		payloadIndex++
 
 		if iBit {
@@ -709,13 +710,22 @@ func IsVP8Keyframe(payload []byte) bool {
 			mBit := (payload[payloadIndex] & 0x80) != 0
 			payloadIndex++
 			if mBit {
+				if payloadIndex >= len(payload) {
+					return false
+				}
 				payloadIndex++
 			}
 		}
 		if lBit {
+			if payloadIndex >= len(payload) {
+				return false
+			}
 			payloadIndex++
 		}
 		if tBit || kBit {
+			if payloadIndex >= len(payload) {
+				return false
+			}
 			payloadIndex++
 		}
 	}
@@ -727,6 +737,7 @@ func IsVP8Keyframe(payload []byte) bool {
 
 	return false
 }
+
 
 // IsKeyframe parses the RTP payload and determines whether it contains a video Keyframe (I-frame / IDR)
 // supporting both VP8 (RFC 7741), H.264 (RFC 6184), and VP9 codecs.

@@ -266,8 +266,8 @@ func InitWebRTC() (*webrtc.API, error) {
 	// High-Throughput OS UDP Socket Buffer Optimization (MTU 1500)
 	settingEngine.SetReceiveMTU(1500)
 
-	// Restrict WebRTC UDP port range (50000 - 52000) and advertise NAT 1:1 Public IP
-	if err := settingEngine.SetEphemeralUDPPortRange(50000, 52000); err != nil {
+	// Restrict WebRTC UDP port range (50000 - 50050) matching Docker & firewall port mapping
+	if err := settingEngine.SetEphemeralUDPPortRange(50000, 50050); err != nil {
 		return nil, err
 	}
 
@@ -382,9 +382,10 @@ func InitWebRTCWithTCPListener(tcpListener net.Listener) (*webrtc.API, error) {
 	// High-Throughput OS UDP Socket Buffer Optimization (MTU 1500)
 	settingEngine.SetReceiveMTU(1500)
 
-	if err := settingEngine.SetEphemeralUDPPortRange(50000, 52000); err != nil {
+	if err := settingEngine.SetEphemeralUDPPortRange(50000, 50050); err != nil {
 		return nil, err
 	}
+
 
 	// Configure SettingEngine to advertise both UDP and TCP candidate types to connecting peers
 	settingEngine.SetNetworkTypes([]webrtc.NetworkType{

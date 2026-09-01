@@ -1618,18 +1618,16 @@
               // Primary Track -> Render in Main Stage
               remoteStream.addTrack(event.track);
 
-              let videoElement = document.getElementById('remote-video');
+              let videoElement = document.getElementById('mainVideo') || document.getElementById('remote-video');
               if (!videoElement) {
-                console.log('[Viewer] Creating new <video id="remote-video"> element...');
                 videoElement = document.createElement('video');
-                videoElement.id = 'remote-video';
+                videoElement.id = 'mainVideo';
                 videoElement.autoplay = true;
                 videoElement.playsInline = true;
                 videoElement.muted = false;
 
                 const targetContainer = document.getElementById('mainVideoWrapper') || document.getElementById('main-stage');
                 if (targetContainer) {
-                  targetContainer.innerHTML = '';
                   targetContainer.appendChild(videoElement);
                 }
               }
