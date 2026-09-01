@@ -1121,18 +1121,15 @@
       const roomID = 'room-' + Math.random().toString(36).substring(2, 8);
 
       try {
-        addLog('1. Initializing WebRTC RTCPeerConnection with STUN servers...', 'info');
+        // Step 1: Connect WebSocket first so candidate signaling is immediately available
+        addLog('1. Connecting WebSocket signaling channel...', 'info');
+        await initWebSocket(roomID, 'host');
 
-        // Step 1: Initialize the RTCPeerConnection with proper STUN servers (Google STUN + dynamic TURN)
-        const iceConfig = await fetchIceServersConfig();
-        peerConnection = new RTCPeerConnection(iceConfig);
-        setupHostPeerConnection(peerConnection, roomID, roomName);
-
-        // Step 2: Call navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        // Step 2: Call navigator.mediaDevices.getUserMedia
         addLog('2. Requesting camera & microphone access (getUserMedia)...', 'info');
         localStream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
 
-        // Step 3: Display the local stream on the video element
+        // Step 3: Display local stream
         isHost = true;
         isLeaving = false;
         showRoomView(roomID, roomName);
@@ -1147,8 +1144,14 @@
         document.getElementById('mainSeatText').innerText = myUserID;
         document.getElementById('card-main-stream').setAttribute('data-user-id', myUserID);
 
-        // Step 4 (Crucial Step): Iterate through the stream and use pc.addTrack(track, stream) / transceivers to attach the media
-        addLog('3. Attaching local media tracks to RTCPeerConnection...', 'info');
+        // Step 4: Initialize RTCPeerConnection with STUN/TURN servers
+        addLog('3. Initializing WebRTC RTCPeerConnection...', 'info');
+        const iceConfig = await fetchIceServersConfig();
+        peerConnection = new RTCPeerConnection(iceConfig);
+        setupHostPeerConnection(peerConnection, roomID, roomName);
+
+        // Step 5: Attach local media tracks
+        addLog('4. Attaching local media tracks to RTCPeerConnection...', 'info');
         localStream.getTracks().forEach(track => {
           if (track.kind === 'video') {
             const videoTransceiver = peerConnection.addTransceiver(track, {
@@ -1168,11 +1171,8 @@
           }
         });
 
-        // Connect WebSocket and wait until OPEN
-        await initWebSocket(roomID, 'host');
-
-        // Step 5: Only AFTER the tracks are added, call pc.createOffer(), set local description, and send offer payload via WebSocket
-        addLog('4. Generating WebRTC SDP Offer and sending to SFU...', 'info');
+        // Step 6: Generate SDP Offer and publish
+        addLog('5. Generating WebRTC SDP Offer and sending to SFU...', 'info');
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
@@ -1188,6 +1188,7 @@
         }));
 
         addLog(`Started broadcast for Room: ${roomName}`, 'success');
+
 
       } catch (err) {
         addLog(`Host start failed: ${err.message}`, 'error');
