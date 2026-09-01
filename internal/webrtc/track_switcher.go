@@ -94,7 +94,7 @@ func NewTrackSwitcher(outTrack *webrtc.TrackLocalStaticRTP, initialLayer string)
 		vp9Parser:            NewVP9PayloadParser(),
 		seqAdjuster:          NewSequenceNumberAdjuster(),
 		tsAdjuster:           NewTimestampAdjuster(),
-		queue:                make(chan *rtp.Packet, 256),
+		queue:                make(chan *rtp.Packet, 2048),
 		closed:               make(chan struct{}),
 	}
 
@@ -110,12 +110,15 @@ func NewTrackSwitcher(outTrack *webrtc.TrackLocalStaticRTP, initialLayer string)
 					return
 				}
 				if ts.outTrack != nil {
-					_ = ts.outTrack.WriteRTP(pkt)
+					if err := ts.outTrack.WriteRTP(pkt); err != nil {
+						// Non-fatal write error
+					}
 					metrics.AddBytesSent(pkt.MarshalSize())
 				}
 			}
 		}
 	}()
+
 
 	return ts
 }
@@ -688,7 +691,12 @@ func (ts *TrackSwitcher) WriteRTP(rid string, packet *rtp.Packet) error {
 		ts.lastOutTS = outPkt.Header.Timestamp
 	}
 
+	if ts.outTrack != nil && ts.outTrack.Codec().PayloadType != 0 {
+		outPkt.Header.PayloadType = uint8(ts.outTrack.Codec().PayloadType)
+	}
+
 	// Enqueue the rewritten packet for the background worker to call outTrack.WriteRTP()
+
 	select {
 	case ts.queue <- &outPkt:
 	default:
