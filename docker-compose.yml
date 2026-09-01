@@ -53,8 +53,9 @@ services:
       - --external-ip=${PUBLIC_IP:-127.0.0.1}
       - --listening-port=3478
       - --use-auth-secret
-      - --static-auth-secret=${TURN_SECRET:-turn_default_secret_999}
-      - --realm=${TURN_REALM:-live.myvps.com}
+      - --static-auth-secret=${TURN_SECRET:-omnicast_secret_turn_key}
+      - --realm=${TURN_REALM:-testlivekit.lolipoplive.top}
+
       - --total-quota=100
       - --min-port=49152
       - --max-port=49250
