@@ -1674,19 +1674,16 @@
               }
             }
           } else if (event.track.kind === 'audio') {
-            // Dedicated audio sink element for reliable audio output
-            let audioElem = document.getElementById('remote-audio-sink');
-            if (!audioElem) {
-              audioElem = document.createElement('audio');
-              audioElem.id = 'remote-audio-sink';
-              audioElem.autoplay = true;
-              document.body.appendChild(audioElem);
-            }
-            const audioStream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
-            audioElem.srcObject = audioStream;
+            // Dedicated audio sink element for each incoming audio stream (Host + all Co-Hosts)
+            const audioElem = document.createElement('audio');
+            audioElem.autoplay = true;
+            audioElem.playsInline = true;
+            audioElem.srcObject = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+            document.body.appendChild(audioElem);
             audioElem.play().catch(err => {
-              console.warn('[Viewer] Audio sink autoplay waiting for user interaction:', err);
+              console.warn('[Audio Playback] waiting for interaction:', err);
             });
+            console.log('[Viewer] Playing audio track:', event.track.id);
           }
         };
 
@@ -2019,14 +2016,23 @@
 
     function acceptSeatRequest() {
       if (!pendingRequesterId || !ws || ws.readyState !== WebSocket.OPEN) return;
+      const targetUser = pendingRequesterId;
       ws.send(JSON.stringify({
         event: 'seat_accept',
         room_id: currentRoomID,
         user_id: myUserID,
-        target_user: pendingRequesterId,
-        payload: { target_user: pendingRequesterId }
+        target_user: targetUser,
+        payload: { target_user: targetUser }
       }));
+      appendSystemMessage(`✅ You accepted ${targetUser} as Co-Host!`);
+      addLog(`Accepted Co-Host request for ${targetUser}`, 'success');
       dismissSeatRequest();
+    }
+
+    function dismissSeatRequest() {
+      const alertBox = document.getElementById('seatAlertBox');
+      if (alertBox) alertBox.style.display = 'none';
+      pendingRequesterId = null;
     }
 
     function leaveSeat() {
