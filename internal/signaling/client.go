@@ -319,20 +319,26 @@ func (c *Client) handlePublishOffer(msg *models.SignalingMessage) {
 	}
 
 	// Access Control: If a user tries to publish a track (Host/Co-host) but their token claim says can_publish: false, forcefully reject the WebRTC offer.
-	if c.Claims != nil && !c.Claims.AllowsPublishing() {
-		log.Printf("[Access Control] Forcefully rejected publish offer from client %s (can_publish=false or insufficient role '%s')\n", c.ID, c.Claims.Role)
-		errPayload, _ := json.Marshal(map[string]any{
-			"status_code": 403,
-			"error":       "Forbidden: token claims do not permit publishing (can_publish: false)",
-		})
-		if enc, err := (&models.SignalingMessage{
-			Event:   "error",
-			RoomID:  roomID,
-			Payload: errPayload,
-		}).Encode(); err == nil {
-			c.SafeSend(enc)
+	c.mu.Lock()
+	clientRole := c.Role
+	c.mu.Unlock()
+
+	if clientRole != "cohost" && clientRole != "host" && clientRole != "publisher" {
+		if c.Claims != nil && !c.Claims.AllowsPublishing() {
+			log.Printf("[Access Control] Forcefully rejected publish offer from client %s (can_publish=false or insufficient role '%s')\n", c.ID, c.Claims.Role)
+			errPayload, _ := json.Marshal(map[string]any{
+				"status_code": 403,
+				"error":       "Forbidden: token claims do not permit publishing (can_publish: false)",
+			})
+			if enc, err := (&models.SignalingMessage{
+				Event:   "error",
+				RoomID:  roomID,
+				Payload: errPayload,
+			}).Encode(); err == nil {
+				c.SafeSend(enc)
+			}
+			return
 		}
-		return
 	}
 
 	// Extract display name, avatar URL, and dynamic metadata if provided
@@ -1670,6 +1676,11 @@ func (c *Client) handleSeatAccept(msg *models.SignalingMessage) {
 			targetClient = vc
 			targetClient.mu.Lock()
 			targetClient.Role = "cohost"
+			if targetClient.Claims != nil {
+				targetClient.Claims.Role = "cohost"
+				canPub := true
+				targetClient.Claims.CanPublish = &canPub
+			}
 			targetClient.mu.Unlock()
 		}
 	}
