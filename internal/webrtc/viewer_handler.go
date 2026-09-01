@@ -112,75 +112,36 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 		}
 	})
 
-	// Canonical Name (CNAME) & Stream ID matching for WebRTC Lip-Sync (RFC 3550 & WebRTC spec)
-	cname := fmt.Sprintf("omnicast-stream-%s", room.RoomID)
-
-	var switcher *TrackSwitcher
-	var viewerVideoTrack *webrtc.TrackLocalStaticRTP
 	var videoSender *webrtc.RTPSender
 	var audioSender *webrtc.RTPSender
 
 	if videoTrack != nil {
-		// Create dedicated egress TrackLocalStaticRTP for this viewer with matching CNAME
-		var trackErr error
-		viewerVideoTrack, trackErr = webrtc.NewTrackLocalStaticRTP(
-			videoTrack.Codec(),
-			videoTrack.ID(),
-			cname,
-		)
-		if trackErr != nil {
-			log.Printf("Failed to create TrackLocalStaticRTP for viewer: %v\n", trackErr)
-			_ = peerConnection.Close()
-			return nil, trackErr
-		}
-
-		// Initialize TrackSwitcher with initial layer 'f' (High / Full Resolution HD)
-		initialLayer := LayerHigh
-		if room.GetVideoTrackByRID(LayerHigh) == nil {
-			if room.GetVideoTrackByRID(LayerMedium) != nil {
-				initialLayer = LayerMedium
-			} else if room.GetVideoTrackByRID(LayerLow) != nil {
-				initialLayer = LayerLow
-			}
-		}
-
-		switcher = NewTrackSwitcher(viewerVideoTrack, initialLayer)
-		viewerID = viewerVideoTrack.ID()
+		viewerID = videoTrack.ID()
 		if peerConnection != nil {
 			if remoteDesc := peerConnection.RemoteDescription(); remoteDesc != nil && remoteDesc.SDP != "" {
 				viewerID = remoteDesc.SDP
 			}
 		}
-		if room != nil {
-			room.RegisterTrackSwitcher(viewerID, switcher)
-		}
 
 		var addErr error
-		videoSender, addErr = peerConnection.AddTrack(viewerVideoTrack)
+		videoSender, addErr = peerConnection.AddTrack(videoTrack)
 		if addErr != nil {
 			log.Printf("Failed to add video track to viewer PeerConnection (Room %s): %v\n", room.RoomID, addErr)
-			if room != nil {
-				room.UnregisterTrackSwitcher(viewerID)
-			}
 			_ = peerConnection.Close()
 			return nil, addErr
 		}
 
-		// 1. Forcefully trigger the PLI throttler to request an immediate keyframe for the new viewer subscription
-		trackID := fmt.Sprintf("%s:%d", room.RoomID, room.GetHostVideoSSRC())
-		if viewerVideoTrack != nil {
-			trackID = viewerVideoTrack.ID()
-		}
-		ForceSendPLI(trackID)
+		// 1. Request an immediate keyframe for the new viewer subscription
 		if room != nil {
 			room.SendPLIImmediate()
 		}
 
 		// Read incoming RTCP feedback from viewer (PLI/FIR/NACK/REMB) using dedicated ReadRTCP goroutine
 		abr := NewABRController()
-		ReadRTCP(videoSender, room, viewerID, switcher, abr)
-		log.Printf("Attached TrackSwitcher video track to viewer for Room: %s (Track ID: %s)\n", room.RoomID, viewerVideoTrack.ID())
+		ReadRTCP(videoSender, room, viewerID, nil, abr)
+		log.Printf("Attached host video track to viewer for Room: %s (Track ID: %s)\n", room.RoomID, videoTrack.ID())
 	}
+
 
 	// Add host's AudioTrack if available
 	if room.AudioTrack != nil {
@@ -200,9 +161,6 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 	// Phase 19: Periodic RTCP Sender Reports for Lip-Sync
 	if syncObj := room.GetTimeSynchronizer(); syncObj != nil {
 		if ts, ok := syncObj.(*TimeSynchronizer); ok && ts != nil {
-			if switcher != nil && switcher.tsAdjuster != nil {
-				ts.SetTimestampAdjuster(switcher.tsAdjuster)
-			}
 			stopSR := make(chan struct{})
 			peerConnection.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 				if state == webrtc.ICEConnectionStateClosed || state == webrtc.ICEConnectionStateFailed {
@@ -244,8 +202,8 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 			if room != nil {
 				// Forcefully trigger PLI throttler to ensure immediate keyframe burst for new viewer
 				trackID := fmt.Sprintf("%s:%d", room.RoomID, room.GetHostVideoSSRC())
-				if viewerVideoTrack != nil {
-					trackID = viewerVideoTrack.ID()
+				if videoTrack != nil {
+					trackID = videoTrack.ID()
 				}
 				ForceSendPLI(trackID)
 				room.SendPLIImmediate()
@@ -267,12 +225,9 @@ func HandleViewerConnectionForRoom(api *webrtc.API, room *models.Room, config we
 					}
 				}()
 			}
-		} else if connectionState == webrtc.ICEConnectionStateFailed || connectionState == webrtc.ICEConnectionStateClosed {
-			if switcher != nil {
-				switcher.Close()
-			}
 		}
 	})
+
 
 	// 4. Attach OnTrack listener in case this viewer upgrades to a publisher / co-host
 	peerConnection.OnTrack(func(remoteTrack *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
