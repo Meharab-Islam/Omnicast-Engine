@@ -18,6 +18,7 @@ import (
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/google/uuid"
+	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"
 )
 
@@ -495,6 +496,23 @@ func (c *Client) handlePublishOffer(msg *models.SignalingMessage) {
 				}
 				room.SetCoHostTrack(c.ID, localTrack)
 				room.SetCoHostVideoSSRC(c.ID, uint32(remoteTrack.SSRC()))
+
+				// Immediate and periodic PLI for Co-Host video encoder
+				_ = pc.WriteRTCP([]rtcp.Packet{
+					&rtcp.PictureLossIndication{MediaSSRC: uint32(remoteTrack.SSRC())},
+				})
+				go func(trackSSRC uint32) {
+					ticker := time.NewTicker(2 * time.Second)
+					defer ticker.Stop()
+					for range ticker.C {
+						if pc.ConnectionState() == webrtc.PeerConnectionStateClosed {
+							return
+						}
+						_ = pc.WriteRTCP([]rtcp.Packet{
+							&rtcp.PictureLossIndication{MediaSSRC: trackSSRC},
+						})
+					}
+				}(uint32(remoteTrack.SSRC()))
 			} else if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio {
 				room.SetCoHostAudioTrack(c.ID, localTrack)
 			}

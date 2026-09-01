@@ -1618,28 +1618,60 @@
           let videoElement = document.getElementById('mainVideo') || document.getElementById('remote-video');
 
           if (event.track.kind === 'video') {
-            if (videoElement) {
-              const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
-              if (videoElement.srcObject !== stream) {
-                videoElement.srcObject = stream;
-              }
-              videoElement.autoplay = true;
-              videoElement.playsInline = true;
-              videoElement.muted = true;
-              videoElement.setAttribute('playsinline', 'true');
-              videoElement.setAttribute('webkit-playsinline', 'true');
+            const mainVideo = document.getElementById('mainVideo');
+            const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+
+            // Route to main stage if empty, otherwise route to co-host grid card
+            if (mainVideo && (!mainVideo.srcObject || !mainVideo.srcObject.active || mainVideo.srcObject.getVideoTracks().length === 0)) {
+              mainVideo.srcObject = stream;
+              mainVideo.autoplay = true;
+              mainVideo.playsInline = true;
+              mainVideo.muted = true;
+              mainVideo.setAttribute('playsinline', 'true');
+              mainVideo.setAttribute('webkit-playsinline', 'true');
 
               event.track.onunmute = () => {
-                console.log('[Viewer] Video track onunmute fired, ensuring playback');
-                videoElement.play().catch(e => console.warn('onunmute play warning:', e));
+                mainVideo.play().catch(e => console.warn('mainVideo onunmute play error:', e));
               };
 
-              videoElement.play().then(() => {
-                console.log('[Viewer] Remote video playing!');
-                addLog('Live video stream rendering.', 'success');
+              mainVideo.play().then(() => {
+                addLog('Main stage video stream rendering.', 'success');
               }).catch(err => {
-                console.warn('[Viewer] Video play waiting for interaction/first frame:', err);
+                console.warn('[Viewer] Main video play waiting for first frame:', err);
               });
+            } else {
+              // Route to Co-Host split screen card
+              const cohostVideos = document.querySelectorAll('#cohost-grid video');
+              let targetVideo = null;
+              for (const v of cohostVideos) {
+                if (v.id !== 'localVideo' && (!v.srcObject || !v.srcObject.active || v.srcObject.getVideoTracks().length === 0)) {
+                  targetVideo = v;
+                  break;
+                }
+              }
+              if (!targetVideo) {
+                const tempId = 'cohost_' + Math.random().toString(36).substring(2, 6);
+                createCoHostCard(tempId);
+                targetVideo = document.getElementById(`video-cohost-${tempId}`);
+              }
+              if (targetVideo) {
+                targetVideo.srcObject = stream;
+                targetVideo.autoplay = true;
+                targetVideo.playsInline = true;
+                targetVideo.muted = true;
+                targetVideo.setAttribute('playsinline', 'true');
+                targetVideo.setAttribute('webkit-playsinline', 'true');
+
+                event.track.onunmute = () => {
+                  targetVideo.play().catch(e => console.warn('cohost video onunmute play error:', e));
+                };
+
+                targetVideo.play().then(() => {
+                  addLog('Co-Host split video rendering.', 'success');
+                }).catch(err => {
+                  console.warn('[Viewer] Co-host video play error:', err);
+                });
+              }
             }
           } else if (event.track.kind === 'audio') {
             // Dedicated audio sink element for reliable audio output
@@ -1822,38 +1854,16 @@
           };
         }
 
-        // Check existing senders before adding tracks to prevent "A sender already exists" error
+        // Check existing senders before adding tracks to prevent duplicate senders
         const senders = peerConnection.getSenders();
         for (const track of localStream.getTracks()) {
           const existingSender = senders.find(s => s.track && s.track.kind === track.kind);
           if (existingSender) {
             console.log('[Co-Host Seamless] Replacing existing sender track for kind:', track.kind);
             await existingSender.replaceTrack(track).catch(err => console.warn('replaceTrack warning:', err));
-            if (track.kind === 'video') {
-              try {
-                const params = existingSender.getParameters();
-                if (!params.encodings || params.encodings.length === 0) {
-                  params.encodings = [{ maxBitrate: 400000 }];
-                } else {
-                  params.encodings[0].maxBitrate = 400000;
-                }
-                await existingSender.setParameters(params);
-              } catch (_) {}
-            }
           } else {
             console.log('[Co-Host Seamless] Adding new track to PeerConnection:', track.kind, track.id);
-            if (track.kind === 'video') {
-              const videoTransceiver = peerConnection.addTransceiver(track, {
-                direction: 'sendonly',
-                streams: [localStream],
-                sendEncodings: [
-                  { maxBitrate: 400000 } // Explicitly cap co-host video bitrate to 400kbps to prevent stuttering/network choking
-                ]
-              });
-              forceVP8Codec(videoTransceiver);
-            } else {
-              peerConnection.addTrack(track, localStream);
-            }
+            peerConnection.addTrack(track, localStream);
           }
         }
 
