@@ -1648,29 +1648,25 @@
           if (event.track.kind === 'video') {
             if (videoElement) {
               const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
-              videoElement.srcObject = stream;
+              if (videoElement.srcObject !== stream) {
+                videoElement.srcObject = stream;
+              }
               videoElement.autoplay = true;
               videoElement.playsInline = true;
+              videoElement.muted = true;
               videoElement.setAttribute('playsinline', 'true');
               videoElement.setAttribute('webkit-playsinline', 'true');
 
               event.track.onunmute = () => {
-                console.log('[Viewer] Video track onunmute fired, triggering play()');
-                videoElement.play().catch(e => console.warn('play error:', e));
+                console.log('[Viewer] Video track onunmute fired, ensuring playback');
+                videoElement.play().catch(e => console.warn('onunmute play warning:', e));
               };
 
-              // Try unmuted playback first; if browser blocks, fallback to muted + unmute button
               videoElement.play().then(() => {
                 console.log('[Viewer] Remote video playing!');
-                addLog('Live video playing with sound.', 'success');
-                hideUnmuteBanner();
-              }).catch(() => {
-                console.log('[Viewer] Autoplay unmuted blocked by browser policy, starting muted with Unmute button');
-                videoElement.muted = true;
-                videoElement.play().then(() => {
-                  addLog('Live video playing (Click Sound to listen).', 'success');
-                  showUnmuteBanner();
-                }).catch(e => console.error('Play retry error:', e));
+                addLog('Live video stream rendering.', 'success');
+              }).catch(err => {
+                console.warn('[Viewer] Video play waiting for interaction/first frame:', err);
               });
             }
           } else if (event.track.kind === 'audio') {
